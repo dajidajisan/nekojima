@@ -13,7 +13,7 @@ nekojima/
 ├── package.json                     ← 関数が使うライブラリ（Supabase用）
 ├── supabase-schema.sql              ← Supabaseで1回だけ実行するSQL
 └── netlify/functions/
-    ├── generate-sentence.js         ← AIによる例文生成（Anthropic APIを中継）
+    ├── generate-sentence.js         ← AIによる例文生成（Google Gemini APIを中継）
     ├── save-data.js                 ← セーブデータの保存
     └── load-data.js                 ← セーブデータの読み込み
 ```
@@ -29,10 +29,13 @@ nekojima/
    - **Project URL**（例: `https://xxxxx.supabase.co`）
    - **service_role キー**（`anon` キーではなく、必ず `service_role` の方です。これはサーバー側だけで使う秘密の鍵なので、絶対にフロント側のコードには書かないでください）
 
-### 2. Anthropic APIキーを用意する
+### 2. Google Gemini APIキーを無料で発行する
 
-1. https://console.anthropic.com でAPIキーを発行します（従量課金です。単語との初対面ごとに1回、短い生成が走ります）。
-2. このキーも後でNetlifyの環境変数として設定します。
+1. https://aistudio.google.com/apikey を開き、お持ちのGoogleアカウントでログインします
+2. 「Create API key」のようなボタンを押します
+3. 表示されたキー（`AIza` から始まる文字列）をコピーしてメモしておきます
+
+**クレジットカードの登録は不要です。** Googleの無料枠（1日あたり数百〜1000回程度のリクエストまで無料）の範囲で、今回の「新しい単語に出会ったときだけ生成する」という使い方には十分すぎるほどです。
 
 ### 3. GitHubにアップロードする
 
@@ -57,7 +60,7 @@ git push -u origin main
 
    | Key | Value |
    |---|---|
-   | `ANTHROPIC_API_KEY` | Anthropicで発行したAPIキー |
+   | `GEMINI_API_KEY` | Google AI Studioで発行したAPIキー |
    | `SUPABASE_URL` | SupabaseのProject URL |
    | `SUPABASE_SERVICE_KEY` | Supabaseの service_role キー |
 
@@ -73,7 +76,7 @@ git push -u origin main
 
 - **Netlify**: 無料枠で十分動きます（個人利用の範囲なら）。
 - **Supabase**: 無料枠（500MBまで）で十分足ります。
-- **Anthropic API**: 従量課金です。単語1つと初めて出会うたびに軽いAPI呼び出しが1回走ります（既に生成済みの単語はキャッシュされるので、2回目以降は課金されません）。心配な場合は、Anthropic Console側で使用量の上限（spending limit）を設定しておくことをおすすめします。
+- **Google Gemini API**: 無料枠の範囲で運用できます。クレジットカード登録も不要です。すでに生成済みの単語はキャッシュされるので、同じ単語で何度もAPIが呼ばれることはありません。
 
 ## セーブデータの仕組み
 
