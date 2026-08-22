@@ -3239,11 +3239,19 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  // movement
+  // movement — joystick input is camera-relative: pushing "up" always
+  // means "move away from the camera" no matter which way the character
+  // is currently facing (this is what makes stick controls feel normal;
+  // treating screen-up as a fixed world direction, as before, meant the
+  // meaning of "up" silently rotated along with the character and felt
+  // backwards/disorienting).
   const mag = Math.hypot(joyVec.x, joyVec.y);
   if(mag > 0.08 && !quizOpen){
-    const moveX = joyVec.x, moveZ = joyVec.y;
-    const targetAngle = Math.atan2(moveX, moveZ);
+    const localRight = joyVec.x;
+    const localForward = -joyVec.y; // screen-up (negative dy) = forward
+    const worldDX = localForward*Math.sin(playerFacing) + localRight*Math.cos(playerFacing);
+    const worldDZ = localForward*Math.cos(playerFacing) - localRight*Math.sin(playerFacing);
+    const targetAngle = Math.atan2(worldDX, worldDZ);
     let diff = targetAngle - playerFacing;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     playerFacing += diff * Math.min(1, dt*8);
