@@ -2288,13 +2288,13 @@ function checkDailyRollover(){
 
 function recordDailyProgress(){
   checkDailyRollover();
-  if(dailyCount < DAILY_GOAL) dailyCount++;
+  dailyCount++;
   if(dailyCount === DAILY_GOAL){
     if(lastGoalDate === yesterdayStr()) streak++;
     else if(lastGoalDate !== todayStr()) streak = 1;
     lastGoalDate = todayStr();
     addCoins(10);
-    showToast(`🎉 今日のノルマ達成！（${streak}日れんぞく）ボーナス +10🪙`);
+    showToast(`🎉 今日の目標（15問）は達成したよ！（${streak}日れんぞく）でも… Keep going! 🐾 ボーナス +10🪙`);
   }
   updateDailyHUD();
   saveProgress();
@@ -2303,7 +2303,7 @@ function recordDailyProgress(){
 function updateDailyHUD(){
   checkDailyRollover();
   const dEl = document.getElementById('dailyCount');
-  if(dEl) dEl.textContent = Math.min(dailyCount, DAILY_GOAL);
+  if(dEl) dEl.textContent = dailyCount >= DAILY_GOAL ? `${DAILY_GOAL}+ ✓` : dailyCount;
   const sEl = document.getElementById('streakCount');
   if(sEl) sEl.textContent = streak;
 }
@@ -2317,6 +2317,7 @@ function recordMistake(en){
   mistakeCounts[en] = (mistakeCounts[en]||0) + 1;
   saveProgress();
   refreshMistakeBadge();
+  scheduleSRSReview(en);
 }
 function recordMistakeResolved(en){
   if(mistakeCounts[en]){
@@ -2324,6 +2325,7 @@ function recordMistakeResolved(en){
     saveProgress();
     refreshMistakeBadge();
   }
+  advanceSRSReview(en);
 }
 function refreshMistakeBadge(){
   const n = Object.keys(mistakeCounts).length;
@@ -2331,6 +2333,44 @@ function refreshMistakeBadge(){
   if(!badge) return;
   if(n>0){ badge.textContent = n; badge.style.display='flex'; }
   else{ badge.style.display='none'; }
+}
+
+/* =========================================================
+   SPACED REPETITION for missed words — expanding intervals
+   (measured in "questions answered", not days, so it works within
+   normal play regardless of session length). Research on the spacing
+   effect favors a real gap before the first re-test (immediate massed
+   repetition helps less) and growing intervals thereafter (~2.5x each
+   step, similar to SM-2/Leitner-style schedulers); a wrong answer at
+   any point resets back to the shortest interval.
+========================================================= */
+const SRS_INTERVALS = [12, 30, 75]; // "due again after N more questions answered"
+let totalAnswered = 0;
+let srsSchedule = {}; // en -> { stage, dueAt }
+
+function scheduleSRSReview(en){
+  srsSchedule[en] = { stage: 0, dueAt: totalAnswered + SRS_INTERVALS[0] };
+  saveProgress();
+}
+function advanceSRSReview(en){
+  const existing = srsSchedule[en];
+  if(!existing) return; // this word wasn't under active spaced review
+  const nextStage = existing.stage + 1;
+  if(nextStage >= SRS_INTERVALS.length){
+    delete srsSchedule[en]; // graduated — reinforced enough times to drop it
+  } else {
+    srsSchedule[en] = { stage: nextStage, dueAt: totalAnswered + SRS_INTERVALS[nextStage] };
+  }
+  saveProgress();
+}
+function getDueSRSItem(){
+  for(const en in srsSchedule){
+    if(srsSchedule[en].dueAt <= totalAnswered){
+      const v = VOCAB.find(x=>x.en===en);
+      if(v) return v;
+    }
+  }
+  return null;
 }
 
 async function saveProgress(){
@@ -2341,6 +2381,7 @@ async function saveProgress(){
       coins,
       ownedCats: Array.from(ownedCats),
       dailyCount, lastPlayDate, lastGoalDate, streak,
+      totalAnswered, srsSchedule,
     }), false);
   } catch(e){ /* storage unavailable */ }
 }
@@ -2358,6 +2399,8 @@ async function loadProgress(){
       lastPlayDate = data.lastPlayDate || null;
       lastGoalDate = data.lastGoalDate || null;
       streak = data.streak || 0;
+      totalAnswered = data.totalAnswered || 0;
+      srsSchedule = data.srsSchedule || {};
       wordCountEl.textContent = masteredWords.size;
       rebuildJarOrbs();
       refreshMistakeBadge();
@@ -3239,7 +3282,66 @@ function updateJoy(e){
 /* =========================================================
    GAME LOOP
 ========================================================= */
+/* =========================================================
+   SOUND EFFECTS (procedural, via Web Audio API — no asset files needed)
+========================================================= */
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return null;
+    audioCtx = new Ctx();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+// unlock audio on the very first touch (mobile browsers block audio until
+// a user gesture happens)
+canvas.addEventListener('pointerdown', ()=> getAudioCtx(), { once:true });
+
+function playTone(freq, duration, startTime, gain, type){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + (startTime||0);
+  g.gain.setValueAtTime(gain, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.02);
+}
+
+function playCorrectSound(){
+  playTone(523.25, 0.14, 0,    0.16, 'sine'); // C5
+  playTone(659.25, 0.14, 0.08, 0.16, 'sine'); // E5
+  playTone(783.99, 0.22, 0.16, 0.18, 'sine'); // G5
+}
+function playWrongSound(){
+  playTone(330, 0.16, 0,    0.11, 'sine');
+  playTone(233, 0.24, 0.09, 0.11, 'sine');
+}
+function playFootstepSound(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  const base = 300 + Math.random()*70;
+  osc.type = 'sine';
+  const t0 = ctx.currentTime;
+  osc.frequency.setValueAtTime(base, t0);
+  osc.frequency.exponentialRampToValueAtTime(base*0.55, t0+0.06);
+  g.gain.setValueAtTime(0.07, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0+0.08);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0+0.09);
+}
+
 const clock = new THREE.Clock();
+let footstepTimer = 0;
 let playerFacing = 0;
 const INTERACT_DIST = 2.6;
 let nearNPC = null;
@@ -3282,8 +3384,15 @@ function animate(){
     }
     player.rotation.y = playerFacing;
     player.position.y = Math.abs(Math.sin(t*9))*0.06;
+
+    footstepTimer += dt;
+    if(footstepTimer > 0.32){
+      footstepTimer = 0;
+      playFootstepSound();
+    }
   } else {
     player.position.y = Math.abs(Math.sin(t*2.4))*0.02;
+    footstepTimer = 0.32; // next step plays right away when movement resumes
   }
 
   // butterflies drifting in lazy loops
@@ -3679,11 +3788,20 @@ function openQuiz(npc){
   npcSub.textContent = `${npc.def.name}とおはなし中`;
 
   const remaining = npc.vocabList.filter(v => !masteredWords.has(v.en));
-  if(remaining.length === 0){
+  let queue = shuffle(remaining);
+
+  // a word that's due for spaced review can surface in any NPC's
+  // conversation, not just the one that originally taught it
+  const dueItem = getDueSRSItem();
+  if(dueItem && !queue.some(v=>v.en===dueItem.en)){
+    queue = [dueItem, ...queue];
+  }
+
+  if(queue.length === 0){
     showAllDone();
     return;
   }
-  activeQueue = shuffle(remaining);
+  activeQueue = queue;
   quizIndex = 0;
   loadQuestion();
 }
@@ -4096,6 +4214,7 @@ function renderBlankExercise(item){
 }
 
 function handleBlankAnswer(btn, correct, item){
+  totalAnswered++;
   const btns = document.querySelectorAll('#choices .choice-btn');
   btns.forEach(b=> b.classList.add('disabled'));
   const slot = document.getElementById('blankSlot');
@@ -4108,6 +4227,7 @@ function handleBlankAnswer(btn, correct, item){
     markMastered(item);
     recordDailyProgress();
     burstSparkles(btn);
+    playCorrectSound();
     speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     document.getElementById('feedbackSlot').innerHTML =
       `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>`;
@@ -4121,6 +4241,7 @@ function handleBlankAnswer(btn, correct, item){
     if(slot) slot.classList.add('filled-wrong');
     quizCard.classList.add('flash-bad');
     btns.forEach(b=>{ if(b.dataset.correct==='1') b.classList.add('correct'); });
+    playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
       `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span></div>`;
     recordMistake(item.en);
@@ -4185,6 +4306,7 @@ function renderOrderExercise(item){
   }
 
   function checkOrder(){
+    totalAnswered++;
     const answer = built.map(idx=>pool[idx]).join(' ');
     const correct = answer === item.sentence;
     const buildChips = buildLine.querySelectorAll('.build-chip');
@@ -4196,6 +4318,7 @@ function renderOrderExercise(item){
       markMastered(item);
       recordDailyProgress();
       burstSparkles(buildLine);
+      playCorrectSound();
       document.getElementById('feedbackSlot').innerHTML =
         `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>`;
       if(item.reaction){
@@ -4207,6 +4330,7 @@ function renderOrderExercise(item){
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
       quizCard.classList.add('flash-bad');
+      playWrongSound();
       document.getElementById('feedbackSlot').innerHTML =
         `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span></div>`;
       const ans = document.createElement('div');
@@ -4232,10 +4356,28 @@ function markMastered(item){
   saveProgress();
 }
 
+/* ---------- voice selection: use Samantha (US English) on Safari/iOS ---------- */
+let preferredVoice = null;
+function pickPreferredVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if(!voices.length) return null;
+  return voices.find(v => v.name === 'Samantha')
+      || voices.find(v => v.name.includes('Samantha'))
+      || voices.find(v => v.lang === 'en-US')
+      || voices[0];
+}
+if('speechSynthesis' in window){
+  preferredVoice = pickPreferredVoice();
+  window.speechSynthesis.onvoiceschanged = ()=>{ preferredVoice = pickPreferredVoice(); };
+}
+
 function speakEnglish(text){
   if(!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang='en-US'; u.rate=0.85;
+  if(!preferredVoice) preferredVoice = pickPreferredVoice();
+  if(preferredVoice) u.voice = preferredVoice;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
