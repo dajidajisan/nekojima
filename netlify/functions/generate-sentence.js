@@ -48,9 +48,13 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'prompt too long' }) };
   }
 
-  // gemini-2.5-flash was retired for new users; gemini-3.6-flash is
-  // Google's current free-tier Flash model as of August 2026.
-  const model = 'gemini-3.6-flash';
+  // Switched from gemini-3.6-flash to the Flash-Lite tier: Flash-Lite
+  // models have thinking OFF by default (vs. Flash's "medium" default),
+  // and are simply faster/cheaper — a good fit for a short, simple
+  // generation task like this one. Even with thinkingLevel forced low,
+  // gemini-3.6-flash was still taking 5-7s; Flash-Lite should cut that
+  // further since it skips the thinking step entirely.
+  const model = 'gemini-3.5-flash-lite';
 
   try {
     const { GoogleGenAI } = await import('@google/genai');
@@ -58,6 +62,10 @@ exports.handler = async (event) => {
     const result = await ai.models.generateContent({
       model,
       contents: prompt,
+      config: {
+        thinkingConfig: { thinkingLevel: 'low' },
+        maxOutputTokens: 350,
+      },
     });
 
     // the SDK's response shape has varied across versions — try the

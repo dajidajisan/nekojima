@@ -191,6 +191,18 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .close-x{position:absolute; top:16px; right:18px; background:none; border:none; font-size:26px; color:var(--plum-soft); cursor:pointer; padding:6px; line-height:1;}
 
 .npc-done-panel{display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 0;}
+.thinking-emoji{ animation:thinkBounce 1s ease-in-out infinite; }
+@keyframes thinkBounce{
+  0%,100%{ transform:translateY(0) rotate(-4deg); }
+  50%{ transform:translateY(-8px) rotate(4deg); }
+}
+.thinking-dots span{ display:inline-block; animation:thinkDot 1.4s ease-in-out infinite; }
+.thinking-dots span:nth-child(2){ animation-delay:.2s; }
+.thinking-dots span:nth-child(3){ animation-delay:.4s; }
+@keyframes thinkDot{
+  0%,60%,100%{ opacity:0.2; transform:translateY(0); }
+  30%{ opacity:1; transform:translateY(-3px); }
+}
 .npc-done-panel .emoji{font-size:44px;}
 .npc-done-panel p{margin:0; color:var(--plum-soft); font-size:13px; text-align:center; font-weight:700;}
 
@@ -3909,11 +3921,21 @@ async function loadQuestion(){
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
   nextBtn.onclick = ()=>{ quizIndex++; loadQuestion(); };
+
+  // quietly start generating the next couple of upcoming words in the
+  // background, so by the time the player gets there, the wait is gone
+  prefetchUpcoming();
 }
 let loadQuestionRequestId = 0;
 
+function prefetchUpcoming(){
+  const upcoming = activeQueue.slice(quizIndex+1, quizIndex+3);
+  upcoming.forEach(item => { generateAndCache(item); }); // fire and forget
+}
+
 /* ---------- generate example sentences on demand for imported words ---------- */
 let sentenceCache = {}; // en -> {sentence, sentenceJa, opener, openerJa, reaction, reactionJa}
+const pendingGenerations = new Map(); // en -> in-flight Promise, avoids duplicate requests
 
 async function loadSentenceCache(){
   try{
@@ -3943,20 +3965,47 @@ function fallbackContent(item){
   };
 }
 
-async function ensureExerciseContent(item){
-  if(item.sentence) return; // curated word, or already generated earlier this session
+// generates (or reuses a cached / in-flight) result for one word, with no
+// UI side effects — safe to call for background prefetching
+async function generateAndCache(item){
+  if(item.sentence) return;
   if(sentenceCache[item.en]){
     applyGeneratedContent(item, sentenceCache[item.en]);
     return;
   }
-  quizBody.innerHTML = `<div class="npc-done-panel"><div class="emoji">💭</div><p>ことばを考え中…</p></div>`;
+  if(pendingGenerations.has(item.en)){
+    await pendingGenerations.get(item.en);
+    return;
+  }
+  const p = (async ()=>{
+    const generated = await generateSentenceForWord(item);
+    const data = generated || fallbackContent(item);
+    applyGeneratedContent(item, data);
+    sentenceCache[item.en] = data;
+    saveSentenceCache();
+  })();
+  pendingGenerations.set(item.en, p);
+  try{ await p; }
+  finally{ pendingGenerations.delete(item.en); }
+}
+
+const THINKING_MESSAGES = ['ことばを考え中', 'もうすこしまってね', 'いい文章をさがし中'];
+
+async function ensureExerciseContent(item){
+  if(item.sentence) return; // curated word, or already generated/prefetched
+  if(sentenceCache[item.en]){
+    applyGeneratedContent(item, sentenceCache[item.en]);
+    return;
+  }
+
+  const msg = THINKING_MESSAGES[Math.floor(Math.random()*THINKING_MESSAGES.length)];
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">💭</div>
+    <p>${msg}<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
   nextBtn.classList.remove('show');
 
-  const generated = await generateSentenceForWord(item);
-  const data = generated || fallbackContent(item);
-  applyGeneratedContent(item, data);
-  sentenceCache[item.en] = data;
-  saveSentenceCache();
+  await generateAndCache(item);
 }
 
 async function generateSentenceForWord(item){
