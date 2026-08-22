@@ -3241,16 +3241,20 @@ function animate(){
 
   // movement — joystick input is camera-relative: pushing "up" always
   // means "move away from the camera" no matter which way the character
-  // is currently facing (this is what makes stick controls feel normal;
-  // treating screen-up as a fixed world direction, as before, meant the
-  // meaning of "up" silently rotated along with the character and felt
-  // backwards/disorienting).
+  // is currently facing. The reference angle for this MUST come from the
+  // camera's actual current (still-lagging) orientation, not playerFacing
+  // itself — using playerFacing both as the reference frame and as the
+  // thing being steered toward a playerFacing-derived target created a
+  // same-frame feedback loop (target always led facing by a fixed offset,
+  // so facing chased a target that kept moving with it — runaway spin on
+  // any non-perfectly-vertical stick input).
   const mag = Math.hypot(joyVec.x, joyVec.y);
   if(mag > 0.08 && !quizOpen){
+    const camYaw = Math.atan2(player.position.x - camera.position.x, player.position.z - camera.position.z);
     const localRight = joyVec.x;
     const localForward = -joyVec.y; // screen-up (negative dy) = forward
-    const worldDX = localForward*Math.sin(playerFacing) + localRight*Math.cos(playerFacing);
-    const worldDZ = localForward*Math.cos(playerFacing) - localRight*Math.sin(playerFacing);
+    const worldDX = localForward*Math.sin(camYaw) + localRight*Math.cos(camYaw);
+    const worldDZ = localForward*Math.cos(camYaw) - localRight*Math.sin(camYaw);
     const targetAngle = Math.atan2(worldDX, worldDZ);
     let diff = targetAngle - playerFacing;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
