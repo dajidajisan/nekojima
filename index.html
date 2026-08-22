@@ -3179,6 +3179,7 @@ let joyVec = {x:0,y:0};
 let joyActive = false;
 let joyPointerId = null;
 let joyOriginX = 0, joyOriginY = 0;
+let joyReferenceYaw = 0; // captured once per touch — see movement code for why
 
 function joyReset(){
   joyVec = {x:0,y:0};
@@ -3198,6 +3199,7 @@ canvas.addEventListener('pointerdown', e=>{
   joyPointerId = e.pointerId;
   joyOriginX = e.clientX;
   joyOriginY = e.clientY;
+  joyReferenceYaw = playerFacing; // lock in "forward" for this whole touch
   joyBase.style.left = joyOriginX + 'px';
   joyBase.style.top = joyOriginY + 'px';
   joyBase.classList.add('show');
@@ -3239,27 +3241,25 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  // movement — joystick input is camera-relative: pushing "up" always
-  // means "move away from the camera" no matter which way the character
-  // is currently facing. The reference angle for this MUST come from the
-  // camera's actual current (still-lagging) orientation, not playerFacing
-  // itself — using playerFacing both as the reference frame and as the
-  // thing being steered toward a playerFacing-derived target created a
-  // same-frame feedback loop (target always led facing by a fixed offset,
-  // so facing chased a target that kept moving with it — runaway spin on
-  // any non-perfectly-vertical stick input).
+  // movement — joystick input is interpreted relative to joyReferenceYaw,
+  // which is captured once when the touch begins (see pointerdown above)
+  // and held fixed for the whole drag. Using anything that updates every
+  // frame (playerFacing, or even the camera's lagging orientation) as the
+  // reference creates a feedback loop: the target angle keeps leading
+  // whatever it's derived from, so facing chases a target that keeps
+  // moving with it — runaway spin on any non-perfectly-vertical stick
+  // input. A per-touch-constant reference has no such loop.
   const mag = Math.hypot(joyVec.x, joyVec.y);
   if(mag > 0.08 && !quizOpen){
-    const camYaw = Math.atan2(player.position.x - camera.position.x, player.position.z - camera.position.z);
     const localRight = joyVec.x;
     const localForward = -joyVec.y; // screen-up (negative dy) = forward
-    const worldDX = localForward*Math.sin(camYaw) + localRight*Math.cos(camYaw);
-    const worldDZ = localForward*Math.cos(camYaw) - localRight*Math.sin(camYaw);
+    const worldDX = localForward*Math.sin(joyReferenceYaw) + localRight*Math.cos(joyReferenceYaw);
+    const worldDZ = localForward*Math.cos(joyReferenceYaw) - localRight*Math.sin(joyReferenceYaw);
     const targetAngle = Math.atan2(worldDX, worldDZ);
     let diff = targetAngle - playerFacing;
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
     playerFacing += diff * Math.min(1, dt*8);
-    const speed = 4.4 * Math.min(mag,1);
+    const speed = 2.8 * Math.min(mag,1);
     player.position.x += Math.sin(playerFacing) * speed * dt;
     player.position.z += Math.cos(playerFacing) * speed * dt;
     // clamp to ground circle
