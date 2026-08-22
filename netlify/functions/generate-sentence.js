@@ -1,11 +1,23 @@
 // POST /.netlify/functions/generate-sentence
 // body: { prompt: string }
 // Forwards the prompt to the Google Gemini API (free tier — no credit card
-// required, generous daily quota) using GEMINI_API_KEY, set as a Netlify
-// environment variable (never shipped to the browser). The response is
-// normalized into the same shape the frontend already expects
-// ({ content: [{ text }] }), so no frontend changes are needed even though
-// Gemini's raw response format differs from Anthropic's.
+// required) using GEMINI_API_KEY, set as a Netlify environment variable
+// (never shipped to the browser).
+//
+// IMPORTANT: this uses the official @google/genai SDK rather than a raw
+// fetch() to the REST endpoint. Google has been rolling out a newer
+// "Auth key" format (keys prefixed "AQ." instead of "AIza") since mid-2026,
+// and as of this writing, many accounts that only get AQ.-format keys see
+// every raw REST call to /v1beta/models/*:generateContent rejected with a
+// 401 ACCESS_TOKEN_TYPE_UNSUPPORTED error — regardless of whether the key is
+// sent via ?key= or the x-goog-api-key header. The official SDK handles
+// this key format correctly, so it's the reliable choice here even though
+// it pulls in a dependency.
+//
+// The response is normalized into the same shape the frontend already
+// expects ({ content: [{ text }] }), so no frontend changes are needed.
+
+const { GoogleGenAI } = require('@google/genai');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -29,39 +41,29 @@ exports.handler = async (event) => {
   if (!prompt || typeof prompt !== 'string') {
     return { statusCode: 400, body: JSON.stringify({ error: 'prompt (string) is required' }) };
   }
-  // simple guardrail so a runaway client can't send a huge prompt
   if (prompt.length > 4000) {
     return { statusCode: 400, body: JSON.stringify({ error: 'prompt too long' }) };
   }
 
-  // gemini-2.5-flash is on Google's free tier as of 2026. If Google changes
-  // free-tier model availability later, swap this string for whichever
-  // Flash-class model is current — the free tier consistently favors
-  // Flash/Flash-Lite models over Pro-class ones.
+  // gemini-2.5-flash is Google's current free-tier Flash model, and the
+  // model shown in @google/genai's own official usage example.
   const model = 'gemini-2.5-flash';
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      }
-    );
+    const ai = new GoogleGenAI({ apiKey });
+    const result = await ai.models.generateContent({
+      model,
+      contents: prompt,
+    });
 
-    const data = await geminiRes.json();
-
-    if (!geminiRes.ok) {
-      return {
-        statusCode: geminiRes.status,
-        body: JSON.stringify({ error: data.error || 'Gemini API error' }),
-      };
-    }
-
-    const text = (data.candidates?.[0]?.content?.parts || [])
-      .map((p) => p.text || '')
-      .join('');
+    // the SDK's response shape has varied across versions — try the
+    // documented shortcuts first, then fall back to walking the raw
+    // candidates array so this doesn't silently break on a minor SDK bump
+    const text =
+      result.text ||
+      result.response?.text?.() ||
+      (result.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('') ||
+      '';
 
     return {
       statusCode: 200,

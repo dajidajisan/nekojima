@@ -2367,7 +2367,7 @@ sun.position.set(10, 16, 8);
 scene.add(sun);
 
 /* ---------- day / night ---------- */
-const DAY = { bg:0xCFEFFF, fog:0xE7F3FF, fogNear:26, fogFar:60, ambient:0xffffff, ambientI:0.85, sun:0xfff3e0, sunI:0.9 };
+const DAY = { bg:0xCFEFFF, fog:0xE7F3FF, fogNear:26, fogFar:60, ambient:0xffffff, ambientI:0.72, sun:0xfff3e0, sunI:0.78 };
 const NIGHT = { bg:0x232152, fog:0x2E2C63, fogNear:18, fogFar:52, ambient:0x8890D0, ambientI:0.42, sun:0xAFC1FF, sunI:0.35 };
 let isNight = false;
 
@@ -2437,7 +2437,7 @@ isNight = (localHour >= 18 || localHour < 6);
 const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
-    theme:{ groundDay:0xBFEFDD, groundNight:0x445A78, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
+    theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
     npcPos:{ neko:[-9,-5], kuma:[8,4], owl:[2,-11], usa:[-13,-2], neko2:[11,3] },
     landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4] },
   },
@@ -2497,7 +2497,7 @@ function travelToIsland(id){
   player.position.set(0,0,4);
   playerFacing = 0;
   player.rotation.y = 0;
-  camera.position.set(0,4.6,4-6.2);
+  camera.position.set(0,2.6,4-6.8);
   camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
 
   applyDayNight();
@@ -3096,7 +3096,7 @@ scene.add(player);
 // place the camera correctly right away, so the very first rendered
 // frame already shows the third-person view (frame 1's delta-time is 0,
 // so the lerp inside the game loop would not move the camera on its own)
-camera.position.set(0, 4.6, 4 - 6.2);
+camera.position.set(0, 2.6, 4 - 6.8);
 camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
 
 /* ---------- npcs ---------- */
@@ -3281,9 +3281,9 @@ function animate(){
 
   // camera follow (third person, behind player)
   const camOffset = new THREE.Vector3(
-    Math.sin(playerFacing) * -6.2,
-    4.6,
-    Math.cos(playerFacing) * -6.2
+    Math.sin(playerFacing) * -6.8,
+    2.6,
+    Math.cos(playerFacing) * -6.8
   );
   const desiredCamPos = player.position.clone().add(camOffset);
   camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
