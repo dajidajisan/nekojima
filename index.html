@@ -3328,16 +3328,17 @@ function playFootstepSound(){
   if(!ctx) return;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
-  const base = 300 + Math.random()*70;
+  const base = 520 + Math.random()*90;
   osc.type = 'sine';
   const t0 = ctx.currentTime;
   osc.frequency.setValueAtTime(base, t0);
-  osc.frequency.exponentialRampToValueAtTime(base*0.55, t0+0.06);
-  g.gain.setValueAtTime(0.07, t0);
-  g.gain.exponentialRampToValueAtTime(0.001, t0+0.08);
+  osc.frequency.exponentialRampToValueAtTime(base*0.5, t0+0.07);
+  g.gain.setValueAtTime(0.001, t0);
+  g.gain.exponentialRampToValueAtTime(0.22, t0+0.008); // quick percussive attack
+  g.gain.exponentialRampToValueAtTime(0.001, t0+0.11);
   osc.connect(g).connect(ctx.destination);
   osc.start(t0);
-  osc.stop(t0+0.09);
+  osc.stop(t0+0.12);
 }
 
 const clock = new THREE.Clock();
