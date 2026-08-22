@@ -48,9 +48,9 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'prompt too long' }) };
   }
 
-  // gemini-2.5-flash is Google's current free-tier Flash model, and the
-  // model shown in @google/genai's own official usage example.
-  const model = 'gemini-2.5-flash';
+  // gemini-2.5-flash was retired for new users; gemini-3.6-flash is
+  // Google's current free-tier Flash model as of August 2026.
+  const model = 'gemini-3.6-flash';
 
   try {
     const { GoogleGenAI } = await import('@google/genai');
