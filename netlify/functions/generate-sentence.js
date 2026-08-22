@@ -17,7 +17,10 @@
 // The response is normalized into the same shape the frontend already
 // expects ({ content: [{ text }] }), so no frontend changes are needed.
 
-const { GoogleGenAI } = require('@google/genai');
+// dynamic import instead of require(): @google/genai may ship as an ES
+// module, and require()'ing an ESM-only package inside a CommonJS Netlify
+// Function can throw at load time even when the package itself is fine.
+// Dynamic import() works regardless of which module format the package uses.
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -50,6 +53,7 @@ exports.handler = async (event) => {
   const model = 'gemini-2.5-flash';
 
   try {
+    const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey });
     const result = await ai.models.generateContent({
       model,
@@ -71,6 +75,8 @@ exports.handler = async (event) => {
       body: JSON.stringify({ content: [{ text }] }),
     };
   } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+    // log full detail server-side (visible in Netlify's function logs)
+    console.error('generate-sentence error:', e);
+    return { statusCode: 500, body: JSON.stringify({ error: e.message, stack: e.stack }) };
   }
 };

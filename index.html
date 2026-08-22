@@ -622,7 +622,12 @@ async function callClaudeProxy(prompt){
     headers:{ 'Content-Type':'application/json' },
     body: JSON.stringify({ prompt }),
   });
-  if(!res.ok) throw new Error('proxy request failed');
+  if(!res.ok){
+    let detail = '';
+    try{ detail = await res.text(); } catch(e){}
+    console.error('generate-sentence backend error:', res.status, detail);
+    throw new Error('proxy request failed: ' + res.status);
+  }
   return res.json();
 }
 
