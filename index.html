@@ -3372,8 +3372,21 @@ function playCorrectSound(){
   playTone(783.99, 0.22, 0.16, 0.18, 'sine'); // G5
 }
 function playWrongSound(){
-  playTone(330, 0.16, 0,    0.11, 'sine');
-  playTone(233, 0.24, 0.09, 0.11, 'sine');
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'square';
+  const t0 = ctx.currentTime;
+  osc.frequency.setValueAtTime(300, t0);
+  osc.frequency.exponentialRampToValueAtTime(120, t0 + 0.35); // classic descending "wah-wah"
+  g.gain.setValueAtTime(0.14, t0);
+  g.gain.setValueAtTime(0.14, t0 + 0.3);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.42);
+  updateAudioDebug('state=' + ctx.state);
 }
 function playFootstepSound(){
   const ctx = getAudioCtx();

@@ -55,7 +55,9 @@ module.exports = async (req, res) => {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        // llama-3.3-70b-versatile was deprecated by Groq on 2026-08-16;
+        // openai/gpt-oss-120b is Groq's official recommended replacement.
+        model: 'openai/gpt-oss-120b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 350,
         temperature: 0.8,
@@ -65,6 +67,7 @@ module.exports = async (req, res) => {
     const data = await groqRes.json();
 
     if (!groqRes.ok) {
+      console.error('generate-sentence: Groq returned non-OK status', groqRes.status, JSON.stringify(data));
       res.status(groqRes.status).json({ error: data.error || 'Groq API error' });
       return;
     }
