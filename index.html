@@ -4052,6 +4052,18 @@ async function requestAIExercise(){
 // Generates a brand-new example sentence for a word the learner has already
 // mastered from this NPC, so the practice keeps adapting instead of repeating
 // the same fixed sentence forever. Uses the in-artifact Claude API call.
+function extractJSON(text){
+  const clean = text.replace(/```json|```/g,'').trim();
+  try{ return JSON.parse(clean); } catch(e){}
+  // fall back to grabbing the first {...} block, in case the model added
+  // any explanatory text around the JSON despite being asked not to
+  const match = clean.match(/\{[\s\S]*\}/);
+  if(match){
+    try{ return JSON.parse(match[0]); } catch(e){}
+  }
+  return null;
+}
+
 async function generateAIExercise(npc){
   const masteredInCat = npc.vocabList.filter(v=>masteredWords.has(v.en));
   if(masteredInCat.length===0) return null;
@@ -4083,9 +4095,8 @@ async function generateAIExercise(npc){
   try{
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
-    const clean = text.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    if(!parsed.sentence || !parsed.sentenceJa) return null;
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.sentence || !parsed.sentenceJa) return null;
     return {
       en: target.en, ja: target.ja, cat: target.cat,
       opener: parsed.opener || '', openerJa: parsed.openerJa || '',
@@ -4226,9 +4237,8 @@ async function generateSentenceForWord(item){
   try{
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
-    const clean = text.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    if(!parsed.sentence || !parsed.sentenceJa) return null;
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.sentence || !parsed.sentenceJa) return null;
     return parsed;
   } catch(e){
     return null;

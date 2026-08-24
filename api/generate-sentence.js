@@ -61,6 +61,10 @@ module.exports = async (req, res) => {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 350,
         temperature: 0.8,
+        // force valid JSON output instead of relying on the model to
+        // follow "reply with JSON only" as a plain instruction, which
+        // open-weight models follow less reliably than Claude/GPT does
+        response_format: { type: 'json_object' },
       }),
     });
 
@@ -74,6 +78,8 @@ module.exports = async (req, res) => {
 
     const text =
       (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+
+    console.log('generate-sentence: raw model output:', text);
 
     res.status(200).json({ content: [{ text }] });
   } catch (e) {
