@@ -3117,14 +3117,17 @@ function makeCharacter({ bodyColor, earColor, earType }){
     nose.rotation.x = Math.PI/2;
     nose.position.set(0, 1.24, 0.8);
     g.add(nose);
-    // whiskers — rotation.z must flip sign with `side` so the left and
-    // right sets actually mirror outward instead of both pointing the
-    // same way (a plain Y-aligned cylinder rotated by ~90° both times,
-    // regardless of side, previously sent both sets in the same direction)
+    // whiskers — the cylinder geometry is shifted so its pivot sits at
+    // one end rather than its center; without that shift, rotating it
+    // just spins a line that's symmetric through the attach point either
+    // way, so left/right always looked the same regardless of rotation
+    // sign. Now rotation.z genuinely controls which way it extends.
+    const whiskerGeo = new THREE.CylinderGeometry(0.008,0.008,0.4,4);
+    whiskerGeo.translate(0, 0.2, 0);
     [-1,1].forEach(side=>{
       for(let i=0;i<3;i++){
         const whisker = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.008,0.008,0.4,4),
+          whiskerGeo,
           new THREE.MeshBasicMaterial({color:0xFFFFFF})
         );
         whisker.rotation.z = -side*Math.PI/2 + (i-1)*0.18;
@@ -3227,7 +3230,7 @@ function spawnNPC(def){
   const npTex = new THREE.CanvasTexture(npCanvas);
   const nameplate = new THREE.Sprite(new THREE.SpriteMaterial({ map:npTex, transparent:true }));
   nameplate.scale.set(1.1, 0.36, 1);
-  nameplate.position.set(0, 2.05, 0);
+  nameplate.position.set(0, 2.5, 0);
   mesh.add(nameplate);
 
   // floating "!" marker
@@ -3241,7 +3244,7 @@ function spawnNPC(def){
   const tex = new THREE.CanvasTexture(markerCanvas);
   const marker = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true }));
   marker.scale.set(0.55,0.55,1);
-  marker.position.set(0,2.65,0);
+  marker.position.set(0,3.05,0);
   mesh.add(marker);
 
   const vocabList = VOCAB.filter(v => def.cats.includes(v.cat));
@@ -3284,6 +3287,7 @@ async function loadCustomNPCs(){
 const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 let moveTarget = null; // {x,z} in world space, or null when not walking
+let wasNearSomething = false; // tracks entering/leaving interact range, see proximity check below
 
 function isTouchOnUI(target){
   // don't hijack touches that land on real UI controls (buttons, overlays, etc.)
@@ -3518,7 +3522,7 @@ function animate(){
   let closest = null, closestDist = Infinity, closestKind = null;
   npcs.forEach(n=>{
     n.mesh.position.y = Math.abs(Math.sin(t*1.8 + n.def.pos[0]))*0.05;
-    n.marker.position.y = 2.65 + Math.sin(t*3 + n.def.pos[0])*0.08;
+    n.marker.position.y = 3.05 + Math.sin(t*3 + n.def.pos[0])*0.08;
     n.marker.visible = !allMastered(n);
     const dist = player.position.distanceTo(n.mesh.position);
     if(dist < closestDist){ closestDist = dist; closest = n; closestKind = 'npc'; }
@@ -3535,11 +3539,13 @@ function animate(){
     nearLandmark = closestKind === 'landmark' ? closest : null;
     interactBtn.textContent = closestKind === 'npc' ? '💬 はなしかける' : closest.label;
     interactBtn.classList.add('show');
-    moveTarget = null; // stop walking once close enough to talk — don't barrel past
+    if(!wasNearSomething) moveTarget = null; // stop only on first entering range, not every frame
+    wasNearSomething = true;
   } else {
     nearNPC = null;
     nearLandmark = null;
     interactBtn.classList.remove('show');
+    wasNearSomething = false;
   }
 
   // camera follow (third person, behind player)
@@ -4182,7 +4188,12 @@ async function loadQuestion(){
   await ensureExerciseContent(item);
   if(myRequestId !== loadQuestionRequestId) return; // a newer question started while we were waiting
 
-  const mode = quizIndex % 2 === 0 ? 'blank' : 'order';
+  // the word-order exercise gets frustratingly hard once a sentence has
+  // too many tokens to juggle — fall back to the (always-manageable)
+  // blank-fill exercise for longer sentences instead
+  const tokenCount = (item.sentence || '').split(' ').length;
+  const preferOrder = quizIndex % 2 !== 0 && tokenCount <= 6;
+  const mode = preferOrder ? 'order' : 'blank';
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
   nextBtn.onclick = ()=>{ quizIndex++; loadQuestion(); };
