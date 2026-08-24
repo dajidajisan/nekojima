@@ -3295,9 +3295,11 @@ function getAudioCtx(){
   if(audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-// unlock audio on the very first touch (mobile browsers block audio until
-// a user gesture happens)
-canvas.addEventListener('pointerdown', ()=> getAudioCtx(), { once:true });
+// unlock audio on the very first touch anywhere on the page (mobile
+// browsers block audio until a genuine user gesture happens; the canvas
+// alone isn't enough since a player might tap a UI button — like the
+// interact button or a quiz answer — before ever touching the 3D view)
+document.addEventListener('pointerdown', ()=> getAudioCtx(), { once:true, capture:true });
 
 function playTone(freq, duration, startTime, gain, type){
   const ctx = getAudioCtx();
