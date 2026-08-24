@@ -10,10 +10,10 @@
 nekojima/
 ├── index.html                       ← ゲーム本体（そのまま配信されます）
 ├── vercel.json                      ← Vercelの設定
-├── package.json                     ← 関数が使うライブラリ（Supabase・Gemini SDK）
+├── package.json                     ← 関数が使うライブラリ（Supabase用）
 ├── supabase-schema.sql              ← Supabaseで1回だけ実行するSQL
 └── api/
-    ├── generate-sentence.js         ← AIによる例文生成（Google Gemini APIを中継）
+    ├── generate-sentence.js         ← AIによる例文生成（Groq APIを中継）
     ├── save-data.js                 ← セーブデータの保存
     └── load-data.js                 ← セーブデータの読み込み
 ```
@@ -22,7 +22,7 @@ nekojima/
 
 Netlifyの無料プランは2025〜2026年の料金体系変更で「月300クレジット、デプロイ1回15クレジット」という仕組みになり、月に約20回デプロイすると無料枠を使い切って止まってしまいます。開発中に何度も直しては公開し直す、という使い方と相性が悪いため、Vercelに切り替えました。VercelのHobby（無料）プランはデプロイ回数の制限が緩やかで、今回のような使い方に向いています。
 
-Supabase（データベース）とGoogle Gemini（AI）はそのまま使えるので、作り直したのはNetlify部分（`/api`フォルダとその中身）だけです。
+Supabase（データベース）とGroq（AI）はそのまま使えるので、作り直したのはNetlify部分（`/api`フォルダとその中身）だけです。
 
 ## セットアップ手順
 
@@ -34,12 +34,14 @@ Supabase（データベース）とGoogle Gemini（AI）はそのまま使える
 2. 「SQL Editor」を開き、`supabase-schema.sql` の中身をコピー＆ペーストして実行します。
 3. 「Project Settings」→「API」から、**Project URL** と **service_role キー**（`anon`キーではない方）をメモしておきます。
 
-### 2. Google Gemini APIキー
+### 2. Groq APIキー
 
 すでに発行済みの場合はこの手順は飛ばしてください。
 
-1. https://aistudio.google.com/apikey を開き、Googleアカウントでログインします。
-2. 「Create API key」でキーを発行し、コピーしておきます（クレジットカード登録は不要です）。
+1. https://console.groq.com/keys を開き、Google/GitHubアカウント等でログインします。
+2. 「Create API Key」でキーを発行し、コピーしておきます（クレジットカード登録は不要です）。
+
+（以前はGoogle Geminiを使っていましたが、2026年8月時点でGoogle側のAPIキー発行に不具合があり、新規アカウントでAI生成が動かない状態が続いていたため、Groqに切り替えました。詳しくは下の「なぜGeminiからGroqに変えたか」を参照してください。）
 
 ### 3. GitHubにアップロードする
 
@@ -55,7 +57,7 @@ Supabase（データベース）とGoogle Gemini（AI）はそのまま使える
 
    | Key | Value |
    |---|---|
-   | `GEMINI_API_KEY` | Google AI Studioで発行したAPIキー |
+   | `GROQ_API_KEY` | console.groq.comで発行したAPIキー |
    | `SUPABASE_URL` | SupabaseのProject URL |
    | `SUPABASE_SERVICE_KEY` | Supabaseの service_role キー |
 
@@ -67,11 +69,15 @@ Supabase（データベース）とGoogle Gemini（AI）はそのまま使える
 2. 「あたらしくはじめる」を押すと、セーブコードが発行されます。
 3. NPCに話しかけて、まだ出会っていない単語で「ことばを考え中…」のあと、実際に英文が出てくれば成功です。
 
+## なぜGeminiからGroqに変えたか
+
+2026年8月現在、Googleは新しいAPIキー形式（`AQ.`から始まる「Auth key」）への移行を進めていますが、新規アカウントで発行されるキーがこの新形式のみで、従来のAPI呼び出し方法では `401 ACCESS_TOKEN_TYPE_UNSUPPORTED` というエラーで拒否されてしまう不具合が広く報告されています（Google公式SDK経由でも同様）。Google側の既知の問題で、こちら側のコードの問題ではありません。解決を待つより、同じく無料で安定して動くGroqに切り替える方が確実だったため、切り替えました。
+
 ## 費用について
 
 - **Vercel**: Hobby（無料）プランで十分動きます。個人・非商用利用の範囲であれば無料です。
 - **Supabase**: 無料枠（500MBまで）で十分足ります。
-- **Google Gemini API**: 無料枠の範囲で運用できます。クレジットカード登録も不要です。
+- **Groq API**: 無料枠の範囲で運用できます（1分あたり30リクエストほど）。クレジットカード登録も不要です。
 
 ## セーブデータの仕組み
 

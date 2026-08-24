@@ -4,7 +4,6 @@
   "private": true,
   "description": "ねこじま - Eiken pre-2 vocabulary learning game",
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "@google/genai": "^2.0.0"
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
