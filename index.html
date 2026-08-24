@@ -420,7 +420,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .settings-row:last-child{ border-bottom:none; }
 .settings-row-label{ font-size:13px; font-weight:800; color:var(--plum-soft); }
 #islandOverlay{
-  position:fixed; inset:0; z-index:82; display:none;
+  position:fixed; inset:0; z-index:86; display:none;
   align-items:center; justify-content:center;
   background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
 }
@@ -514,9 +514,73 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   display:flex; align-items:center; gap:12px; background:#FBF9FF; border-radius:14px;
   padding:10px 14px; margin-top:8px; opacity:0.75;
 }
+.minigame-card.playable{
+  opacity:1; cursor:pointer; border:2px solid var(--mint-deep);
+  background:linear-gradient(135deg,#FFF3EC,#FFE8D9);
+}
+.minigame-card.playable .minigame-status{ color:var(--mint-deep); }
 .minigame-emoji{ font-size:26px; }
 .minigame-name{ font-weight:800; color:var(--plum); font-size:13.5px; }
 .minigame-status{ font-size:11px; color:var(--plum-soft); font-weight:700; }
+
+/* ---------- LODE RUNNER MINIGAME ---------- */
+#loderunnerOverlay{
+  position:fixed; inset:0; z-index:200; display:none;
+  align-items:center; justify-content:center;
+  background:#1a1730;
+}
+#loderunnerOverlay.show{ display:flex; }
+.lr-frame{
+  width:100%; height:100%; max-width:900px; max-height:100vh;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:10px; box-sizing:border-box; position:relative;
+}
+.lr-hud{
+  width:100%; max-width:800px; display:flex; align-items:center; gap:10px;
+  padding:6px 4px; color:#fff; font-family:'M PLUS Rounded 1c',sans-serif;
+}
+.lr-close{
+  background:rgba(255,255,255,0.15); border:none; color:#fff; width:34px; height:34px;
+  border-radius:50%; font-size:16px; cursor:pointer; flex-shrink:0;
+}
+.lr-sentence{ flex:1; font-size:13px; font-weight:800; text-align:center; }
+.lr-progress{
+  font-family:'Fredoka',sans-serif; font-size:14px; font-weight:700; color:#FFD873;
+  text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:220px;
+}
+.lr-lives{ font-size:14px; flex-shrink:0; }
+#lrCanvas{
+  width:100%; max-width:800px; aspect-ratio:800/480; background:#241f42;
+  border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.4); touch-action:none;
+}
+.lr-controls{ width:100%; max-width:800px; display:flex; justify-content:flex-start; margin-top:10px; }
+.lr-dpad{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+.lr-dpad-mid{ display:flex; gap:44px; }
+.lr-btn{
+  width:56px; height:56px; border-radius:14px; border:none;
+  background:rgba(255,255,255,0.18); color:#fff; font-size:22px; font-weight:800;
+  cursor:pointer; -webkit-user-select:none; user-select:none;
+}
+.lr-btn:active{ background:rgba(255,255,255,0.35); }
+.lr-endpanel{
+  position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(26,23,48,0.85); border-radius:16px;
+}
+.lr-endpanel.show{ display:flex; }
+.lr-endcard{
+  background:#fff; border-radius:24px; padding:30px 28px; text-align:center; max-width:320px;
+  font-family:'M PLUS Rounded 1c',sans-serif;
+}
+.lr-endcard .emoji{ font-size:48px; }
+.lr-endcard h3{ font-family:'Fredoka',sans-serif; color:var(--plum); margin:6px 0; }
+.lr-endcard p{ color:var(--plum-soft); font-weight:700; font-size:13px; margin:0 0 16px; }
+.lr-endcard button{
+  background:linear-gradient(135deg, var(--coral), var(--coral-deep)); color:#fff; border:none;
+  border-radius:999px; padding:12px 28px; font-weight:800; font-size:14px; cursor:pointer;
+  margin:4px;
+}
+.lr-endcard button.secondary{ background:#FBF9FF; color:var(--plum-soft); border:2px solid #ECE5FA; }
 </style>
 
 <div id="quizOverlay">
@@ -588,14 +652,37 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
           <div class="minigame-status">近日公開</div>
         </div>
       </div>
-      <div class="minigame-card">
+      <div class="minigame-card playable" id="loderunnerCard">
         <div class="minigame-emoji">🏃</div>
         <div>
           <div class="minigame-name">ねこロードランナー</div>
-          <div class="minigame-status">近日公開</div>
+          <div class="minigame-status">タップしてあそぶ！</div>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="loderunnerOverlay">
+  <div class="lr-frame">
+    <div class="lr-hud">
+      <button class="lr-close" id="lrCloseBtn">✕</button>
+      <div class="lr-sentence" id="lrSentenceJa"></div>
+      <div class="lr-progress" id="lrProgress"></div>
+      <div class="lr-lives" id="lrLives">❤️❤️❤️</div>
+    </div>
+    <canvas id="lrCanvas" width="800" height="480"></canvas>
+    <div class="lr-controls">
+      <div class="lr-dpad">
+        <button class="lr-btn" id="lrUp">▲</button>
+        <div class="lr-dpad-mid">
+          <button class="lr-btn" id="lrLeft">◀</button>
+          <button class="lr-btn" id="lrRight">▶</button>
+        </div>
+        <button class="lr-btn" id="lrDown">▼</button>
+      </div>
+    </div>
+    <div class="lr-endpanel" id="lrEndPanel"></div>
   </div>
 </div>
 
@@ -3863,6 +3950,364 @@ function renderCatAlbum(){
       setTimeout(()=> note.remove(), 2200);
     });
   });
+}
+
+
+/* =========================================================
+   MINIGAME: ねこロードランナー (Cat Lode Runner)
+   A small graph-based platformer: collect the word tiles for a
+   sentence you've already mastered, in the correct order, while
+   dodging a chasing mouse. Reuses VOCAB data directly — no separate
+   content authoring needed, and only draws from words the player has
+   already mastered, so this functions as spaced review rather than
+   introducing new material.
+========================================================= */
+const LR = {}; // all game state lives here, reset each play
+
+const LR_COLS = 8, LR_ROWS = 4;
+const LR_LADDER_COLS = [1,3,5,7];
+const LR_ROW_Y = [420,300,180,60]; // row 0 = bottom
+const LR_COL_X = [50,150,250,350,450,550,650,750];
+
+function lrNodeId(col,row){ return col+'_'+row; }
+
+function lrBuildGraph(){
+  const graph = {};
+  for(let row=0; row<LR_ROWS; row++){
+    for(let col=0; col<LR_COLS; col++){
+      const id = lrNodeId(col,row);
+      graph[id] = {
+        col, row,
+        x: LR_COL_X[col], y: LR_ROW_Y[row],
+        left:  col>0 ? lrNodeId(col-1,row) : null,
+        right: col<LR_COLS-1 ? lrNodeId(col+1,row) : null,
+        up:    (LR_LADDER_COLS.includes(col) && row<LR_ROWS-1) ? lrNodeId(col,row+1) : null,
+        down:  (LR_LADDER_COLS.includes(col) && row>0) ? lrNodeId(col,row-1) : null,
+      };
+    }
+  }
+  return graph;
+}
+
+function lrBfsPath(graph, fromId, toId){
+  if(fromId === toId) return [];
+  const visited = new Set([fromId]);
+  const queue = [[fromId]];
+  while(queue.length){
+    const path = queue.shift();
+    const cur = path[path.length-1];
+    const node = graph[cur];
+    for(const dir of ['left','right','up','down']){
+      const next = node[dir];
+      if(next && !visited.has(next)){
+        const newPath = [...path, next];
+        if(next === toId) return newPath.slice(1);
+        visited.add(next);
+        queue.push(newPath);
+      }
+    }
+  }
+  return [];
+}
+
+function lrPickSentence(){
+  const pool = VOCAB.filter(v => masteredWords.has(v.en) && v.sentence && v.sentence.split(' ').length <= 7);
+  if(pool.length === 0) return null;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function lrStart(){
+  const item = lrPickSentence();
+  const endPanel = document.getElementById('lrEndPanel');
+  endPanel.classList.remove('show');
+  endPanel.innerHTML = '';
+
+  if(!item){
+    endPanel.innerHTML = `<div class="lr-endcard">
+      <div class="emoji">📚</div>
+      <h3>まだあそべません</h3>
+      <p>ことばをいくつか覚えてから、また来てね！</p>
+      <button id="lrGiveUp">とじる</button>
+    </div>`;
+    endPanel.classList.add('show');
+    document.getElementById('lrGiveUp').onclick = lrClose;
+    return;
+  }
+
+  const graph = lrBuildGraph();
+  const tokens = item.sentence.split(' ');
+  const allNodeIds = Object.keys(graph);
+  const startId = lrNodeId(0,0);
+  const enemyStartId = lrNodeId(LR_COLS-1, LR_ROWS-1);
+
+  // pick distinct nodes (not the two start spots) for word tiles: one
+  // per sentence token, plus a couple of decoy words from other vocab
+  const candidateNodes = shuffle(allNodeIds.filter(id => id!==startId && id!==enemyStartId));
+  const decoyPool = shuffle(VOCAB.filter(v=>v.en!==item.en && v.sentence)).slice(0,4);
+  const decoyWords = shuffle(decoyPool.flatMap(v=>v.sentence.split(' '))).slice(0, Math.min(3, Math.max(0, candidateNodes.length - tokens.length)));
+
+  const tileWords = shuffle([...tokens.map((w,i)=>({word:w, correctIndex:i, isDecoy:false})), ...decoyWords.map(w=>({word:w, correctIndex:-1, isDecoy:true}))]);
+  const tiles = tileWords.map((tw, i) => ({
+    ...tw,
+    nodeId: candidateNodes[i],
+    collected: false,
+  })).filter(t => t.nodeId);
+
+  LR.item = item;
+  LR.tokens = tokens;
+  LR.graph = graph;
+  LR.tiles = tiles;
+  LR.collectedOrder = [];
+  LR.nextIndex = 0;
+  LR.lives = 3;
+  LR.playerNode = startId;
+  LR.playerPos = { ...graph[startId] };
+  LR.playerMoving = false;
+  LR.enemyNode = enemyStartId;
+  LR.enemyPos = { ...graph[enemyStartId] };
+  LR.enemyPath = [];
+  LR.enemyMoveTimer = 0;
+  LR.invincibleTimer = 0;
+  LR.won = false;
+  LR.input = { left:false, right:false, up:false, down:false };
+
+  document.getElementById('lrSentenceJa').textContent = item.sentenceJa;
+  lrUpdateProgress();
+  lrUpdateLives();
+
+  if(!LR.loopRunning){
+    LR.loopRunning = true;
+    requestAnimationFrame(lrLoop);
+  }
+}
+
+function lrUpdateProgress(){
+  const parts = LR.tokens.map((w,i)=> i < LR.collectedOrder.length ? w : '＿');
+  document.getElementById('lrProgress').textContent = parts.join(' ');
+}
+function lrUpdateLives(){
+  document.getElementById('lrLives').textContent = '❤️'.repeat(Math.max(0,LR.lives)) + '🤍'.repeat(Math.max(0,3-LR.lives));
+}
+
+function lrOpen(){
+  document.getElementById('loderunnerOverlay').classList.add('show');
+  lrStart();
+}
+function lrClose(){
+  document.getElementById('loderunnerOverlay').classList.remove('show');
+  LR.won = true; // stop gameplay updates while closed
+}
+
+document.getElementById('loderunnerCard').addEventListener('click', lrOpen);
+document.getElementById('lrCloseBtn').addEventListener('click', lrClose);
+
+// touch d-pad
+function lrBindHold(id, key){
+  const el = document.getElementById(id);
+  const set = (v)=> LR.input && (LR.input[key] = v);
+  el.addEventListener('pointerdown', e=>{ e.preventDefault(); set(true); });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=> el.addEventListener(ev, ()=> set(false)));
+}
+lrBindHold('lrLeft','left');
+lrBindHold('lrRight','right');
+lrBindHold('lrUp','up');
+lrBindHold('lrDown','down');
+
+const LR_MOVE_TIME = 0.16; // seconds to glide between adjacent nodes
+const LR_ENEMY_STEP_TIME = 0.55;
+
+function lrLoop(ts){
+  requestAnimationFrame(lrLoop);
+  const overlay = document.getElementById('loderunnerOverlay');
+  if(!overlay.classList.contains('show')) return;
+  if(!LR.graph) return;
+
+  const now = ts/1000;
+  const dt = Math.min(0.05, now - (LR._lastTs || now));
+  LR._lastTs = now;
+
+  if(!LR.won){
+    lrUpdatePlayer(dt);
+    lrUpdateEnemy(dt);
+    lrCheckCollisions();
+  }
+  lrDraw();
+}
+
+function lrUpdatePlayer(dt){
+  if(!LR.playerMoving){
+    const node = LR.graph[LR.playerNode];
+    let dir = null;
+    if(LR.input.left && node.left) dir = 'left';
+    else if(LR.input.right && node.right) dir = 'right';
+    else if(LR.input.up && node.up) dir = 'up';
+    else if(LR.input.down && node.down) dir = 'down';
+    if(dir){
+      const targetId = node[dir];
+      LR.playerFrom = { ...node };
+      LR.playerTo = { ...LR.graph[targetId] };
+      LR.playerNode = targetId;
+      LR.playerMoving = true;
+      LR.playerMoveT = 0;
+      LR.playerFacing = (dir==='left') ? -1 : (dir==='right' ? 1 : LR.playerFacing||1);
+    }
+  } else {
+    LR.playerMoveT += dt / LR_MOVE_TIME;
+    if(LR.playerMoveT >= 1){
+      LR.playerMoveT = 1;
+      LR.playerMoving = false;
+      LR.playerPos = { ...LR.playerTo };
+    } else {
+      LR.playerPos = {
+        x: LR.playerFrom.x + (LR.playerTo.x - LR.playerFrom.x)*LR.playerMoveT,
+        y: LR.playerFrom.y + (LR.playerTo.y - LR.playerFrom.y)*LR.playerMoveT,
+      };
+    }
+  }
+  if(LR.invincibleTimer > 0) LR.invincibleTimer -= dt;
+}
+
+function lrUpdateEnemy(dt){
+  LR.enemyMoveTimer += dt;
+  if(LR.enemyMoveTimer < LR_ENEMY_STEP_TIME) return;
+  LR.enemyMoveTimer = 0;
+
+  if(LR.enemyPath.length === 0){
+    LR.enemyPath = lrBfsPath(LR.graph, LR.enemyNode, LR.playerNode);
+  }
+  const nextId = LR.enemyPath.shift();
+  if(nextId){
+    LR.enemyNode = nextId;
+    LR.enemyPos = { ...LR.graph[nextId] };
+  }
+}
+
+function lrCheckCollisions(){
+  // tile collection: only the correct next word can be picked up
+  for(const tile of LR.tiles){
+    if(tile.collected) continue;
+    if(tile.nodeId !== LR.playerNode) continue;
+    if(tile.correctIndex === LR.nextIndex){
+      tile.collected = true;
+      LR.collectedOrder.push(tile.word);
+      LR.nextIndex++;
+      playCorrectSound();
+      lrUpdateProgress();
+      if(LR.nextIndex >= LR.tokens.length){
+        lrWin();
+      }
+    }
+    // wrong-order or decoy tiles: no penalty, just don't collect —
+    // encourages exploration without punishing curiosity
+  }
+
+  // enemy contact
+  if(LR.invincibleTimer <= 0){
+    const dx = LR.playerPos.x - LR.enemyPos.x, dy = LR.playerPos.y - LR.enemyPos.y;
+    if(Math.hypot(dx,dy) < 40){
+      LR.lives--;
+      LR.invincibleTimer = 1.5;
+      lrUpdateLives();
+      playWrongSound();
+      if(LR.lives <= 0) lrLose();
+    }
+  }
+}
+
+function lrWin(){
+  LR.won = true;
+  markMastered(LR.item); // small reinforcement bonus (no-op mastery-wise, already mastered)
+  addCoins(8);
+  const endPanel = document.getElementById('lrEndPanel');
+  endPanel.innerHTML = `<div class="lr-endcard">
+    <div class="emoji">🎉</div>
+    <h3>クリア！</h3>
+    <p>${LR.item.sentence}<br>${LR.item.sentenceJa}</p>
+    <button id="lrPlayAgain">もう一回 🎲</button>
+    <button class="secondary" id="lrDone">とじる</button>
+  </div>`;
+  endPanel.classList.add('show');
+  document.getElementById('lrPlayAgain').onclick = ()=>{ endPanel.classList.remove('show'); LR.won=false; lrStart(); };
+  document.getElementById('lrDone').onclick = lrClose;
+}
+function lrLose(){
+  LR.won = true;
+  const endPanel = document.getElementById('lrEndPanel');
+  endPanel.innerHTML = `<div class="lr-endcard">
+    <div class="emoji">😿</div>
+    <h3>つかまっちゃった…</h3>
+    <p>もう一度 ちょうせんしてみよう！</p>
+    <button id="lrRetry">もう一回 🎲</button>
+    <button class="secondary" id="lrDone2">とじる</button>
+  </div>`;
+  endPanel.classList.add('show');
+  document.getElementById('lrRetry').onclick = ()=>{ endPanel.classList.remove('show'); LR.won=false; lrStart(); };
+  document.getElementById('lrDone2').onclick = lrClose;
+}
+
+function lrDraw(){
+  const canvas = document.getElementById('lrCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // platforms
+  ctx.fillStyle = '#3A3564';
+  LR_ROW_Y.forEach(y=>{
+    ctx.fillRect(30, y+18, 740, 10);
+  });
+  // ladders
+  ctx.strokeStyle = '#8993B0';
+  ctx.lineWidth = 4;
+  LR_LADDER_COLS.forEach(col=>{
+    const x = LR_COL_X[col];
+    ctx.beginPath();
+    ctx.moveTo(x-14, LR_ROW_Y[0]+18);
+    ctx.lineTo(x-14, LR_ROW_Y[LR_ROWS-1]+18);
+    ctx.moveTo(x+14, LR_ROW_Y[0]+18);
+    ctx.lineTo(x+14, LR_ROW_Y[LR_ROWS-1]+18);
+    ctx.stroke();
+    for(let y=LR_ROW_Y[LR_ROWS-1]+18; y<=LR_ROW_Y[0]+18; y+=18){
+      ctx.beginPath(); ctx.moveTo(x-14,y); ctx.lineTo(x+14,y); ctx.stroke();
+    }
+  });
+
+  // tiles
+  if(LR.tiles){
+    LR.tiles.forEach(tile=>{
+      if(tile.collected) return;
+      const node = LR.graph[tile.nodeId];
+      const isNext = tile.correctIndex === LR.nextIndex;
+      ctx.fillStyle = isNext ? '#FFD873' : '#5E5A88';
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(node.x-34, node.y-30, 68, 26, 8) : ctx.rect(node.x-34, node.y-30, 68, 26);
+      ctx.fill();
+      ctx.fillStyle = isNext ? '#6b4a00' : '#EDEBFA';
+      ctx.font = '700 13px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(tile.word, node.x, node.y-17);
+    });
+  }
+
+  // enemy
+  if(LR.enemyPos){
+    ctx.font = '34px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🐭', LR.enemyPos.x, LR.enemyPos.y);
+  }
+
+  // player
+  if(LR.playerPos){
+    ctx.save();
+    if(LR.invincibleTimer > 0 && Math.floor(LR.invincibleTimer*10)%2===0) ctx.globalAlpha = 0.3;
+    ctx.font = '38px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.save();
+    ctx.translate(LR.playerPos.x, LR.playerPos.y);
+    if(LR.playerFacing < 0) ctx.scale(-1,1);
+    ctx.fillText('🐱', 0, 0);
+    ctx.restore();
+    ctx.restore();
+  }
 }
 
 
