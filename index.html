@@ -3288,12 +3288,27 @@ let audioCtx = null;
 function getAudioCtx(){
   if(!audioCtx){
     const Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) return null;
+    if(!Ctx){ updateAudioDebug('no AudioContext support'); return null; }
     audioCtx = new Ctx();
+    audioCtx.addEventListener('statechange', ()=> updateAudioDebug());
   }
   if(audioCtx.state === 'suspended') audioCtx.resume();
+  updateAudioDebug();
   return audioCtx;
 }
+
+// TEMPORARY debug indicator (top-left) so we can see the actual
+// AudioContext state without needing dev tools — remove once sound is
+// confirmed working reliably.
+const audioDebugEl = document.createElement('div');
+audioDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.7); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none;';
+audioDebugEl.textContent = '🔊 audio: not created yet';
+document.body.appendChild(audioDebugEl);
+function updateAudioDebug(msg){
+  if(msg){ audioDebugEl.textContent = '🔊 ' + msg; return; }
+  if(audioCtx) audioDebugEl.textContent = '🔊 audio: ' + audioCtx.state;
+}
+
 // unlock audio on the very first touch anywhere on the page. iOS Safari
 // can require more than just creating/resuming the context — actually
 // starting a (silent) node within the gesture is the more reliable way
@@ -3308,11 +3323,14 @@ function unlockAudio(){
   osc.connect(g).connect(ctx.destination);
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + 0.01);
+  updateAudioDebug('unlock tried, state=' + ctx.state);
 }
 
+let toneCallCount = 0;
 function playTone(freq, duration, startTime, gain, type){
   const ctx = getAudioCtx();
-  if(!ctx) return;
+  toneCallCount++;
+  if(!ctx){ updateAudioDebug('no ctx, calls=' + toneCallCount); return; }
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = type || 'sine';
@@ -3323,6 +3341,7 @@ function playTone(freq, duration, startTime, gain, type){
   osc.connect(g).connect(ctx.destination);
   osc.start(t0);
   osc.stop(t0 + duration + 0.02);
+  updateAudioDebug('state=' + ctx.state + ', calls=' + toneCallCount);
 }
 
 function playCorrectSound(){
