@@ -3295,11 +3295,21 @@ function getAudioCtx(){
   if(audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
-// unlock audio on the very first touch anywhere on the page (mobile
-// browsers block audio until a genuine user gesture happens; the canvas
-// alone isn't enough since a player might tap a UI button — like the
-// interact button or a quiz answer — before ever touching the 3D view)
-document.addEventListener('pointerdown', ()=> getAudioCtx(), { once:true, capture:true });
+// unlock audio on the very first touch anywhere on the page. iOS Safari
+// can require more than just creating/resuming the context — actually
+// starting a (silent) node within the gesture is the more reliable way
+// to fully unlock playback.
+document.addEventListener('pointerdown', unlockAudio, { once:true, capture:true });
+function unlockAudio(){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  g.gain.value = 0.0001;
+  osc.connect(g).connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.01);
+}
 
 function playTone(freq, duration, startTime, gain, type){
   const ctx = getAudioCtx();
