@@ -59,12 +59,22 @@ module.exports = async (req, res) => {
         // openai/gpt-oss-120b is Groq's official recommended replacement.
         model: 'openai/gpt-oss-120b',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 350,
+        max_tokens: 600,
         temperature: 0.8,
         // force valid JSON output instead of relying on the model to
         // follow "reply with JSON only" as a plain instruction, which
         // open-weight models follow less reliably than Claude/GPT does
         response_format: { type: 'json_object' },
+        // gpt-oss-120b is a reasoning model (default reasoning_effort is
+        // 'medium'). Its internal chain-of-thought was eating the whole
+        // max_tokens budget before ever emitting the JSON answer, and/or
+        // leaking into the content field and breaking JSON validation —
+        // hence Groq's "Failed to validate JSON" / empty failed_generation
+        // errors. Groq's docs explicitly require reasoning_format to be
+        // 'hidden' or 'parsed' (not the default) when combined with JSON
+        // mode, and 'low' effort is plenty for a short generation task.
+        reasoning_effort: 'low',
+        reasoning_format: 'hidden',
       }),
     });
 
