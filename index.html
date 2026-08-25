@@ -186,14 +186,15 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .type-answer-submit:disabled{ opacity:0.55; }
 .correct-answer-inline{ display:block; font-size:12px; color:#fff; opacity:0.9; margin-top:3px; font-weight:700; }
 .choice-btn{
-  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:16px; padding:16px 10px;
-  font-family:'M PLUS Rounded 1c',sans-serif; font-size:17px; font-weight:700; color:var(--plum);
+  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:14px; padding:10px 8px;
+  font-family:'M PLUS Rounded 1c',sans-serif; font-size:14px; font-weight:700; color:var(--plum);
   cursor:pointer; transition:all .15s ease; text-align:center;
 }
 .choice-btn.correct{background:linear-gradient(135deg, var(--mint), var(--mint-deep)); border-color:var(--mint-deep); color:#fff;}
 .choice-btn.wrong{background:linear-gradient(135deg, var(--coral), var(--coral-deep)); border-color:var(--coral-deep); color:#fff;}
 .choice-btn.disabled{pointer-events:none; opacity:0.6;}
 .choice-btn.disabled.correct, .choice-btn.disabled.wrong{opacity:1;}
+.choice-btn.choice-hint{ cursor:default; opacity:0.85; }
 
 .quiz-footer-btn{
   margin-top:4px; background:linear-gradient(135deg, var(--coral), var(--coral-deep)); color:#fff; border:none;
@@ -4979,6 +4980,7 @@ function renderBlankExercise(item){
     <span class="reply-label">きみの返事 ▼</span>
     <div class="sentence-line" id="sentenceLine"></div>
     <div class="ja-hint">${item.sentenceJa}</div>
+    <div class="choices" id="choices"></div>
     <div class="type-answer-row">
       <input type="text" id="typeAnswerInput" class="type-answer-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="えいごで にゅうりょく">
       <button class="type-answer-submit" id="typeAnswerSubmit">こたえる</button>
@@ -4988,6 +4990,19 @@ function renderBlankExercise(item){
   `;
   const blankHtml = insertBlank(item.sentence, item.en);
   document.getElementById('sentenceLine').innerHTML = blankHtml;
+
+  // choices are shown as a hint only — tapping them does nothing;
+  // answering happens by typing below
+  const distractors = shuffle(VOCAB.filter(v=>v.en!==item.en)).slice(0,3);
+  const options = shuffle([item, ...distractors]);
+  const cw = document.getElementById('choices');
+  options.forEach(opt=>{
+    const chip = document.createElement('div');
+    chip.className = 'choice-btn choice-hint';
+    chip.textContent = opt.en;
+    chip.dataset.correct = opt.en===item.en ? '1':'0';
+    cw.appendChild(chip);
+  });
 
   const input = document.getElementById('typeAnswerInput');
   const submit = document.getElementById('typeAnswerSubmit');
@@ -5003,6 +5018,9 @@ function handleBlankAnswer(input, typedValue, item){
   if(slot) slot.textContent = item.en;
   input.disabled = true;
   document.getElementById('typeAnswerSubmit').disabled = true;
+  document.querySelectorAll('#choices .choice-hint').forEach(c=>{
+    if(c.dataset.correct === '1') c.classList.add('correct');
+  });
 
   const correct = typedValue.trim().toLowerCase() === item.en.trim().toLowerCase();
 
