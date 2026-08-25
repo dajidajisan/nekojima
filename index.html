@@ -3472,7 +3472,15 @@ const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 let moveTarget = null; // {x,z} in world space, or null when not walking
 let wasNearSomething = false; // tracks entering/leaving interact range, see proximity check below
-let conversationContext = ''; // last exchange's reaction, fed into the next AI generation prompt so consecutive questions with the same NPC feel like one ongoing conversation
+let conversationContext = ''; // the last full exchange (opener→reply→reaction), fed into the next AI generation prompt so consecutive questions with the same NPC feel like one ongoing conversation
+
+function formatExchange(item){
+  const lines = [];
+  if(item.opener) lines.push(`「${item.opener}」（${item.openerJa||''}）`);
+  lines.push(`「${item.sentence}」（${item.sentenceJa||''}）`);
+  if(item.reaction) lines.push(`「${item.reaction}」（${item.reactionJa||''}）`);
+  return lines.join('\n');
+}
 
 function isTouchOnUI(target){
   // don't hijack touches that land on real UI controls (buttons, overlays, etc.)
@@ -3783,6 +3791,23 @@ function shuffle(arr){
   const a=[...arr];
   for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
+}
+
+function clusterByCategory(items){
+  const byCat = {};
+  items.forEach(v=>{
+    (byCat[v.cat] = byCat[v.cat] || []).push(v);
+  });
+  const catNames = shuffle(Object.keys(byCat));
+  const clusterSize = 4; // roughly how many same-topic words appear in a row
+  const queue = [];
+  catNames.forEach(cat=>{
+    const words = shuffle(byCat[cat]);
+    for(let i=0; i<words.length; i+=clusterSize){
+      queue.push(words.slice(i, i+clusterSize));
+    }
+  });
+  return shuffle(queue).flat();
 }
 
 /* =========================================================
@@ -4547,7 +4572,7 @@ function openQuiz(npc){
   npcSub.textContent = `${npc.def.name}とおはなし中`;
 
   const remaining = npc.vocabList.filter(v => !masteredWords.has(v.en));
-  let queue = shuffle(remaining);
+  let queue = clusterByCategory(remaining);
 
   // a word that's due for spaced review can surface in any NPC's
   // conversation, not just the one that originally taught it
@@ -4783,7 +4808,12 @@ async function generateAIExercise(npc){
 条件：
 - ${difficultyHint}にすること
 - まずキャラが何か話しかける一文（opener）を作る
-- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+
+【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
+- 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
+- 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
+
 - 最後にキャラが返す短いリアクション（reaction）を1文作る。ここにキャラクターの性格を反映させること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
 - 日本語訳の文末表現にも、そのキャラクターの性格・口調を反映させること
@@ -4936,16 +4966,26 @@ async function ensureExerciseContent(item){
 
 async function generateSentenceForWord(item){
   const personality = activeNPC ? (activeNPC.def.personality || 'げんき') : 'げんき';
-  const contextLine = conversationContext
-    ? `\n直前の会話の流れ: 「${conversationContext}」\nこの流れに自然につながるように、話しかける一文（opener）を作ること（急に話題を変えないこと）。`
+  const contextSection = conversationContext
+    ? `\n直前に、このキャラクターとはこんな会話をしていました:\n${conversationContext}\nこれは同じキャラクターとの1つの会話の続きです。まったく新しい話題を始めるのではなく、上の内容を受けて自然に続く opener（話しかけの一文）にしてください。`
     : '';
   const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくるキャラクター（性格: ${personality}）です。
-英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を使った、短い2〜3ターンの自然な会話を1つ作ってください。${contextLine}
+英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を自然に使った、短い会話を1つ作ってください。${contextSection}
+
+会話の作り方（この順番で考えること）：
+1. まず、そのキャラクターらしい話しかけの一文（opener）を考える
+2. その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る
+
+【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
+- 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
+- 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
+このように、opener で聞かれたことに sentence がまっすぐ答える形にしてください。
+
+3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
+
 条件：
 - 中学生にもわかる、やさしい英文にすること
-- まずキャラが何か話しかける一文（opener）を作る
-- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
-- 最後にキャラが返す短いリアクション（reaction）を1文作る
+- 単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
 {"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
@@ -5040,7 +5080,7 @@ function handleBlankAnswer(input, typedValue, item){
         `<div class="reaction-bubble"><span class="en">${item.reaction}</span><span class="ja">${item.reactionJa||''}</span></div>`;
     }
     recordMistakeResolved(item.en);
-    conversationContext = item.reaction || item.sentence;
+    conversationContext = formatExchange(item);
     prefetchUpcoming();
   } else {
     input.classList.add('wrong');
@@ -5131,7 +5171,7 @@ function renderOrderExercise(item){
           `<div class="reaction-bubble"><span class="en">${item.reaction}</span><span class="ja">${item.reactionJa||''}</span></div>`;
       }
       recordMistakeResolved(item.en);
-      conversationContext = item.reaction || item.sentence;
+      conversationContext = formatExchange(item);
       prefetchUpcoming();
       speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     } else {
