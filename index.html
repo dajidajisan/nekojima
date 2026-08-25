@@ -65,9 +65,9 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 #quizOverlay.show{display:flex;}
 .quiz-card{
-  width:min(94vw, 560px); background:var(--card); border-radius:28px;
-  padding:28px 26px 30px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
-  display:flex; flex-direction:column; align-items:center; gap:14px;
+  width:min(94vw, 560px); background:var(--card); border-radius:26px;
+  padding:20px 20px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
+  display:flex; flex-direction:column; align-items:center; gap:10px;
   border:3px solid transparent; transition:border-color .2s ease;
   position:relative;
   max-height:88vh; overflow-y:auto;
@@ -76,10 +76,10 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .quiz-card.flash-bad{border-color:var(--coral-deep); animation:shake .4s ease;}
 @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}}
 
-.npc-header{display:flex; align-items:center; gap:12px; align-self:flex-start; width:100%; padding-right:44px;}
+.npc-header{display:flex; align-items:center; gap:10px; align-self:flex-start; width:100%; padding-right:40px;}
 #npcProfileBtn{
-  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:50%; width:38px; height:38px;
-  font-size:18px; cursor:pointer; flex-shrink:0;
+  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:50%; width:32px; height:32px;
+  font-size:15px; cursor:pointer; flex-shrink:0;
 }
 #npcProfileOverlay{
   position:fixed; inset:0; z-index:85; display:none;
@@ -87,60 +87,60 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
 }
 #npcProfileOverlay.show{ display:flex; }
-.npc-avatar{width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:28px;}
-.npc-name{font-weight:800; color:var(--plum); font-size:19px;}
-.npc-sub{font-size:14px; color:var(--plum-soft); font-weight:700;}
+.npc-avatar{width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px;}
+.npc-name{font-weight:800; color:var(--plum); font-size:15px;}
+.npc-sub{font-size:11.5px; color:var(--plum-soft); font-weight:700;}
 .dialogue-bubble{
-  align-self:flex-start; max-width:92%; background:#F1F3FF; border-radius:16px 16px 16px 4px;
-  padding:14px 18px; font-size:17px; font-weight:700; color:var(--plum);
+  align-self:flex-start; max-width:92%; background:#F1F3FF; border-radius:14px 14px 14px 4px;
+  padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--plum);
 }
-.dialogue-bubble .en{ font-family:'Fredoka',sans-serif; font-size:22px; }
-.dialogue-bubble .ja{ display:block; font-size:15px; color:var(--plum-soft); font-weight:700; margin-top:6px; }
-.reply-label{font-size:13.5px; font-weight:800; color:var(--mint-deep); align-self:flex-end;}
+.dialogue-bubble .en{ font-family:'Fredoka',sans-serif; font-size:17px; }
+.dialogue-bubble .ja{ display:block; font-size:12px; color:var(--plum-soft); font-weight:700; margin-top:4px; }
+.reply-label{font-size:11px; font-weight:800; color:var(--mint-deep); align-self:flex-end;}
 .reaction-bubble{
-  align-self:flex-start; max-width:92%; background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-radius:16px 16px 16px 4px;
-  padding:14px 18px; font-size:17px; font-weight:700; color:var(--plum); margin-top:2px;
+  align-self:flex-start; max-width:92%; background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-radius:14px 14px 14px 4px;
+  padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--plum); margin-top:2px;
 }
-.reaction-bubble .en{ font-family:'Fredoka',sans-serif; font-size:20px; }
-.reaction-bubble .ja{ display:block; font-size:14.5px; color:var(--plum-soft); font-weight:700; margin-top:6px; }
+.reaction-bubble .en{ font-family:'Fredoka',sans-serif; font-size:15.5px; }
+.reaction-bubble .ja{ display:block; font-size:11.5px; color:var(--plum-soft); font-weight:700; margin-top:4px; }
 
-.prompt-label{font-size:14px; font-weight:700; color:var(--plum-soft);}
-.prompt-main{display:flex; align-items:center; gap:12px; justify-content:center; min-height:60px; text-align:center;}
-.en-word{font-family:'Fredoka',sans-serif; font-size:clamp(28px,7vw,36px); font-weight:600; color:var(--plum);}
+.prompt-label{font-size:12px; font-weight:700; color:var(--plum-soft);}
+.prompt-main{display:flex; align-items:center; gap:10px; justify-content:center; min-height:48px; text-align:center;}
+.en-word{font-family:'Fredoka',sans-serif; font-size:clamp(24px,6vw,30px); font-weight:600; color:var(--plum);}
 .speak-btn{
-  width:50px; height:50px; border-radius:50%; border:none;
+  width:42px; height:42px; border-radius:50%; border:none;
   background:linear-gradient(135deg, var(--mint), var(--mint-deep));
   display:flex; align-items:center; justify-content:center; cursor:pointer;
   box-shadow:0 4px 10px rgba(63,199,166,0.4); flex-shrink:0;
 }
-.speak-btn svg{width:24px; height:24px;}
+.speak-btn svg{width:20px; height:20px;}
 
-.npc-speech{font-size:14px; font-weight:800; color:var(--plum-soft); align-self:flex-start;}
-.sentence-line{font-family:'Fredoka',sans-serif; font-size:clamp(22px,5.5vw,28px); font-weight:600; color:var(--plum); text-align:center; line-height:1.55;}
-.blank-slot{display:inline-block; min-width:76px; padding:2px 8px; border-bottom:4px solid var(--lavender-deep); color:var(--lavender-deep); font-weight:700;}
+.npc-speech{font-size:12px; font-weight:800; color:var(--plum-soft); align-self:flex-start;}
+.sentence-line{font-family:'Fredoka',sans-serif; font-size:clamp(18px,4.6vw,22px); font-weight:600; color:var(--plum); text-align:center; line-height:1.4;}
+.blank-slot{display:inline-block; min-width:64px; padding:1px 6px; border-bottom:3px solid var(--lavender-deep); color:var(--lavender-deep); font-weight:700;}
 .blank-slot.filled-correct{color:var(--mint-deep); border-color:var(--mint-deep);}
 .blank-slot.filled-wrong{color:var(--coral-deep); border-color:var(--coral-deep);}
-.ja-hint{font-size:15px; color:var(--plum-soft); font-weight:700; text-align:center;}
-.exercise-tag{font-size:12px; font-weight:800; color:#fff; padding:4px 12px; border-radius:999px; align-self:flex-start;}
+.ja-hint{font-size:12.5px; color:var(--plum-soft); font-weight:700; text-align:center;}
+.exercise-tag{font-size:10.5px; font-weight:800; color:#fff; padding:3px 10px; border-radius:999px; align-self:flex-start;}
 .exercise-tag.blank{background:var(--lavender-deep);}
 .exercise-tag.order{background:var(--sunshine-deep); color:#6b4a00;}
 
-.build-line{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-content:flex-start; min-height:56px; width:100%; padding:12px; background:#FBF9FF; border-radius:16px; border:2px dashed #ECE5FA;}
-.build-chip{background:linear-gradient(135deg, var(--lavender), var(--lavender-deep)); color:#fff; padding:10px 16px; border-radius:12px; font-weight:700; font-size:16px; cursor:pointer; border:none; font-family:'Fredoka',sans-serif;}
+.build-line{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-content:flex-start; min-height:44px; width:100%; padding:10px; background:#FBF9FF; border-radius:14px; border:2px dashed #ECE5FA;}
+.build-chip{background:linear-gradient(135deg, var(--lavender), var(--lavender-deep)); color:#fff; padding:8px 13px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; border:none; font-family:'Fredoka',sans-serif;}
 .build-chip.correct{background:linear-gradient(135deg, var(--mint), var(--mint-deep));}
 .build-chip.wrong{background:linear-gradient(135deg, var(--coral), var(--coral-deep));}
 .build-chip.locked{pointer-events:none;}
 
-.chip-pool{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; width:100%;}
-.chip{background:#FBF9FF; border:2px solid #ECE5FA; color:var(--plum); padding:10px 16px; border-radius:12px; font-weight:700; font-size:16px; cursor:pointer; font-family:'Fredoka',sans-serif; transition:all .15s ease;}
+.chip-pool{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;}
+.chip{background:#FBF9FF; border:2px solid #ECE5FA; color:var(--plum); padding:8px 13px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; font-family:'Fredoka',sans-serif; transition:all .15s ease;}
 .chip:active{transform:scale(0.95);}
 
-.sentence-answer{font-size:14.5px; color:var(--mint-deep); font-weight:700; text-align:center;}
+.sentence-answer{font-size:12.5px; color:var(--mint-deep); font-weight:700; text-align:center;}
 .feedback-banner{
   align-self:center; text-align:center; font-family:'Fredoka',sans-serif; font-weight:700;
-  font-size:19px; padding:8px 18px; border-radius:999px; animation:feedbackPop .3s ease;
+  font-size:15.5px; padding:7px 16px; border-radius:999px; animation:feedbackPop .3s ease;
 }
-.feedback-banner .ja{ font-family:'M PLUS Rounded 1c',sans-serif; font-size:13px; margin-left:6px; }
+.feedback-banner .ja{ font-family:'M PLUS Rounded 1c',sans-serif; font-size:11.5px; margin-left:5px; }
 .feedback-banner.correct{ background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; }
 .feedback-banner.wrong{ background:linear-gradient(135deg, var(--coral), var(--coral-deep)); color:#fff; }
 @keyframes feedbackPop{
@@ -168,6 +168,23 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 
 .choices{display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%;}
+
+.type-answer-row{ display:flex; gap:8px; width:100%; align-items:center; }
+.type-answer-input{
+  flex:1; border:2px solid #ECE5FA; border-radius:14px; padding:12px 14px;
+  font-family:'Fredoka',sans-serif; font-size:18px; color:var(--plum); outline:none;
+  background:#FBF9FF;
+}
+.type-answer-input:focus{ border-color:var(--lavender); }
+.type-answer-input.correct{ border-color:var(--mint-deep); background:#EFFBF6; }
+.type-answer-input.wrong{ border-color:var(--coral-deep); background:#FFF1F3; }
+.type-answer-submit{
+  background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none;
+  border-radius:14px; padding:12px 18px; font-weight:800; font-size:14px; cursor:pointer;
+  font-family:'M PLUS Rounded 1c',sans-serif; white-space:nowrap; flex-shrink:0;
+}
+.type-answer-submit:disabled{ opacity:0.55; }
+.correct-answer-inline{ display:block; font-size:12px; color:#fff; opacity:0.9; margin-top:3px; font-weight:700; }
 .choice-btn{
   background:#FBF9FF; border:2px solid #ECE5FA; border-radius:16px; padding:16px 10px;
   font-family:'M PLUS Rounded 1c',sans-serif; font-size:17px; font-weight:700; color:var(--plum);
@@ -4827,16 +4844,18 @@ async function loadQuestion(){
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
   nextBtn.onclick = ()=>{ quizIndex++; loadQuestion(); };
-
-  // quietly start generating the next couple of upcoming words in the
-  // background, so by the time the player gets there, the wait is gone
-  prefetchUpcoming();
 }
 let loadQuestionRequestId = 0;
 
 function prefetchUpcoming(){
-  const upcoming = activeQueue.slice(quizIndex+1, quizIndex+3);
-  upcoming.forEach(item => { generateAndCache(item); }); // fire and forget
+  // only prefetch a single item, one ahead — called right after a correct
+  // answer (once conversationContext reflects that exchange), so the
+  // very next question's opener has a chance to actually follow on from
+  // it. Prefetching further ahead than this defeats continuity, since
+  // later items would generate before their own predecessor's reaction
+  // is known.
+  const next = activeQueue[quizIndex+1];
+  if(next) generateAndCache(next); // fire and forget
 }
 
 /* ---------- generate example sentences on demand for imported words ---------- */
@@ -4960,40 +4979,40 @@ function renderBlankExercise(item){
     <span class="reply-label">きみの返事 ▼</span>
     <div class="sentence-line" id="sentenceLine"></div>
     <div class="ja-hint">${item.sentenceJa}</div>
-    <div class="choices" id="choices"></div>
+    <div class="type-answer-row">
+      <input type="text" id="typeAnswerInput" class="type-answer-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="えいごで にゅうりょく">
+      <button class="type-answer-submit" id="typeAnswerSubmit">こたえる</button>
+    </div>
     <div id="feedbackSlot"></div>
     <div id="reactionSlot"></div>
   `;
   const blankHtml = insertBlank(item.sentence, item.en);
   document.getElementById('sentenceLine').innerHTML = blankHtml;
 
-  const distractors = shuffle(VOCAB.filter(v=>v.en!==item.en)).slice(0,3);
-  const options = shuffle([item, ...distractors]);
-  const cw = document.getElementById('choices');
-  options.forEach(opt=>{
-    const btn = document.createElement('button');
-    btn.className='choice-btn';
-    btn.textContent = opt.en;
-    btn.dataset.correct = opt.en===item.en ? '1':'0';
-    btn.onclick = ()=> handleBlankAnswer(btn, opt.en===item.en, item);
-    cw.appendChild(btn);
-  });
+  const input = document.getElementById('typeAnswerInput');
+  const submit = document.getElementById('typeAnswerSubmit');
+  const submitAnswer = ()=> handleBlankAnswer(input, input.value, item);
+  submit.onclick = submitAnswer;
+  input.addEventListener('keydown', e=>{ if(e.key === 'Enter') submitAnswer(); });
+  setTimeout(()=> input.focus(), 50);
 }
 
-function handleBlankAnswer(btn, correct, item){
+function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
-  const btns = document.querySelectorAll('#choices .choice-btn');
-  btns.forEach(b=> b.classList.add('disabled'));
   const slot = document.getElementById('blankSlot');
   if(slot) slot.textContent = item.en;
+  input.disabled = true;
+  document.getElementById('typeAnswerSubmit').disabled = true;
+
+  const correct = typedValue.trim().toLowerCase() === item.en.trim().toLowerCase();
 
   if(correct){
-    btn.classList.add('correct');
+    input.classList.add('correct');
     if(slot) slot.classList.add('filled-correct');
     quizCard.classList.add('flash-good');
     markMastered(item);
     recordDailyProgress();
-    burstSparkles(btn);
+    burstSparkles(input);
     playCorrectSound();
     speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     document.getElementById('feedbackSlot').innerHTML =
@@ -5004,14 +5023,14 @@ function handleBlankAnswer(btn, correct, item){
     }
     recordMistakeResolved(item.en);
     conversationContext = item.reaction || item.sentence;
+    prefetchUpcoming();
   } else {
-    btn.classList.add('wrong');
+    input.classList.add('wrong');
     if(slot) slot.classList.add('filled-wrong');
     quizCard.classList.add('flash-bad');
-    btns.forEach(b=>{ if(b.dataset.correct==='1') b.classList.add('correct'); });
     playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
-      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span></div>`;
+      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.en}</span></div>`;
     recordMistake(item.en);
   }
   nextBtn.classList.add('show');
@@ -5095,6 +5114,7 @@ function renderOrderExercise(item){
       }
       recordMistakeResolved(item.en);
       conversationContext = item.reaction || item.sentence;
+      prefetchUpcoming();
       speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
