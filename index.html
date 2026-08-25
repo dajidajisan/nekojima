@@ -491,12 +491,22 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .rarity-tab.active{ background:linear-gradient(135deg, var(--lavender), var(--lavender-deep)); border-color:var(--lavender-deep); color:#fff; }
 
+.cat-complete-row{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+#catCompleteLabel{ font-size:11.5px; font-weight:800; color:var(--plum-soft); white-space:nowrap; }
+.cat-complete-bar{ flex:1; height:8px; border-radius:999px; background:#ECE5FA; overflow:hidden; }
+.cat-complete-fill{ height:100%; width:0%; background:linear-gradient(90deg, var(--mint), var(--sunshine-deep)); transition:width .3s ease; }
+
 .cat-album{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; max-height:320px; overflow-y:auto; padding-right:2px; }
 .cat-card{
   border-radius:14px; padding:10px 12px; background:#F8F7FB; border:2px solid #ECE5FA;
   display:flex; flex-direction:column; gap:4px;
 }
-.cat-card.owned{ background:linear-gradient(135deg,#FFF3EC,#FFE8D9); }
+.cat-card.owned{ background:linear-gradient(135deg,#FFF3EC,#FFE8D9); cursor:pointer; }
+.cat-portrait{
+  width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:20px; margin-bottom:2px; box-shadow:inset 0 -4px 8px rgba(0,0,0,0.12);
+}
+.cat-portrait.locked{ background:#DCD8E8 !important; filter:grayscale(1); opacity:0.6; }
 .cat-card .name{ font-weight:800; color:var(--plum); font-size:12.5px; display:flex; align-items:center; gap:5px; }
 .cat-card .rarity-pill{ font-size:9px; font-weight:800; color:#fff; padding:2px 7px; border-radius:999px; align-self:flex-start; }
 .rarity-pill.common{ background:#8FC7FF; }
@@ -509,6 +519,13 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#9088A8; cursor:default; }
 .cat-card .owned-label{ font-size:11px; font-weight:800; color:var(--mint-deep); margin-top:2px; }
+
+#catDetailOverlay{
+  position:fixed; inset:0; z-index:87; display:none;
+  align-items:center; justify-content:center;
+  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
+}
+#catDetailOverlay.show{ display:flex; }
 
 .minigame-card{
   display:flex; align-items:center; gap:12px; background:#FBF9FF; border-radius:14px;
@@ -633,6 +650,10 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
     <div class="reward-section">
       <div class="reward-section-title">😺 ねこ図鑑</div>
       <p class="reward-sub">コインをためて、すきな ねこの しゅるいを 図鑑に くわえよう！</p>
+      <div class="cat-complete-row">
+        <span id="catCompleteLabel">コンプリート 0%</span>
+        <div class="cat-complete-bar"><div class="cat-complete-fill" id="catCompleteFill"></div></div>
+      </div>
       <div class="rarity-tabs" id="rarityTabs">
         <button class="rarity-tab active" data-rarity="all">すべて</button>
         <button class="rarity-tab" data-rarity="common">よくいる</button>
@@ -641,6 +662,16 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
         <button class="rarity-tab" data-rarity="legendary">でんせつ</button>
       </div>
       <div class="cat-album" id="catAlbum"></div>
+    </div>
+
+    <div id="catDetailOverlay">
+      <div class="npc-create-card" style="max-width:320px; align-items:center; text-align:center;">
+        <button class="close-x" id="closeCatDetail">✕</button>
+        <div id="catDetailPortrait" class="cat-portrait" style="width:80px;height:80px;font-size:40px;margin:0 auto;"></div>
+        <div id="catDetailName" style="font-family:'Fredoka',sans-serif; font-weight:700; font-size:19px; color:var(--plum); margin-top:8px;"></div>
+        <div id="catDetailRarity" class="rarity-pill" style="margin:6px auto;"></div>
+        <p id="catDetailFact" style="font-size:13px; color:var(--plum-soft); font-weight:700; line-height:1.6;"></p>
+      </div>
     </div>
 
     <div class="reward-section">
@@ -2915,6 +2946,58 @@ function makePond(x,z){
   return g;
 }
 
+/* ---------- river + bridge ---------- */
+function makeRiver(){
+  const g = new THREE.Group();
+  // a gentle, slightly wandering river made of a few connected strips
+  const points = [[19,-17],[18,-9],[20,-1],[18,7],[19,15],[19,20]];
+  for(let i=0;i<points.length-1;i++){
+    const [x1,z1] = points[i], [x2,z2] = points[i+1];
+    const midX = (x1+x2)/2, midZ = (z1+z2)/2;
+    const len = Math.hypot(x2-x1, z2-z1);
+    const angle = Math.atan2(x2-x1, z2-z1);
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, len+0.6),
+      new THREE.MeshLambertMaterial({ color:0x7EC3E8 })
+    );
+    water.rotation.x = -Math.PI/2;
+    water.rotation.z = -angle;
+    water.position.set(midX, 0.015, midZ);
+    g.add(water);
+    const bank = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, len+0.6),
+      new THREE.MeshLambertMaterial({ color:0xE8DCC0 })
+    );
+    bank.rotation.x = -Math.PI/2;
+    bank.rotation.z = -angle;
+    bank.position.set(midX, 0.008, midZ);
+    g.add(bank);
+  }
+  return g;
+}
+function makeRiverBridge(x,z,rotY){
+  const g = new THREE.Group();
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.14,4.6), new THREE.MeshLambertMaterial({color:0xC9A96E}));
+  plank.position.y = 0.12;
+  g.add(plank);
+  [-1,1].forEach(side=>{
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.4,4.6), new THREE.MeshLambertMaterial({color:0x9A7C4A}));
+    rail.position.set(side*1.15, 0.35, 0);
+    g.add(rail);
+    for(let i=-1;i<=1;i++){
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.5,6), new THREE.MeshLambertMaterial({color:0x9A7C4A}));
+      post.position.set(side*1.15, 0.35, i*1.8);
+      g.add(post);
+    }
+  });
+  g.add(makeBlobShadow(2.8));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+natureGroup.add(makeRiver());
+natureGroup.add(makeRiverBridge(19,-1, Math.PI*0.06));
+
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
 function makeButterfly(x,z){
@@ -3204,21 +3287,17 @@ function makeCharacter({ bodyColor, earColor, earType }){
     nose.rotation.x = Math.PI/2;
     nose.position.set(0, 1.24, 0.8);
     g.add(nose);
-    // whiskers — the cylinder geometry is shifted so its pivot sits at
-    // one end rather than its center; without that shift, rotating it
-    // just spins a line that's symmetric through the attach point either
-    // way, so left/right always looked the same regardless of rotation
-    // sign. Now rotation.z genuinely controls which way it extends.
-    const whiskerGeo = new THREE.CylinderGeometry(0.008,0.008,0.4,4);
-    whiskerGeo.translate(0, 0.2, 0);
+    // whiskers — built as explicit line segments from a start point to
+    // an end point (both given directly in local X/Y/Z), instead of
+    // rotating a shape. This sidesteps rotation-sign math entirely, so
+    // there's no way for left/right to accidentally end up identical.
     [-1,1].forEach(side=>{
       for(let i=0;i<3;i++){
-        const whisker = new THREE.Mesh(
-          whiskerGeo,
-          new THREE.MeshBasicMaterial({color:0xFFFFFF})
-        );
-        whisker.rotation.z = -side*Math.PI/2 + (i-1)*0.18;
-        whisker.position.set(side*0.4, 1.2 - (i-1)*0.05, 0.7);
+        const yOff = (i-1)*0.06;
+        const start = new THREE.Vector3(side*0.3, 1.2 - yOff, 0.62);
+        const end   = new THREE.Vector3(side*0.66, 1.19 - yOff*1.3, 0.66);
+        const whiskerGeo = new THREE.BufferGeometry().setFromPoints([start, end]);
+        const whisker = new THREE.Line(whiskerGeo, new THREE.LineBasicMaterial({color:0xFFFFFF}));
         g.add(whisker);
       }
     });
@@ -3375,6 +3454,7 @@ const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 let moveTarget = null; // {x,z} in world space, or null when not walking
 let wasNearSomething = false; // tracks entering/leaving interact range, see proximity check below
+let conversationContext = ''; // last exchange's reaction, fed into the next AI generation prompt so consecutive questions with the same NPC feel like one ongoing conversation
 
 function isTouchOnUI(target){
   // don't hijack touches that land on real UI controls (buttons, overlays, etc.)
@@ -3875,6 +3955,59 @@ reviewStartBtn.addEventListener('click', ()=>{
 const RARITY_COST = { common:50, uncommon:100, rare:200, legendary:400 };
 const RARITY_LABEL = { common:'よくいる', uncommon:'めずらしい', rare:'レア', legendary:'でんせつ' };
 
+const CAT_FACTS = {
+  'マンチカン':'脚が短いのが特徴で、名前は「小さい」という意味の言葉に由来するよ。',
+  'スコティッシュフォールド':'耳がぺたんと折れているのが特徴。生まれたときは耳が立っていることが多いよ。',
+  'アメリカンショートヘア':'もともとネズミ捕り名人として、船や農場で活躍していたよ。',
+  'ブリティッシュショートヘア':'まんまるの顔とがっしりした体つきが特徴。イギリスで一番古い猫種のひとつだよ。',
+  'ペルシャ':'長くてふわふわの毛が特徴。とても穏やかな性格で有名だよ。',
+  'シャム':'青い瞳としゃべるようによく鳴くことで有名。タイが原産だよ。',
+  'ロシアンブルー':'銀色がかった青い毛並みが美しい、もの静かでおとなしい性格の猫だよ。',
+  'ヒマラヤン':'ペルシャとシャムをかけあわせて生まれた猫種。青い瞳と長い毛が特徴だよ。',
+  'エキゾチックショートヘア':'「短毛のペルシャ」とも呼ばれる、まんまる顔がかわいい猫だよ。',
+  'ジャパニーズボブテイル':'しっぽが短いのが特徴。日本では昔から縁起がいい猫とされてきたよ。',
+  'メインクーン':'世界最大級の猫種のひとつ。ふさふさの尻尾と大きな体が特徴だよ。',
+  'ラグドール':'抱っこするとぐったり脱力することが名前の由来（ぬいぐるみのように）だよ。',
+  'ノルウェージャンフォレストキャット':'北欧の森で暮らしていた、寒さに強い長毛の猫だよ。',
+  'ベンガル':'野生のヤマネコの血をひく、豹のような美しい模様が特徴だよ。',
+  'アビシニアン':'世界で一番古い猫種のひとつとも言われているよ。',
+  'ソマリ':'アビシニアンの長毛タイプ。ふさふさのしっぽが特徴だよ。',
+  'バーマン':'ミャンマー生まれとされる、白い靴下をはいたような足先が特徴だよ。',
+  'オリエンタルショートヘア':'シャムに似たスマートな体型で、毛色や柄がとても多いよ。',
+  'マンクス':'しっぽがほとんどない、または全くないのが特徴の猫種だよ。',
+  'バリニーズ':'シャムの長毛タイプ。優雅な見た目からこの名前がついたよ。',
+  'トンキニーズ':'シャムとバーミーズをかけあわせて生まれた、人懐っこい猫種だよ。',
+  'チャートリュー':'フランス生まれの、青灰色の毛並みが美しい猫だよ。',
+  'バーミーズ':'筋肉質でがっしりした体と、つやのある毛並みが特徴だよ。',
+  'サイベリアン':'ロシア生まれの長毛種で、寒さにとても強いよ。',
+  'アメリカンボブテイル':'短いしっぽと野性的な見た目が特徴の猫種だよ。',
+  'コーニッシュレックス':'毛がくるくるとカールしているのが特徴的な猫だよ。',
+  'デボンレックス':'大きな耳とカールした毛が特徴。「妖精のような猫」とも呼ばれるよ。',
+  'シンガプーラ':'世界最小級の猫種。シンガポール生まれだよ。',
+  'オシキャット':'野生のヤマネコに似た斑点模様が特徴だけど、性格はとても人懐っこいよ。',
+  'ボンベイ':'黒ヒョウのような真っ黒な毛並みとつやが特徴の猫だよ。',
+  'セルカークレックス':'くるくるした巻き毛が特徴。「猫界の羊」とも呼ばれるよ。',
+  'ラパーマ':'生まれたときはつるつるで、成長すると巻き毛になる珍しい猫だよ。',
+  'ターキッシュアンゴラ':'とても古い歴史を持つ、しなやかな体つきの長毛種だよ。',
+  'ターキッシュバン':'泳ぐのが好きなことで有名な、めずらしい猫種だよ。',
+  'エジプシャンマウ':'自然に斑点模様ができる、数少ない猫種のひとつだよ。',
+  'ハバナブラウン':'濃い茶色の毛並みが特徴。名前は葉巻の色に由来しているよ。',
+  'コラット':'タイ生まれの、幸運を呼ぶとされる銀灰色の猫だよ。',
+  'ラガマフィン':'ラグドールから生まれた、大きくてふわふわの毛が特徴の猫種だよ。',
+  'アメリカンカール':'耳が後ろにくるっと巻いているのが特徴的だよ。',
+  'ピクシーボブ':'山猫のような見た目だけど、実は普通の家猫の血統だよ。',
+  'スフィンクス':'毛がほとんどない、しわしわの肌が特徴のとても珍しい猫種だよ。',
+  'サバンナ':'アフリカの野生のサーバルという動物の血をひく、大きくて活発な猫だよ。',
+  'キムリック':'マンクスの長毛タイプ。しっぽがないのが特徴だよ。',
+  'ネベロング':'ロシアンブルーに似た、青灰色の長毛が特徴の珍しい猫種だよ。',
+  'トイビー':'とても小さい体が特徴の、生まれたばかりの珍しい猫種だよ。',
+  'ミヌエット':'短い脚とふわふわの毛が特徴。「ナポレオン」とも呼ばれていたよ。',
+  'ヨーロピアンショートヘア':'ヨーロッパで昔から暮らしてきた、自然な体つきの猫だよ。',
+  'キンカロー':'巻き耳と短い脚を両方持つ、とても珍しい猫種だよ。',
+  'ドンスコイ':'毛のないロシア生まれの猫。しわの多い肌が特徴だよ。',
+  'ウクライナレフコイ':'折れ耳と毛のない肌をあわせ持つ、世界的にとても珍しい猫種だよ。',
+};
+
 const CAT_BREEDS = [
   // common
   ...['マンチカン','スコティッシュフォールド','アメリカンショートヘア','ブリティッシュショートヘア','ペルシャ',
@@ -3894,7 +4027,7 @@ const CAT_BREEDS = [
   ...['スフィンクス','サバンナ','キムリック','ネベロング','トイビー',
       'ミヌエット','ヨーロピアンショートヘア','キンカロー','ドンスコイ','ウクライナレフコイ']
     .map(name=>({ name, rarity:'legendary' })),
-].map((c,i)=>({ id:'breed_'+i, ...c, cost:RARITY_COST[c.rarity] }));
+].map((c,i)=>({ id:'breed_'+i, ...c, cost:RARITY_COST[c.rarity], fact:CAT_FACTS[c.name]||'' }));
 
 let catAlbumFilter = 'all';
 
@@ -3909,6 +4042,10 @@ document.getElementById('closeRewards').addEventListener('click', ()=>{
   rewardsOverlay.classList.remove('show');
 });
 
+document.getElementById('closeCatDetail').addEventListener('click', ()=>{
+  document.getElementById('catDetailOverlay').classList.remove('show');
+});
+
 document.getElementById('rarityTabs').addEventListener('click', e=>{
   const btn = e.target.closest('.rarity-tab'); if(!btn) return;
   document.querySelectorAll('.rarity-tab').forEach(b=>b.classList.remove('active'));
@@ -3917,21 +4054,48 @@ document.getElementById('rarityTabs').addEventListener('click', e=>{
   renderCatAlbum();
 });
 
+const PORTRAIT_COLORS = ['#FFB870','#FF8FA3','#8FC7FF','#B9A6E8','#6FE0C2','#FFD873','#C9A96E','#F2965B','#5FA3E8','#3FC7A6'];
+function portraitColor(id){
+  const n = parseInt(id.split('_')[1],10) || 0;
+  return PORTRAIT_COLORS[n % PORTRAIT_COLORS.length];
+}
+
 function renderCatAlbum(){
   const albumEl = document.getElementById('catAlbum');
   const list = CAT_BREEDS.filter(c => catAlbumFilter==='all' || c.rarity===catAlbumFilter);
+
+  const pct = Math.round((ownedCats.size / CAT_BREEDS.length) * 100);
+  document.getElementById('catCompleteLabel').textContent = `コンプリート ${pct}%（${ownedCats.size}/${CAT_BREEDS.length}）`;
+  document.getElementById('catCompleteFill').style.width = pct + '%';
+
   albumEl.innerHTML = list.map(c=>{
     const owned = ownedCats.has(c.id);
     const canAfford = coins >= c.cost;
-    return `<div class="cat-card ${owned?'owned':''}">
+    return `<div class="cat-card ${owned?'owned':''}" ${owned?`data-id="${c.id}"`:''}>
+      <div class="cat-portrait ${owned?'':'locked'}" style="background:${owned?portraitColor(c.id):'#DCD8E8'};">${owned?'🐱':'❔'}</div>
       <span class="rarity-pill ${c.rarity}">${RARITY_LABEL[c.rarity]}</span>
-      <span class="name">🐱 ${c.name}</span>
+      <span class="name">${owned ? c.name : '？？？'}</span>
       ${owned
-        ? `<span class="owned-label">✓ 図鑑にある</span>`
+        ? `<span class="owned-label">✓ タップでしょうさい</span>`
         : `<button class="acquire-btn" data-id="${c.id}" ${canAfford?'':'disabled'}>${canAfford ? `てにいれる（${c.cost}🪙）` : `${c.cost}🪙 ひつよう`}</button>`
       }
     </div>`;
   }).join('');
+
+  albumEl.querySelectorAll('.cat-card.owned').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const breed = CAT_BREEDS.find(c=>c.id===card.dataset.id);
+      if(!breed) return;
+      document.getElementById('catDetailPortrait').style.background = portraitColor(breed.id);
+      document.getElementById('catDetailPortrait').textContent = '🐱';
+      document.getElementById('catDetailName').textContent = breed.name;
+      const rp = document.getElementById('catDetailRarity');
+      rp.textContent = RARITY_LABEL[breed.rarity];
+      rp.className = 'rarity-pill ' + breed.rarity;
+      document.getElementById('catDetailFact').textContent = breed.fact || '';
+      document.getElementById('catDetailOverlay').classList.add('show');
+    });
+  });
 
   albumEl.querySelectorAll('.acquire-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -4105,13 +4269,26 @@ document.getElementById('lrCloseBtn').addEventListener('click', lrClose);
 function lrBindHold(id, key){
   const el = document.getElementById(id);
   const set = (v)=> LR.input && (LR.input[key] = v);
-  el.addEventListener('pointerdown', e=>{ e.preventDefault(); set(true); });
+  el.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); } catch(err){}
+    set(true);
+  });
   ['pointerup','pointercancel','pointerleave'].forEach(ev=> el.addEventListener(ev, ()=> set(false)));
 }
 lrBindHold('lrLeft','left');
 lrBindHold('lrRight','right');
 lrBindHold('lrUp','up');
 lrBindHold('lrDown','down');
+
+// safety net: if a touch/click release is ever missed by the buttons
+// above (a known source of "stuck" held-down input on touch devices),
+// force-clear all D-pad state on any release or focus loss anywhere
+function lrClearInput(){
+  if(LR.input){ LR.input.left = LR.input.right = LR.input.up = LR.input.down = false; }
+}
+window.addEventListener('pointercancel', lrClearInput);
+window.addEventListener('blur', lrClearInput);
 
 const LR_MOVE_TIME = 0.16; // seconds to glide between adjacent nodes
 const LR_ENEMY_STEP_TIME = 0.55;
@@ -4343,6 +4520,7 @@ document.getElementById('closeNpcProfile').addEventListener('click', ()=>{
 function openQuiz(npc){
   activeNPC = npc;
   quizOpen = true;
+  conversationContext = '';
   quizOverlay.classList.add('show');
   document.getElementById('npcProfileBtn').style.display = '';
   npcAvatar.textContent = npc.def.emoji;
@@ -4587,9 +4765,10 @@ async function generateAIExercise(npc){
 条件：
 - ${difficultyHint}にすること
 - まずキャラが何か話しかける一文（opener）を作る
-- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）
+- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - 最後にキャラが返す短いリアクション（reaction）を1文作る。ここにキャラクターの性格を反映させること
-- 日本語訳（openerJa, reactionJa）の文末表現にも、そのキャラクターの性格・口調を反映させること
+- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
+- 日本語訳の文末表現にも、そのキャラクターの性格・口調を反映させること
 - 前に使った例文「${target.sentence}」とは違う場面・文脈にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
 {"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
@@ -4633,11 +4812,17 @@ async function loadQuestion(){
   await ensureExerciseContent(item);
   if(myRequestId !== loadQuestionRequestId) return; // a newer question started while we were waiting
 
-  // the word-order exercise gets frustratingly hard once a sentence has
-  // too many tokens to juggle — fall back to the (always-manageable)
-  // blank-fill exercise for longer sentences instead
+  // some vocab entries are pattern templates using placeholder letters,
+  // e.g. "turn A into B" or "prevent A from B" — in any natural sentence
+  // demonstrating them, A and B get replaced with real words, so the
+  // literal phrase never appears verbatim and blank-fill mode can't work
+  // for these at all (it was leaving a dangling, disconnected blank).
+  // Route them to the order exercise only, which just scrambles the
+  // whole sentence's tokens and doesn't need to find the phrase as a
+  // substring.
+  const isTemplateWord = /\bA\b|\bB\b/.test(item.en);
   const tokenCount = (item.sentence || '').split(' ').length;
-  const preferOrder = quizIndex % 2 !== 0 && tokenCount <= 6;
+  const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 6);
   const mode = preferOrder ? 'order' : 'blank';
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
@@ -4731,13 +4916,17 @@ async function ensureExerciseContent(item){
 
 async function generateSentenceForWord(item){
   const personality = activeNPC ? (activeNPC.def.personality || 'げんき') : 'げんき';
+  const contextLine = conversationContext
+    ? `\n直前の会話の流れ: 「${conversationContext}」\nこの流れに自然につながるように、話しかける一文（opener）を作ること（急に話題を変えないこと）。`
+    : '';
   const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくるキャラクター（性格: ${personality}）です。
-英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を使った、短い2〜3ターンの自然な会話を1つ作ってください。
+英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を使った、短い2〜3ターンの自然な会話を1つ作ってください。${contextLine}
 条件：
 - 中学生にもわかる、やさしい英文にすること
 - まずキャラが何か話しかける一文（opener）を作る
-- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）
+- それに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - 最後にキャラが返す短いリアクション（reaction）を1文作る
+- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
 {"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
 
@@ -4814,6 +5003,7 @@ function handleBlankAnswer(btn, correct, item){
         `<div class="reaction-bubble"><span class="en">${item.reaction}</span><span class="ja">${item.reactionJa||''}</span></div>`;
     }
     recordMistakeResolved(item.en);
+    conversationContext = item.reaction || item.sentence;
   } else {
     btn.classList.add('wrong');
     if(slot) slot.classList.add('filled-wrong');
@@ -4904,6 +5094,7 @@ function renderOrderExercise(item){
           `<div class="reaction-bubble"><span class="en">${item.reaction}</span><span class="ja">${item.reactionJa||''}</span></div>`;
       }
       recordMistakeResolved(item.en);
+      conversationContext = item.reaction || item.sentence;
       speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
