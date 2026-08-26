@@ -66,8 +66,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 #quizOverlay.show{display:flex;}
 .quiz-card{
   width:min(94vw, 560px); background:var(--card); border-radius:26px;
-  padding:22px 22px 24px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
-  display:flex; flex-direction:column; align-items:center; gap:16px;
+  padding:24px 22px 26px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
+  display:flex; flex-direction:column; align-items:center; gap:20px;
   border:3px solid transparent; transition:border-color .2s ease;
   position:relative;
   max-height:88vh; overflow-y:auto;
@@ -167,9 +167,9 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   100%{ transform:scale(1); }
 }
 
-.choices{display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%;}
+.choices{display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; margin-top:4px;}
 
-.type-answer-row{ display:flex; gap:8px; width:100%; align-items:center; }
+.type-answer-row{ display:flex; gap:8px; width:100%; align-items:center; margin-top:6px; }
 .type-answer-input{
   flex:1; border:2px solid #ECE5FA; border-radius:14px; padding:12px 14px;
   font-family:'Fredoka',sans-serif; font-size:18px; color:var(--plum); outline:none;
@@ -264,10 +264,10 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
     <span class="coin-icon">🪙</span>
     <span class="coin-count" id="coinCount">0</span>
   </div>
-  <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-    <span style="font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:#fff; text-shadow:0 2px 6px rgba(74,59,92,0.35); pointer-events:none;">🐾 ねこじま</span>
-    <div class="hint-pill" id="hintPill">スティックで歩いて、NPCに近づいてね</div>
-  </div>
+</div>
+<div style="position:fixed; top:14px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:4px; z-index:19; pointer-events:none;">
+  <span style="font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:#fff; text-shadow:0 2px 6px rgba(74,59,92,0.35);">🐾 ねこじま</span>
+  <div class="hint-pill" id="hintPill">スティックで歩いて、NPCに近づいてね</div>
 </div>
 
 <button id="interactBtn">💬 はなしかける</button>
@@ -4505,13 +4505,13 @@ const JOKES = [
 ];
 
 const FORTUNES = [
-  { luck:'大吉', en:"Great things are coming your way today!", ja:"今日はすてきなことが起こりそうだよ！" },
-  { luck:'中吉', en:"Your hard work will pay off soon.", ja:"がんばりが、もうすぐ実りそう。" },
-  { luck:'吉', en:"A good friend will make you smile today.", ja:"今日は友だちが、きみを笑顔にしてくれそう。" },
-  { luck:'小吉', en:"Something small but nice will happen.", ja:"小さいけど、うれしいことがありそう。" },
-  { luck:'末吉', en:"Keep trying — tomorrow looks even better!", ja:"がんばって！明日はもっといい日になりそう。" },
-  { luck:'大吉', en:"Your English is getting stronger every day!", ja:"きみの英語力は、毎日ぐんぐん伸びているよ！" },
-  { luck:'中吉', en:"A new word you learn today will help you later.", ja:"今日覚えた単語が、あとできっと役に立つよ。" },
+  { luck:'大吉', luckEn:'Great Blessing', en:"Great things are coming your way today!", ja:"今日はすてきなことが起こりそうだよ！" },
+  { luck:'中吉', luckEn:'Middle Blessing', en:"Your hard work will pay off soon.", ja:"がんばりが、もうすぐ実りそう。" },
+  { luck:'吉', luckEn:'Blessing', en:"A good friend will make you smile today.", ja:"今日は友だちが、きみを笑顔にしてくれそう。" },
+  { luck:'小吉', luckEn:'Small Blessing', en:"Something small but nice will happen.", ja:"小さいけど、うれしいことがありそう。" },
+  { luck:'末吉', luckEn:'Future Blessing', en:"Keep trying — tomorrow looks even better!", ja:"がんばって！明日はもっといい日になりそう。" },
+  { luck:'大吉', luckEn:'Great Blessing', en:"Your English is getting stronger every day!", ja:"きみの英語力は、毎日ぐんぐん伸びているよ！" },
+  { luck:'中吉', luckEn:'Middle Blessing', en:"A new word you learn today will help you later.", ja:"今日覚えた単語が、あとできっと役に立つよ。" },
 ];
 
 const PRAISES = [
@@ -4597,6 +4597,7 @@ function renderFortuneResult(landmark){
   quizBody.innerHTML = `
     <span class="exercise-tag blank" style="background:var(--lavender-deep);">🔮 きょうの運勢</span>
     <div class="omikuji-result">${pick.luck}</div>
+    <div class="ja-hint" style="margin-top:-8px;">${pick.luckEn}</div>
     <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
     <button class="speak-btn" id="lmSpeak" style="align-self:center;">
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
@@ -4604,6 +4605,7 @@ function renderFortuneResult(landmark){
     <div class="ja-hint">${pick.ja}</div>
   `;
   document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+  speakEnglish(pick.en);
   burstSparkles(document.getElementById('lmSpeak'));
   nextBtn.textContent = 'もう一度ひく 🎲';
   nextBtn.classList.add('show');
@@ -4705,6 +4707,7 @@ async function generateAIExercise(npc){
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書くこと
+- sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
@@ -4801,13 +4804,23 @@ async function saveSentenceCache(){
 }
 
 function applyGeneratedContent(item, data){
-  item.sentence = data.sentence;
+  item.sentence = dedupeAdjacentRepeat(data.sentence, data.usedPhrase || item.en);
   item.sentenceJa = data.sentenceJa;
   item.opener = data.opener || '';
   item.openerJa = data.openerJa || '';
   item.reaction = data.reaction || '';
   item.reactionJa = data.reactionJa || '';
   item.usedPhrase = data.usedPhrase || item.en;
+}
+
+// occasionally the AI accidentally repeats the target phrase right next
+// to itself (e.g. "a virus virus that makes us sick") — likely because
+// it's asked to both use the phrase AND report it back as usedPhrase.
+// Collapse any such immediate duplication defensively.
+function dedupeAdjacentRepeat(sentence, phrase){
+  if(!sentence || !phrase) return sentence;
+  const re = new RegExp('\\b(' + escapeRegex(phrase) + ')\\s+\\1\\b', 'gi');
+  return sentence.replace(re, '$1');
 }
 
 function fallbackContent(item){
@@ -4881,6 +4894,7 @@ async function generateSentenceForWord(item){
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
 4. sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書く
+5. sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 条件：
 - 中学生にもわかる、やさしい英文にすること
