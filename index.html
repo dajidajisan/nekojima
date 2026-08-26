@@ -2360,7 +2360,7 @@ const NPCS_PER_WORLD = 10;
 const NPC_NAME_POOL = ['ここちゃん','くうた','ふくろう先生','もこ','みけ','そら','つき','まる','ぽん','りん',
   'はな','くる','とと','ちゃこ','ふく','なな','ここあ','きなこ','もも','あんず',
   'さくら','ゆず','みつき','こむぎ','あずき','まろん','ぴのこ','たると','しろ','くろ'];
-const NPC_TYPE_POOL = ['cat','bear','owl','rabbit'];
+const NPC_TYPE_POOL = ['cat'];
 const NPC_PERSONALITY_POOL = ['げんき','のんびり','クール','やさしい'];
 const NPC_COLOR_POOL = [
   [0xFF8FA3,0xFFC9D6],[0x6FE0C2,0x3FC7A6],[0xB9A6E8,0x9A82D6],[0xFFD873,0xF5B942],
@@ -2368,6 +2368,7 @@ const NPC_COLOR_POOL = [
 ];
 const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク' };
 const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
+const NPC_BREED_POOL = ['三毛猫','黒猫','白猫','キジトラ','茶トラ','サビ猫','ハチワレ','グレー猫','ポインテッド柄','しま猫'];
 
 // each of the 30 NPCs owns an explicit ~50-word slice of VOCAB (instead of
 // filtering by category) — this is what makes "~50 words per NPC" exact
@@ -2392,6 +2393,7 @@ function buildNpcRoster(){
         name: NPC_NAME_POOL[idx % NPC_NAME_POOL.length],
         type,
         emoji: EMOJI_BY_TYPE[type],
+        breed: NPC_BREED_POOL[idx % NPC_BREED_POOL.length],
         color, earColor,
         pos,
         personality: NPC_PERSONALITY_POOL[idx % NPC_PERSONALITY_POOL.length],
@@ -2665,17 +2667,17 @@ const ISLANDS = [
     landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4] },
   },
   {
-    id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:150, status:'ready',
+    id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:250, status:'ready',
     theme:{ groundDay:0xC7C9D4, groundNight:0x33364A, path:0x9098A8, wall:0xE4E6EE, roofs:[0x6B7A99,0x8993B0,0x5E6B87], buildingScaleY:2.1, natureVisible:false },
     landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14] },
   },
   {
-    id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:350, status:'ready',
+    id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
     landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9] },
   },
   {
-    id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:500, status:'comingSoon',
+    id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
     theme:{}, landmarkPos:{},
   },
 ];
@@ -4133,7 +4135,7 @@ function lrStart(){
   // per sentence token, plus a couple of decoy words from other vocab
   const candidateNodes = shuffle(allNodeIds.filter(id => id!==startId && id!==enemyStartId));
   const decoyPool = shuffle(VOCAB.filter(v=>v.en!==item.en && v.sentence)).slice(0,4);
-  const decoyWords = shuffle(decoyPool.flatMap(v=>v.sentence.split(' '))).slice(0, Math.min(3, Math.max(0, candidateNodes.length - tokens.length)));
+  const decoyWords = shuffle(decoyPool.flatMap(v=>v.sentence.split(' '))).slice(0, Math.min(2, Math.max(0, candidateNodes.length - tokens.length)));
 
   const tileWords = shuffle([...tokens.map((w,i)=>({word:w, correctIndex:i, isDecoy:false})), ...decoyWords.map(w=>({word:w, correctIndex:-1, isDecoy:true}))]);
   const tiles = tileWords.map((tw, i) => ({
@@ -4215,8 +4217,8 @@ function lrClearInput(){
 window.addEventListener('pointercancel', lrClearInput);
 window.addEventListener('blur', lrClearInput);
 
-const LR_MOVE_TIME = 0.16; // seconds to glide between adjacent nodes
-const LR_ENEMY_STEP_TIME = 0.55;
+const LR_MOVE_TIME = 0.24; // seconds to glide between adjacent nodes
+const LR_ENEMY_STEP_TIME = 0.85;
 
 function lrLoop(ts){
   requestAnimationFrame(lrLoop);
@@ -4260,9 +4262,13 @@ function lrUpdatePlayer(dt){
       LR.playerMoving = false;
       LR.playerPos = { ...LR.playerTo };
     } else {
+      // ease-in-out instead of linear, for smoother-looking motion
+      const e = LR.playerMoveT < 0.5
+        ? 2*LR.playerMoveT*LR.playerMoveT
+        : 1 - Math.pow(-2*LR.playerMoveT + 2, 2) / 2;
       LR.playerPos = {
-        x: LR.playerFrom.x + (LR.playerTo.x - LR.playerFrom.x)*LR.playerMoveT,
-        y: LR.playerFrom.y + (LR.playerTo.y - LR.playerFrom.y)*LR.playerMoveT,
+        x: LR.playerFrom.x + (LR.playerTo.x - LR.playerFrom.x)*e,
+        y: LR.playerFrom.y + (LR.playerTo.y - LR.playerFrom.y)*e - Math.sin(e*Math.PI)*4,
       };
     }
   }
@@ -4429,7 +4435,7 @@ document.getElementById('npcProfileBtn').addEventListener('click', ()=>{
   if(!activeNPC) return; // no profile for the review-notebook session
   const def = activeNPC.def;
   document.getElementById('profileAvatar').textContent = def.emoji;
-  document.getElementById('profileName').textContent = def.name;
+  document.getElementById('profileName').textContent = def.breed ? `${def.name}（${def.breed}）` : def.name;
   const pTag = document.getElementById('profilePersonality');
   pTag.textContent = def.personality || 'げんき';
   pTag.className = 'rarity-pill ' + (PERSONALITY_COLOR[def.personality] || 'common');
@@ -4455,7 +4461,7 @@ function openQuiz(npc){
   npcAvatar.textContent = npc.def.emoji;
   npcAvatar.style.background = '#'+npc.def.color.toString(16).padStart(6,'0')+'33';
   npcName.textContent = npc.def.name;
-  npcSub.textContent = `${npc.def.name}とおはなし中`;
+  npcSub.textContent = `${npc.def.breed || ''} ・ ${npc.def.personality || ''}`;
 
   const remaining = npc.vocabList.filter(v => !masteredWords.has(v.en));
   let queue = clusterByCategory(remaining);
@@ -4566,6 +4572,7 @@ function renderLandmarkContent(landmark){
       <div class="ja-hint">${pick.ja}</div>
     `;
     document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+    speakEnglish(pick.en);
     burstSparkles(document.getElementById('lmSpeak'));
     nextBtn.textContent = 'もう一回 🎲';
     nextBtn.classList.add('show');
@@ -4696,7 +4703,8 @@ async function generateAIExercise(npc){
 - ${difficultyHint}にすること
 - opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
 - まずキャラが何か話しかける一文（opener）を作る
-- その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書くこと
 
 【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
@@ -4707,7 +4715,7 @@ async function generateAIExercise(npc){
 - 日本語訳の文末表現にも、そのキャラクターの性格・口調を反映させること
 - 前に使った例文「${target.sentence}」とは違う場面・文脈にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
-{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
+{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
 
   try{
     const data = await callClaudeProxy(prompt);
@@ -4799,6 +4807,7 @@ function applyGeneratedContent(item, data){
   item.openerJa = data.openerJa || '';
   item.reaction = data.reaction || '';
   item.reactionJa = data.reactionJa || '';
+  item.usedPhrase = data.usedPhrase || item.en;
 }
 
 function fallbackContent(item){
@@ -4806,6 +4815,7 @@ function fallbackContent(item){
     sentence: `I want to learn the word "${item.en}".`,
     sentenceJa: `わたしは「${item.ja}」ということばを覚えたいです。`,
     opener: '', openerJa: '', reaction: '', reactionJa: '',
+    usedPhrase: item.en,
   };
 }
 
@@ -4870,14 +4880,15 @@ async function generateSentenceForWord(item){
 このように、opener で聞かれたことに sentence がまっすぐ答える形にしてください。
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
+4. sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書く
 
 条件：
 - 中学生にもわかる、やさしい英文にすること
 - opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
-- 単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- 文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
-{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
+{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
 
   try{
     const data = await callClaudeProxy(prompt);
@@ -4917,7 +4928,7 @@ function renderBlankExercise(item){
     <div id="feedbackSlot"></div>
     <div id="reactionSlot"></div>
   `;
-  const blankHtml = insertBlank(item.sentence, item.en);
+  const blankHtml = insertBlank(item.sentence, item.usedPhrase || item.en);
   document.getElementById('sentenceLine').innerHTML = blankHtml;
 
   // choices are shown as a hint only — tapping them does nothing;
