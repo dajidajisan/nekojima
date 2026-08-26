@@ -66,8 +66,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 #quizOverlay.show{display:flex;}
 .quiz-card{
   width:min(94vw, 560px); background:var(--card); border-radius:26px;
-  padding:20px 20px 22px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
-  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:22px 22px 24px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
+  display:flex; flex-direction:column; align-items:center; gap:16px;
   border:3px solid transparent; transition:border-color .2s ease;
   position:relative;
   max-height:88vh; overflow-y:auto;
@@ -273,7 +273,6 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 <button id="interactBtn">💬 はなしかける</button>
 
 <button id="settingsBtn">⚙️ 設定</button>
-<button id="addNpcBtn">🐾＋ なかまをつくる</button>
 <button id="reviewBtn">📖 復習ノート<span id="mistakeBadge" class="mistake-badge"></span></button>
 <button id="rewardsBtn">🎁 ごほうび</button>
 
@@ -306,51 +305,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   </div>
 </div>
 
-<div id="npcCreateOverlay">
-  <div class="npc-create-card">
-    <button class="close-x" id="closeNpcCreate">✕</button>
-    <h2>あたらしい なかまをつくろう</h2>
-
-    <label class="nc-label">なまえ</label>
-    <input type="text" id="ncName" maxlength="8" placeholder="例: みかん" class="nc-input">
-
-    <label class="nc-label">どうぶつ</label>
-    <div class="nc-row" id="ncTypeRow">
-      <button class="nc-choice active" data-type="cat">🐱 ねこ</button>
-      <button class="nc-choice" data-type="bear">🐻 くま</button>
-      <button class="nc-choice" data-type="owl">🦉 ふくろう</button>
-      <button class="nc-choice" data-type="rabbit">🐰 うさぎ</button>
-    </div>
-
-    <label class="nc-label">いろ</label>
-    <div class="nc-row" id="ncColorRow"></div>
-
-    <label class="nc-label">せいかく</label>
-    <div class="nc-row" id="ncPersonalityRow">
-      <button class="nc-choice active" data-p="げんき">げんき</button>
-      <button class="nc-choice" data-p="のんびり">のんびり</button>
-      <button class="nc-choice" data-p="クール">クール</button>
-      <button class="nc-choice" data-p="やさしい">やさしい</button>
-    </div>
-
-    <label class="nc-label">おしえてくれることば</label>
-    <div class="nc-row" id="ncCatRow"></div>
-
-    <label class="nc-label">ひとことプロフィール（にんい）</label>
-    <textarea id="ncBio" maxlength="60" placeholder="例: あまいものが大好きなカフェ店員" class="nc-input" rows="2" style="resize:none;"></textarea>
-
-    <button class="quiz-footer-btn show" id="ncCreateBtn" style="margin-top:6px;">この子をつくる！</button>
-  </div>
-</div>
-
 <style>
-#addNpcBtn{
-  position:fixed; top:14px; right:14px; z-index:22;
-  background:rgba(255,255,255,0.82); backdrop-filter:blur(6px);
-  border:none; border-radius:999px; padding:10px 16px;
-  font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:12.5px; color:var(--plum);
-  box-shadow:0 4px 14px rgba(122,106,147,0.2); cursor:pointer;
-}
 #reviewBtn, #rewardsBtn{
   position:fixed; right:14px; z-index:22;
   background:rgba(255,255,255,0.82); backdrop-filter:blur(6px);
@@ -358,8 +313,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:12.5px; color:var(--plum);
   box-shadow:0 4px 14px rgba(122,106,147,0.2); cursor:pointer;
 }
-#reviewBtn{ top:60px; }
-#rewardsBtn{ top:106px; }
+#reviewBtn{ top:14px; }
+#rewardsBtn{ top:60px; }
 .mistake-badge{
   display:none; align-items:center; justify-content:center;
   position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
@@ -453,12 +408,6 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .island-emoji{ font-size:30px; }
 .island-name{ font-weight:800; color:var(--plum); font-size:14px; }
 .island-status{ font-size:11px; color:var(--plum-soft); font-weight:700; margin-top:2px; }
-#npcCreateOverlay{
-  position:fixed; inset:0; z-index:80; display:none;
-  align-items:center; justify-content:center;
-  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
-}
-#npcCreateOverlay.show{display:flex;}
 .npc-create-card{
   width:min(92vw,440px); max-height:88vh; overflow-y:auto;
   background:var(--card); border-radius:26px; padding:22px 22px 26px;
@@ -2406,18 +2355,55 @@ const IMPORTED_VOCAB = [
 
 const VOCAB = [...CURATED_VOCAB, ...IMPORTED_VOCAB];
 
-const NPC_DEFS = [
-  { id:"neko", name:"ここちゃん", type:"cat",  emoji:"🐱", color:0xFF8FA3, earColor:0xFFC9D6, pos:[-9,0,-5],  cats:["気持ち","接続","たんご"],
-    personality:"げんき", bio:"おしゃべりが大好きな元気っ子。気持ちを表すことばが得意だよ！" },
-  { id:"kuma", name:"くうた",     type:"bear", emoji:"🐻", color:0x6FE0C2, earColor:0x3FC7A6, pos:[8,0,4],    cats:["せいかつ","熟語","からだ"],
-    personality:"のんびり", bio:"のんびり屋さんで、毎日の暮らしのことばや熟語にくわしいよ。" },
-  { id:"owl",  name:"ふくろう先生", type:"owl",  emoji:"🦉", color:0xB9A6E8, earColor:0x9A82D6, pos:[2,0,-11],  cats:["がっこう","しぜん","時間","しごと"],
-    personality:"クール", bio:"物知りな先生タイプ。学校・自然・時間・社会のことばを教えてくれる。" },
-  { id:"usa",  name:"もこ",       type:"rabbit", emoji:"🐰", color:0xFFD873, earColor:0xF5B942, pos:[-13,0,-2], cats:["気持ち","からだ","たんご"],
-    personality:"やさしい", bio:"甘えん坊でやさしい性格。気持ちや体のことばにくわしいよ。" },
-  { id:"neko2", name:"みけ",      type:"cat",  emoji:"🐱", color:0x8FC7FF, earColor:0x5FA3E8, pos:[11,0,3],   cats:["しごと","接続","たんご"],
-    personality:"クール", bio:"クールでちょっと大人びた猫。社会や接続のことばが得意だよ。" },
+const WORLD_IDS = ['meadow','city','themepark'];
+const NPCS_PER_WORLD = 10;
+const NPC_NAME_POOL = ['ここちゃん','くうた','ふくろう先生','もこ','みけ','そら','つき','まる','ぽん','りん',
+  'はな','くる','とと','ちゃこ','ふく','なな','ここあ','きなこ','もも','あんず',
+  'さくら','ゆず','みつき','こむぎ','あずき','まろん','ぴのこ','たると','しろ','くろ'];
+const NPC_TYPE_POOL = ['cat','bear','owl','rabbit'];
+const NPC_PERSONALITY_POOL = ['げんき','のんびり','クール','やさしい'];
+const NPC_COLOR_POOL = [
+  [0xFF8FA3,0xFFC9D6],[0x6FE0C2,0x3FC7A6],[0xB9A6E8,0x9A82D6],[0xFFD873,0xF5B942],
+  [0x8FC7FF,0x5FA3E8],[0xFFB870,0xF2965B],[0xC9A96E,0x9A7C4A],[0xFFFFFF,0xE5DDF5],
 ];
+const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク' };
+const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
+
+// each of the 30 NPCs owns an explicit ~50-word slice of VOCAB (instead of
+// filtering by category) — this is what makes "~50 words per NPC" exact
+// regardless of how unevenly categories happen to be sized
+function buildNpcRoster(){
+  const worldChunkSize = Math.ceil(VOCAB.length / WORLD_IDS.length);
+  const defs = [];
+  WORLD_IDS.forEach((world, wi)=>{
+    const worldWords = VOCAB.slice(wi*worldChunkSize, (wi+1)*worldChunkSize);
+    const npcChunkSize = Math.ceil(worldWords.length / NPCS_PER_WORLD);
+    for(let ni=0; ni<NPCS_PER_WORLD; ni++){
+      const words = worldWords.slice(ni*npcChunkSize, (ni+1)*npcChunkSize);
+      if(words.length === 0) continue;
+      const idx = wi*NPCS_PER_WORLD + ni;
+      const type = NPC_TYPE_POOL[idx % NPC_TYPE_POOL.length];
+      const [color, earColor] = NPC_COLOR_POOL[idx % NPC_COLOR_POOL.length];
+      const angle = (ni / NPCS_PER_WORLD) * Math.PI * 2;
+      const radius = 18 + (ni % 3) * 5;
+      const pos = [Math.round(Math.cos(angle)*radius*10)/10, 0, Math.round(Math.sin(angle)*radius*10)/10];
+      defs.push({
+        id: 'npc_'+idx,
+        name: NPC_NAME_POOL[idx % NPC_NAME_POOL.length],
+        type,
+        emoji: EMOJI_BY_TYPE[type],
+        color, earColor,
+        pos,
+        personality: NPC_PERSONALITY_POOL[idx % NPC_PERSONALITY_POOL.length],
+        bio: `${WORLD_LABELS[world]}で ことばを おしえてくれる なかまだよ。`,
+        world,
+        wordList: words,
+      });
+    }
+  });
+  return defs;
+}
+const NPC_DEFS = buildNpcRoster();
 
 let masteredWords = new Set();
 let mistakeCounts = {};   // en -> number of times missed (not yet cleared)
@@ -2676,18 +2662,21 @@ const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
     theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
-    npcPos:{ neko:[-9,-5], kuma:[8,4], owl:[2,-11], usa:[-13,-2], neko2:[11,3] },
     landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4] },
   },
   {
     id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:150, status:'ready',
     theme:{ groundDay:0xC7C9D4, groundNight:0x33364A, path:0x9098A8, wall:0xE4E6EE, roofs:[0x6B7A99,0x8993B0,0x5E6B87], buildingScaleY:2.1, natureVisible:false },
-    npcPos:{ neko:[-6,7], kuma:[9,-9], owl:[-8,-11], usa:[-11,-3], neko2:[4,10] },
     landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14] },
   },
   {
-    id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:400, status:'comingSoon',
-    theme:{}, npcPos:{}, landmarkPos:{},
+    id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:350, status:'ready',
+    theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9] },
+  },
+  {
+    id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:500, status:'comingSoon',
+    theme:{}, landmarkPos:{},
   },
 ];
 
@@ -2721,10 +2710,11 @@ function travelToIsland(id){
   // show/hide trees & co.
   natureGroup.visible = theme.natureVisible;
 
-  // move NPCs & landmarks to this island's layout
+  // each of the 30 NPCs belongs to exactly one world now (they each teach
+  // a distinct ~50-word slice), so switching worlds shows/hides the
+  // matching set rather than repositioning a shared cast
   npcs.forEach(n=>{
-    const pos = island.npcPos[n.def.id];
-    if(pos){ n.mesh.position.set(pos[0],0,pos[1]); n.def.pos=[pos[0],0,pos[1]]; }
+    n.mesh.visible = (n.def.world === id);
   });
   landmarks.forEach(l=>{
     const pos = island.landmarkPos[l.id];
@@ -3300,11 +3290,34 @@ function makeCharacter({ bodyColor, earColor, earType }){
       earInner.rotation.z = side*0.08;
       g.add(ear, earInner);
     });
-    // pink nose
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.07,6), toon(0xFF8FA3));
-    nose.rotation.x = Math.PI/2;
-    nose.position.set(0, 1.24, 0.8);
-    g.add(nose);
+    // nose + mouth, drawn as a small canvas decal so the mouth can be a
+    // proper cute curved "w" smile (matching the reference image) rather
+    // than something built out of 3D primitives
+    const faceCanvas = document.createElement('canvas');
+    faceCanvas.width = 100; faceCanvas.height = 60;
+    const fctx = faceCanvas.getContext('2d');
+    fctx.fillStyle = '#FF8FA3';
+    fctx.beginPath();
+    fctx.ellipse(50, 16, 7, 5, 0, 0, Math.PI*2);
+    fctx.fill();
+    fctx.strokeStyle = '#3A3450';
+    fctx.lineWidth = 4;
+    fctx.lineCap = 'round';
+    fctx.beginPath();
+    fctx.moveTo(50, 22);
+    fctx.quadraticCurveTo(38, 38, 22, 24);
+    fctx.stroke();
+    fctx.beginPath();
+    fctx.moveTo(50, 22);
+    fctx.quadraticCurveTo(62, 38, 78, 24);
+    fctx.stroke();
+    const faceTex = new THREE.CanvasTexture(faceCanvas);
+    const faceDecal = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.55, 0.33),
+      new THREE.MeshBasicMaterial({ map:faceTex, transparent:true })
+    );
+    faceDecal.position.set(0, 1.14, 0.79);
+    g.add(faceDecal);
     // whiskers — built as explicit line segments from a start point to
     // an end point (both given directly in local X/Y/Z), instead of
     // rotating a shape. This sidesteps rotation-sign math entirely, so
@@ -3360,7 +3373,7 @@ function makeCharacter({ bodyColor, earColor, earType }){
   });
 
   // big simple round eyes (flat dots, closer to the clean line-art look)
-  const eyeGeo = new THREE.CircleGeometry(0.1,16);
+  const eyeGeo = new THREE.CircleGeometry(0.115,16);
   const eyeMat = new THREE.MeshBasicMaterial({color:0x2E2A3A});
   [-1,1].forEach(side=>{
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
@@ -3431,35 +3444,13 @@ function spawnNPC(def){
   marker.position.set(0,3.05,0);
   mesh.add(marker);
 
-  const vocabList = VOCAB.filter(v => def.cats.includes(v.cat));
+  const vocabList = def.wordList || VOCAB.filter(v => (def.cats||[]).includes(v.cat));
   const npc = { def, mesh, marker, nameplate, vocabList, baseY:0 };
   npcs.push(npc);
   return npc;
 }
 
 NPC_DEFS.forEach(spawnNPC);
-
-// pick a free-ish spot for a newly created custom NPC
-function findSpawnSpot(){
-  for(let tries=0; tries<30; tries++){
-    const a = Math.random()*Math.PI*2, r = 6 + Math.random()*20;
-    const x = Math.cos(a)*r, z = Math.sin(a)*r;
-    const tooClose = npcs.some(n => Math.hypot(n.def.pos[0]-x, n.def.pos[2]-z) < 4);
-    if(!tooClose) return [x,z];
-  }
-  return [Math.random()*10-5, Math.random()*10-5];
-}
-
-// load any custom NPCs the player made in a previous session
-async function loadCustomNPCs(){
-  try{
-    const res = await window.storage.get('neko_custom_npcs');
-    if(res && res.value){
-      const list = JSON.parse(res.value);
-      list.forEach(def => spawnNPC(def));
-    }
-  } catch(e){ /* no saved NPCs yet, that's fine */ }
-}
 
 /* =========================================================
    CONTROLS: tap-to-move — tap anywhere on the ground and the
@@ -3714,6 +3705,7 @@ function animate(){
   // npc idle bob + nearest check (NPCs and special landmarks share the interact button)
   let closest = null, closestDist = Infinity, closestKind = null;
   npcs.forEach(n=>{
+    if(!n.mesh.visible) return; // belongs to a different world, not shown right now
     n.mesh.position.y = Math.abs(Math.sin(t*1.8 + n.def.pos[0]))*0.05;
     n.marker.position.y = 3.05 + Math.sin(t*3 + n.def.pos[0])*0.08;
     n.marker.visible = !allMastered(n);
@@ -3808,116 +3800,6 @@ function clusterByCategory(items){
     }
   });
   return shuffle(queue).flat();
-}
-
-/* =========================================================
-   NPC CREATOR
-========================================================= */
-const NPC_COLOR_PRESETS = [
-  { color:0xFF8FA3, ear:0xFFC9D6 },
-  { color:0x6FE0C2, ear:0x3FC7A6 },
-  { color:0xB9A6E8, ear:0x9A82D6 },
-  { color:0xFFD873, ear:0xF5B942 },
-  { color:0x8FC7FF, ear:0x5FA3E8 },
-  { color:0xFFB870, ear:0xF2965B },
-  { color:0xC9A96E, ear:0x9A7C4A },
-  { color:0xFFFFFF, ear:0xE5DDF5 },
-];
-const ALL_CATS = ["気持ち","接続","せいかつ","熟語","がっこう","しぜん","時間","しごと","からだ","たんご"];
-
-const addNpcBtn = document.getElementById('addNpcBtn');
-const npcCreateOverlay = document.getElementById('npcCreateOverlay');
-const ncTypeRow = document.getElementById('ncTypeRow');
-const ncColorRow = document.getElementById('ncColorRow');
-const ncPersonalityRow = document.getElementById('ncPersonalityRow');
-const ncCatRow = document.getElementById('ncCatRow');
-const ncName = document.getElementById('ncName');
-
-let selectedType = 'cat';
-let selectedColorIdx = 0;
-let selectedPersonality = 'げんき';
-let selectedCats = new Set();
-
-function hexToCss(h){ return '#'+h.toString(16).padStart(6,'0'); }
-
-ncColorRow.innerHTML = NPC_COLOR_PRESETS.map((c,i)=>
-  `<button class="nc-swatch ${i===0?'active':''}" data-idx="${i}" style="background:${hexToCss(c.color)}"></button>`
-).join('');
-
-ncCatRow.innerHTML = ALL_CATS.map(c =>
-  `<button class="nc-choice" data-cat="${c}">${c}</button>`
-).join('');
-
-ncTypeRow.addEventListener('click', e=>{
-  const btn = e.target.closest('.nc-choice'); if(!btn) return;
-  ncTypeRow.querySelectorAll('.nc-choice').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  selectedType = btn.dataset.type;
-});
-ncColorRow.addEventListener('click', e=>{
-  const btn = e.target.closest('.nc-swatch'); if(!btn) return;
-  ncColorRow.querySelectorAll('.nc-swatch').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  selectedColorIdx = Number(btn.dataset.idx);
-});
-ncPersonalityRow.addEventListener('click', e=>{
-  const btn = e.target.closest('.nc-choice'); if(!btn) return;
-  ncPersonalityRow.querySelectorAll('.nc-choice').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  selectedPersonality = btn.dataset.p;
-});
-ncCatRow.addEventListener('click', e=>{
-  const btn = e.target.closest('.nc-choice'); if(!btn) return;
-  const c = btn.dataset.cat;
-  if(selectedCats.has(c)){ selectedCats.delete(c); btn.classList.remove('active'); }
-  else { selectedCats.add(c); btn.classList.add('active'); }
-});
-
-addNpcBtn.addEventListener('click', ()=>{
-  npcCreateOverlay.classList.add('show');
-});
-document.getElementById('closeNpcCreate').addEventListener('click', ()=>{
-  npcCreateOverlay.classList.remove('show');
-});
-
-document.getElementById('ncCreateBtn').addEventListener('click', async ()=>{
-  const name = ncName.value.trim();
-  if(!name){ ncName.focus(); return; }
-  if(selectedCats.size === 0){ return; } // need at least one topic
-
-  const preset = NPC_COLOR_PRESETS[selectedColorIdx];
-  const emojiMap = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
-  const [x,z] = findSpawnSpot();
-  const bio = document.getElementById('ncBio').value.trim();
-
-  const def = {
-    id: 'custom_' + Date.now(),
-    name,
-    type: selectedType,
-    emoji: emojiMap[selectedType],
-    color: preset.color,
-    earColor: preset.ear,
-    personality: selectedPersonality,
-    bio: bio || `${selectedPersonality}な性格の、あたらしいなかま。`,
-    pos: [x, 0, z],
-    cats: Array.from(selectedCats),
-  };
-
-  spawnNPC(def);
-  await saveCustomNPCs();
-
-  npcCreateOverlay.classList.remove('show');
-  ncName.value = '';
-  document.getElementById('ncBio').value = '';
-  selectedCats.clear();
-  ncCatRow.querySelectorAll('.nc-choice').forEach(b=>b.classList.remove('active'));
-});
-
-async function saveCustomNPCs(){
-  try{
-    const customDefs = npcs.filter(n => n.def.id.startsWith('custom_')).map(n => n.def);
-    await window.storage.set('neko_custom_npcs', JSON.stringify(customDefs), false);
-  } catch(e){ /* storage unavailable, custom NPC just won't persist */ }
 }
 
 /* =========================================================
@@ -4552,8 +4434,12 @@ document.getElementById('npcProfileBtn').addEventListener('click', ()=>{
   pTag.textContent = def.personality || 'げんき';
   pTag.className = 'rarity-pill ' + (PERSONALITY_COLOR[def.personality] || 'common');
   document.getElementById('profileBio').textContent = def.bio || 'まだ自己紹介はないみたい。';
-  document.getElementById('profileCats').innerHTML = (def.cats||[])
-    .map(c=>`<span class="nc-choice active" style="cursor:default;">${c}</span>`).join('');
+  const cats = def.cats && def.cats.length
+    ? def.cats
+    : [...new Set(activeNPC.vocabList.map(v=>v.cat))];
+  const wordCountTag = `<span class="nc-choice active" style="cursor:default;">📖 ${activeNPC.vocabList.length}語 たんとう</span>`;
+  document.getElementById('profileCats').innerHTML = wordCountTag +
+    cats.slice(0,4).map(c=>`<span class="nc-choice active" style="cursor:default;">${c}</span>`).join('');
   npcProfileOverlay.classList.add('show');
 });
 document.getElementById('closeNpcProfile').addEventListener('click', ()=>{
@@ -4661,6 +4547,7 @@ function renderLandmarkContent(landmark){
       <div class="ja-hint">💡 ${pick.explain}</div>
     `;
     document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+    speakEnglish(pick.en);
     nextBtn.textContent = 'もう一回 🎲';
     nextBtn.classList.add('show');
     nextBtn.onclick = ()=> renderLandmarkContent(landmark);
@@ -4807,6 +4694,7 @@ async function generateAIExercise(npc){
 このキャラクターの口調・性格が伝わるように、英検準2級レベルの単語・熟語「${target.en}」（日本語の意味: ${target.ja}）を使った、短い2〜3ターンの自然な会話を1つ新しく作ってください。
 条件：
 - ${difficultyHint}にすること
+- opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 
@@ -4985,6 +4873,7 @@ async function generateSentenceForWord(item){
 
 条件：
 - 中学生にもわかる、やさしい英文にすること
+- opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
 - 単語や熟語の形は変えないこと（活用や語順を変えない）。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
@@ -5283,16 +5172,16 @@ function burstSparkles(btn){
 }
 
 // show the save-code screen (if needed), then restore mastered words,
-// mistake history, coins, cat collection, custom NPCs, and the AI
-// sentence cache for that code
+// mistake history, coins, cat collection, and the AI sentence cache for
+// that code
 ensurePlayerCode().then(()=>{
   loadProgress();
   loadSentenceCache();
-  loadCustomNPCs();
 });
 applyDayNight();
 updateIslandUI();
 updateWordPercent();
+npcs.forEach(n=>{ n.mesh.visible = (n.def.world === currentIslandId); });
 
 </script>
 </body>
