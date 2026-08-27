@@ -232,17 +232,15 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .sparkle{position:fixed; pointer-events:none; font-size:20px; z-index:70; animation:sparkleFly .9s ease-out forwards;}
 @keyframes sparkleFly{0%{transform:translate(0,0) scale(0.4) rotate(0deg); opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(1.1) rotate(180deg); opacity:0;}}
 
-/* narrow screens (iPhone portrait): the jar+daily group can wrap onto a
-   second line, making hud-top taller — push the fixed review/rewards
-   buttons down further so they don't overlap it, and shrink things a
-   little so wrapping happens less often in the first place */
+/* narrow screens (iPhone portrait): shrink the HUD a little so it wraps
+   less often. Review/rewards buttons are bottom-anchored now (mirroring
+   settingsBtn's bottom-left placement) so they no longer depend on the
+   top HUD's width/wrapping at all. */
 @media (max-width: 430px){
   .jar-wrap{ padding:5px 14px 5px 5px; gap:8px; }
   .jar-svg{ width:38px; height:38px; }
   .jar-label .title{ font-size:11px; }
   .daily-wrap{ font-size:11px; padding:6px 10px; gap:6px; }
-  #reviewBtn{ top:100px; }
-  #rewardsBtn{ top:146px; }
 }
 </style>
 </head>
@@ -336,8 +334,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:12.5px; color:var(--plum);
   box-shadow:0 4px 14px rgba(122,106,147,0.2); cursor:pointer;
 }
-#reviewBtn{ top:14px; }
-#rewardsBtn{ top:60px; }
+#reviewBtn{ bottom:72px; }
+#rewardsBtn{ bottom:26px; }
 .mistake-badge{
   display:none; align-items:center; justify-content:center;
   position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
@@ -2582,6 +2580,10 @@ async function loadProgress(){
       updateLevelHUD();
     }
   } catch(e){ /* first time playing, nothing saved yet */ }
+  // always initialize this, whether or not saved progress existed —
+  // otherwise a brand-new player (no save data yet) would never have it
+  // set at all, leaving grammar checkpoints permanently disabled
+  lastGrammarAtCount = totalAnswered;
 }
 
 function rebuildJarOrbs(){
@@ -4716,9 +4718,12 @@ async function generateAIExercise(npc){
 このキャラクターの口調・性格が伝わるように、英検準2級レベルの単語・熟語「${target.en}」（日本語の意味: ${target.ja}）を使った、短い2〜3ターンの自然な会話を1つ新しく作ってください。
 条件：
 - ${difficultyHint}にすること
-- opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
+- opener・sentence・reaction は、それぞれ8語以内のごく短い一文にすること（長い文にしないこと。特にsentenceは短いほど良い）
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- 【重要】対象の単語の品詞は絶対に変えないこと。名詞（例: belief）を動詞（believe）に、動詞を名詞に変えるなど、別の品詞の単語に置きかえてはいけない。活用形を変えるのはOKだが、品詞そのものを変えるのはNG
+- 【重要】sentence は主語・動詞がそろった、文法的に完全な一文にすること。単語が途中で抜け落ちて意味が通じない文（例: "I ___ any whispers."のように動詞が抜けている）を作らないこと
+- 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
 - opener（話しかけの一文）の中には、対象の単語・熟語「${target.en}」そのものを書かないこと。sentence（返事）の中だけで使うこと（opener で答えを言ってしまわないこと）
 - sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書くこと。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
 - sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
@@ -5015,12 +5020,13 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"「〜であればなあ」という仮定法過去は過去形を使うよ。" },
 ];
 
-let questionsSinceGrammar = 0;
+let lastGrammarAtCount = -1; // initialized properly once totalAnswered loads, see loadProgress
 let lastGrammarIndex = -1;
 
 function maybeShowGrammarQuestion(){
-  if(questionsSinceGrammar < 9) return false;
-  questionsSinceGrammar = 0;
+  if(lastGrammarAtCount < 0) return false; // not loaded yet — skip until progress restore completes
+  if(totalAnswered - lastGrammarAtCount < 10) return false;
+  lastGrammarAtCount = totalAnswered;
   renderGrammarQuestion();
   return true;
 }
@@ -5193,8 +5199,11 @@ async function generateSentenceForWord(item){
 
 条件：
 - 中学生にもわかる、やさしい英文にすること
-- opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
+- opener・sentence・reaction は、それぞれ8語以内のごく短い一文にすること（長い文にしないこと。特にsentenceは短いほど良い）
 - 文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- 【重要】対象の単語の品詞は絶対に変えないこと。名詞を動詞に、動詞を名詞に変えるなど、別の品詞の単語に置きかえてはいけない
+- 【重要】sentence は主語・動詞がそろった、文法的に完全な一文にすること。単語が途中で抜け落ちて意味が通じない文を作らないこと
+- 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと。直訳のせいで意味が通じない日本語（例:「スナックは離れている」のような、主語と動詞の関係がおかしい文）にしないこと。誰が読んでも自然に意味が通る日本語にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
 {"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
@@ -5267,7 +5276,6 @@ function renderBlankExercise(item){
 
 function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
-  questionsSinceGrammar++;
   const slot = document.getElementById('blankSlot');
   if(slot) slot.textContent = item.en;
   input.disabled = true;
@@ -5378,7 +5386,6 @@ function renderOrderExercise(item){
 
   function checkOrder(){
     totalAnswered++;
-    questionsSinceGrammar++;
     const answer = built.map(idx=>pool[idx]).join(' ');
     const correct = answer === item.sentence;
     const buildChips = buildLine.querySelectorAll('.build-chip');
