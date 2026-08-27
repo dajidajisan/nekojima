@@ -129,6 +129,12 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .blank-slot.filled-correct{color:var(--mint-deep); border-color:var(--mint-deep);}
 .blank-slot.filled-wrong{color:var(--coral-deep); border-color:var(--coral-deep);}
 .ja-hint{font-size:12.5px; color:var(--plum-soft); font-weight:700; text-align:center; margin-top:8px;}
+.vocab-callout{
+  display:flex; flex-direction:column; gap:4px; align-self:stretch; text-align:left;
+  background:#F1F3FF; border:2px solid #DCE1F7; border-radius:14px; padding:10px 14px; margin-top:10px;
+}
+.vocab-callout-word{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:var(--lavender-deep); }
+.vocab-callout-explain{ font-size:12px; color:var(--plum-soft); font-weight:700; line-height:1.5; }
 .exercise-tag{font-size:10.5px; font-weight:800; color:#fff; padding:3px 10px; border-radius:999px; align-self:flex-start;}
 .exercise-tag.blank{background:var(--lavender-deep);}
 .exercise-tag.order{background:var(--sunshine-deep); color:#6b4a00;}
@@ -490,6 +496,16 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   font-size:20px; margin-bottom:2px; box-shadow:inset 0 -4px 8px rgba(0,0,0,0.12);
 }
 .cat-portrait.locked{ background:#DCD8E8 !important; filter:grayscale(1); opacity:0.6; }
+.cat-acquire-note{ animation:catAcquirePop .4s ease; }
+@keyframes catAcquirePop{
+  0%{ transform:scale(0.6); opacity:0; }
+  60%{ transform:scale(1.1); opacity:1; }
+  100%{ transform:scale(1); }
+}
+.cat-acquire-portrait{
+  display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px;
+  border-radius:50%; font-size:12px; vertical-align:-5px; box-shadow:inset 0 -3px 6px rgba(0,0,0,0.12);
+}
 .cat-card .name{ font-weight:800; color:var(--plum); font-size:12.5px; display:flex; align-items:center; gap:5px; }
 .cat-card .rarity-pill{ font-size:9px; font-weight:800; color:#fff; padding:2px 7px; border-radius:999px; align-self:flex-start; }
 .rarity-pill.common{ background:#8FC7FF; }
@@ -3575,10 +3591,41 @@ function spawnNPC(def){
   marker.position.set(0,3.05,0);
   mesh.add(marker);
 
+  // small "remaining word count" badge, sitting just above the "!"
+  const countCanvas = document.createElement('canvas');
+  countCanvas.width = 72; countCanvas.height = 40;
+  const countCtx = countCanvas.getContext('2d');
+  const countTex = new THREE.CanvasTexture(countCanvas);
+  const countSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:countTex, transparent:true }));
+  countSprite.scale.set(0.5, 0.28, 1);
+  countSprite.position.set(0, 3.42, 0);
+  mesh.add(countSprite);
+
   const vocabList = def.wordList || VOCAB.filter(v => (def.cats||[]).includes(v.cat));
-  const npc = { def, mesh, marker, nameplate, vocabList, baseY:0 };
+  const npc = { def, mesh, marker, nameplate, countSprite, countCanvas, countCtx, countTex, vocabList, baseY:0 };
+  refreshNpcCount(npc);
   npcs.push(npc);
   return npc;
+}
+
+function refreshNpcCount(npc){
+  const remaining = npc.vocabList.filter(v => !masteredWords.has(v.en)).length;
+  const c = npc.countCtx;
+  c.clearRect(0,0,72,40);
+  if(remaining <= 0){ npc.countSprite.visible = false; return; }
+  npc.countSprite.visible = true;
+  c.fillStyle = 'rgba(74,59,92,0.78)';
+  c.beginPath();
+  c.moveTo(10,4); c.arcTo(62,4,62,20,10); c.arcTo(62,36,10,36,10); c.arcTo(10,36,10,4,10); c.arcTo(10,4,62,4,10);
+  c.closePath(); c.fill();
+  c.fillStyle = '#FFFFFF';
+  c.font = '700 22px sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(String(remaining), 36, 21);
+  npc.countTex.needsUpdate = true;
+}
+function refreshAllNpcCounts(){
+  npcs.forEach(refreshNpcCount);
 }
 
 NPC_DEFS.forEach(spawnNPC);
@@ -4166,13 +4213,16 @@ function renderCatAlbum(){
       ownedCats.add(breed.id);
       updateCoinHUD();
       saveProgress();
+      playCorrectSound();
+      burstSparkles(btn);
       renderCatAlbum();
 
       const note = document.createElement('div');
-      note.style.cssText = 'grid-column:1/-1; text-align:center; font-weight:800; color:var(--plum); font-size:13px; padding:6px 0;';
-      note.textContent = `🎉 ${breed.name} を 図鑑に くわえた！`;
+      note.className = 'cat-acquire-note';
+      note.style.cssText = 'grid-column:1/-1; text-align:center; font-weight:800; color:var(--plum); font-size:14px; padding:8px 0;';
+      note.innerHTML = `🎉 <span class="cat-acquire-portrait" style="background:${portraitColor(breed.id)};">🐱</span> ${breed.name} を 図鑑に くわえた！`;
       albumEl.parentElement.insertBefore(note, albumEl);
-      setTimeout(()=> note.remove(), 2200);
+      setTimeout(()=> note.remove(), 2400);
     });
   });
 }
@@ -4720,44 +4770,61 @@ function openQuiz(npc){
 ========================================================= */
 const JOKES = [
   { en:"Why did the cat sit on the computer? Because it wanted to keep an eye on the mouse!",
-    explain:"「mouse」はパソコンの『マウス』と動物の『ねずみ』の両方の意味があるダジャレだよ。" },
+    keyWord:"mouse", explain:"「mouse」はパソコンの『マウス』と動物の『ねずみ』の両方の意味があるダジャレだよ。" },
   { en:"What do you call a fish wearing a bowtie? So-fish-ticated!",
-    explain:"「so-fish-ticated」は『sophisticated（洗練された）』と『fish（魚）』をかけているよ。" },
+    keyWord:"so-fish-ticated", explain:"「so-fish-ticated」は『sophisticated（洗練された）』と『fish（魚）』をかけているよ。" },
   { en:"Why don't scientists trust atoms? Because they make up everything!",
-    explain:"「make up」には『作り上げる』と『でっちあげる』の2つの意味があるよ。" },
+    keyWord:"make up", explain:"「make up」には『作り上げる』と『でっちあげる』の2つの意味があるよ。" },
   { en:"What do you call a bear with no teeth? A gummy bear!",
-    explain:"「gummy」は『歯ぐきの』という意味と、お菓子の『グミ』をかけているよ。" },
+    keyWord:"gummy", explain:"「gummy」は『歯ぐきの』という意味と、お菓子の『グミ』をかけているよ。" },
   { en:"Why did the bicycle fall over? Because it was two-tired!",
-    explain:"「two-tired（タイヤが2つ）」と「too tired（すごく疲れた）」が同じ発音になるダジャレだよ。" },
+    keyWord:"two-tired", explain:"「two-tired（タイヤが2つ）」と「too tired（すごく疲れた）」が同じ発音になるダジャレだよ。" },
   { en:"What do you call cheese that isn't yours? Nacho cheese!",
-    explain:"「Nacho cheese」は『ナチョス用チーズ』と『not your cheese』をかけているよ。" },
+    keyWord:"Nacho cheese", explain:"「Nacho cheese」は『ナチョス用チーズ』と『not your cheese』をかけているよ。" },
   { en:"Why did the golfer bring two pairs of pants? In case he got a hole in one!",
-    explain:"「hole in one（ホールインワン）」とズボンに『穴（hole）』があくことをかけているよ。" },
+    keyWord:"hole in one", explain:"「hole in one（ホールインワン）」とズボンに『穴（hole）』があくことをかけているよ。" },
   { en:"What did one wall say to the other wall? I'll meet you at the corner!",
-    explain:"壁（wall）同士が『角（corner）』で会う、というシンプルな言葉遊びだよ。" },
+    keyWord:"corner", explain:"壁（wall）同士が『角（corner）』で会う、というシンプルな言葉遊びだよ。" },
 ];
 
 const FORTUNES = [
-  { luck:'大吉', luckEn:'Great Blessing', en:"Great things are coming your way today!", ja:"今日はすてきなことが起こりそうだよ！" },
-  { luck:'中吉', luckEn:'Middle Blessing', en:"Your hard work will pay off soon.", ja:"がんばりが、もうすぐ実りそう。" },
-  { luck:'吉', luckEn:'Blessing', en:"A good friend will make you smile today.", ja:"今日は友だちが、きみを笑顔にしてくれそう。" },
-  { luck:'小吉', luckEn:'Small Blessing', en:"Something small but nice will happen.", ja:"小さいけど、うれしいことがありそう。" },
-  { luck:'末吉', luckEn:'Future Blessing', en:"Keep trying — tomorrow looks even better!", ja:"がんばって！明日はもっといい日になりそう。" },
-  { luck:'大吉', luckEn:'Great Blessing', en:"Your English is getting stronger every day!", ja:"きみの英語力は、毎日ぐんぐん伸びているよ！" },
-  { luck:'中吉', luckEn:'Middle Blessing', en:"A new word you learn today will help you later.", ja:"今日覚えた単語が、あとできっと役に立つよ。" },
+  { luck:'大吉', luckEn:'Great Blessing', en:"Great things are coming your way today!", ja:"今日はすてきなことが起こりそうだよ！",
+    keyWord:"come your way", explain:"「come your way」で『自分のところにやってくる』という意味の熟語だよ。" },
+  { luck:'中吉', luckEn:'Middle Blessing', en:"Your hard work will pay off soon.", ja:"がんばりが、もうすぐ実りそう。",
+    keyWord:"pay off", explain:"「pay off」は（努力などが）『報われる、実を結ぶ』という意味の熟語だよ。" },
+  { luck:'吉', luckEn:'Blessing', en:"A good friend will make you smile today.", ja:"今日は友だちが、きみを笑顔にしてくれそう。",
+    keyWord:"make you smile", explain:"「make + 人 + 動詞の原形」で『〜に…させる』という意味になるよ。" },
+  { luck:'小吉', luckEn:'Small Blessing', en:"Something small but nice will happen.", ja:"小さいけど、うれしいことがありそう。",
+    keyWord:"happen", explain:"「happen」は『（出来事が）起こる』という意味の基本的な動詞だよ。" },
+  { luck:'末吉', luckEn:'Future Blessing', en:"Keep trying — tomorrow looks even better!", ja:"がんばって！明日はもっといい日になりそう。",
+    keyWord:"keep trying", explain:"「keep + 動詞のing形」で『〜し続ける』という意味だよ。" },
+  { luck:'大吉', luckEn:'Great Blessing', en:"Your English is getting stronger every day!", ja:"きみの英語力は、毎日ぐんぐん伸びているよ！",
+    keyWord:"getting stronger", explain:"「get + 形容詞」で『だんだん〜になる』という変化を表すよ。" },
+  { luck:'中吉', luckEn:'Middle Blessing', en:"A new word you learn today will help you later.", ja:"今日覚えた単語が、あとできっと役に立つよ。",
+    keyWord:"help you later", explain:"「help + 人」で『〜の役に立つ、〜を助ける』という意味だよ。" },
 ];
 
 const PRAISES = [
-  { en:"You're doing amazing!", ja:"きみ、本当にすごいよ！" },
-  { en:"I'm so proud of you!", ja:"きみのこと、とても誇りに思うよ！" },
-  { en:"You never give up. That's wonderful!", ja:"あきらめないきみは、すばらしい！" },
-  { en:"Your smile makes everyone happy!", ja:"きみの笑顔は、みんなを幸せにするよ！" },
-  { en:"You're getting better every single day!", ja:"きみは毎日、ちゃんと成長しているよ！" },
-  { en:"You have a kind heart!", ja:"きみは、やさしい心の持ち主だね！" },
-  { en:"You're a superstar!", ja:"きみはスーパースターだよ！" },
-  { en:"Great job today!", ja:"今日もよくがんばったね！" },
-  { en:"You make this town brighter!", ja:"きみがいるだけで、この島が明るくなるよ！" },
-  { en:"Keep shining, just the way you are!", ja:"そのままのきみで、輝き続けてね！" },
+  { en:"You're doing amazing!", ja:"きみ、本当にすごいよ！",
+    keyWord:"amazing", explain:"「amazing」は『すごい、驚くほど良い』という意味の形容詞だよ。" },
+  { en:"I'm so proud of you!", ja:"きみのこと、とても誇りに思うよ！",
+    keyWord:"proud of", explain:"「proud of」で『〜を誇りに思う』という意味の熟語だよ。" },
+  { en:"You never give up. That's wonderful!", ja:"あきらめないきみは、すばらしい！",
+    keyWord:"give up", explain:"「give up」は『あきらめる』という意味の熟語だよ。" },
+  { en:"Your smile makes everyone happy!", ja:"きみの笑顔は、みんなを幸せにするよ！",
+    keyWord:"makes everyone happy", explain:"「make + 人 + 形容詞」で『〜を…にする』という意味だよ。" },
+  { en:"You're getting better every single day!", ja:"きみは毎日、ちゃんと成長しているよ！",
+    keyWord:"every single day", explain:"「every single day」は『毎日毎日』と強調する言い方だよ。" },
+  { en:"You have a kind heart!", ja:"きみは、やさしい心の持ち主だね！",
+    keyWord:"kind heart", explain:"「kind heart」は『優しい心』という意味の表現だよ。" },
+  { en:"You're a superstar!", ja:"きみはスーパースターだよ！",
+    keyWord:"superstar", explain:"「superstar」は『とても人気で優れた人』という意味の名詞だよ。" },
+  { en:"Great job today!", ja:"今日もよくがんばったね！",
+    keyWord:"great job", explain:"「great job」は『よくやった』というほめ言葉の定番表現だよ。" },
+  { en:"You make this town brighter!", ja:"きみがいるだけで、この島が明るくなるよ！",
+    keyWord:"brighter", explain:"「brighter」は『明るい』という意味の形容詞 bright の比較級だよ。" },
+  { en:"Keep shining, just the way you are!", ja:"そのままのきみで、輝き続けてね！",
+    keyWord:"the way you are", explain:"「the way you are」は『ありのままの姿』という意味の表現だよ。" },
 ];
 
 function openLandmark(landmark){
@@ -4772,6 +4839,11 @@ function openLandmark(landmark){
   renderLandmarkContent(landmark);
 }
 
+function vocabCallout(keyWord, explain){
+  if(!keyWord) return '';
+  return `<div class="vocab-callout"><span class="vocab-callout-word">📘 ${keyWord}</span><span class="vocab-callout-explain">${explain||''}</span></div>`;
+}
+
 function renderLandmarkContent(landmark){
   quizCard.classList.remove('flash-good','flash-bad');
 
@@ -4783,7 +4855,7 @@ function renderLandmarkContent(landmark){
       <button class="speak-btn" id="lmSpeak" style="align-self:center;">
         <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       </button>
-      <div class="ja-hint">💡 ${pick.explain}</div>
+      ${vocabCallout(pick.keyWord, pick.explain)}
     `;
     document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
     speakEnglish(pick.en);
@@ -4803,6 +4875,7 @@ function renderLandmarkContent(landmark){
         <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       </button>
       <div class="ja-hint">${pick.ja}</div>
+      ${vocabCallout(pick.keyWord, pick.explain)}
     `;
     document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
     speakEnglish(pick.en);
@@ -4835,6 +4908,7 @@ function renderFortuneResult(landmark){
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
     </button>
     <div class="ja-hint">${pick.ja}</div>
+    ${vocabCallout(pick.keyWord, pick.explain)}
   `;
   document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
   speakEnglish(pick.en);
@@ -5684,6 +5758,7 @@ function markMastered(item){
   if(!masteredWords.has(item.en)){
     masteredWords.add(item.en);
     addOrb(); // awards +3 coins for a brand-new word
+    refreshAllNpcCounts();
   } else {
     addCoins(1); // smaller reward for correctly reviewing an already-known word
   }
@@ -5772,7 +5847,7 @@ function burstSparkles(btn){
 // show the save-code screen (if needed), then restore mastered words,
 // mistake history, coins, and the cat collection for that code
 ensurePlayerCode().then(()=>{
-  loadProgress();
+  loadProgress().then(refreshAllNpcCounts);
 });
 applyDayNight();
 updateIslandUI();
