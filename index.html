@@ -96,7 +96,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .dialogue-bubble .en{ font-family:'Fredoka',sans-serif; font-size:17px; }
 .dialogue-bubble .ja{ display:block; font-size:12px; color:var(--plum-soft); font-weight:700; margin-top:4px; }
-.reply-label{font-size:11px; font-weight:800; color:var(--mint-deep); align-self:flex-end;}
+.reply-label{font-size:11px; font-weight:800; color:var(--mint-deep); align-self:flex-end; margin-top:8px; display:block;}
 .reaction-bubble{
   align-self:flex-start; max-width:92%; background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-radius:14px 14px 14px 4px;
   padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--plum); margin-top:2px;
@@ -115,7 +115,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .speak-btn svg{width:20px; height:20px;}
 
-.order-controls{ display:flex; align-items:center; justify-content:center; gap:10px; }
+.order-controls{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 .undo-btn{
   background:#FBF9FF; border:2px solid #ECE5FA; border-radius:999px; padding:9px 16px;
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:13px; color:var(--plum-soft);
@@ -128,18 +128,18 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .blank-slot{display:inline-block; min-width:64px; padding:1px 6px; border-bottom:3px solid var(--lavender-deep); color:var(--lavender-deep); font-weight:700;}
 .blank-slot.filled-correct{color:var(--mint-deep); border-color:var(--mint-deep);}
 .blank-slot.filled-wrong{color:var(--coral-deep); border-color:var(--coral-deep);}
-.ja-hint{font-size:12.5px; color:var(--plum-soft); font-weight:700; text-align:center;}
+.ja-hint{font-size:12.5px; color:var(--plum-soft); font-weight:700; text-align:center; margin-top:8px;}
 .exercise-tag{font-size:10.5px; font-weight:800; color:#fff; padding:3px 10px; border-radius:999px; align-self:flex-start;}
 .exercise-tag.blank{background:var(--lavender-deep);}
 .exercise-tag.order{background:var(--sunshine-deep); color:#6b4a00;}
 
-.build-line{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-content:flex-start; min-height:44px; width:100%; padding:10px; background:#FBF9FF; border-radius:14px; border:2px dashed #ECE5FA;}
+.build-line{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-content:flex-start; min-height:44px; width:100%; padding:10px; background:#FBF9FF; border-radius:14px; border:2px dashed #ECE5FA; margin-top:12px;}
 .build-chip{background:linear-gradient(135deg, var(--lavender), var(--lavender-deep)); color:#fff; padding:8px 13px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; border:none; font-family:'Fredoka',sans-serif;}
 .build-chip.correct{background:linear-gradient(135deg, var(--mint), var(--mint-deep));}
 .build-chip.wrong{background:linear-gradient(135deg, var(--coral), var(--coral-deep));}
 .build-chip.locked{pointer-events:none;}
 
-.chip-pool{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%;}
+.chip-pool{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%; margin-top:14px;}
 .chip{background:#FBF9FF; border:2px solid #ECE5FA; color:var(--plum); padding:8px 13px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; font-family:'Fredoka',sans-serif; transition:all .15s ease;}
 .chip:active{transform:scale(0.95);}
 
@@ -4716,6 +4716,14 @@ async function generateAIExercise(npc){
 - 性格: ${npc.def.personality || 'げんき'}
 - プロフィール: ${npc.def.bio || '（とくになし）'}
 このキャラクターの口調・性格が伝わるように、英検準2級レベルの単語・熟語「${target.en}」（日本語の意味: ${target.ja}）を使った、短い2〜3ターンの自然な会話を1つ新しく作ってください。
+
+【最優先ルール・絶対に守ること】opener が過去形（did, was, wereなどを使った質問、または"last year"や"yesterday"のような過去を表す語を含む文）の場合、sentence の動詞も必ず過去形にすること。sentence の中に "last year"（去年）や "yesterday"（昨日）のような過去を示す語があるのに、動詞だけ現在形のまま、というのは絶対にNGです。
+- 悪い例1（NG）: opener「Did you ever wear costumes for school events?」→ sentence「I dress up as a princess last year.」（"last year"があるのに"dress up"が現在形のまま＝NG）
+- 良い例1（OK）: 同じopenerなら → sentence「I dressed up as a princess last year.」（過去形"dressed up"＝OK）
+- 悪い例2（NG）: opener「Did you learn anything surprising in French class?」→ sentence「I find out that French nouns have genders.」（過去形の質問なのに"find out"が現在形のまま＝NG）
+- 良い例2（OK）: 同じopenerなら → sentence「I found out that French nouns have genders.」（過去形"found out"＝OK）
+sentence を書き終えたら、必ずこのルールに違反していないか自分で確認してから出力すること。
+
 条件：
 - ${difficultyHint}にすること
 - opener・sentence・reaction は、それぞれ8語以内のごく短い一文にすること（長い文にしないこと。特にsentenceは短いほど良い）
@@ -4728,13 +4736,9 @@ async function generateAIExercise(npc){
 - sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書くこと。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
 - sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
-【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
+【重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
 - 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
-
-【時制も必ず opener に合わせること】opener が過去形の質問なら、sentence も過去形で答えること。現在形のまま答えないこと。
-- 悪い例（NG）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confuse the art teacher.」（現在形のまま＝時制が合っていないのでNG）
-- 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 - 最後にキャラが返す短いリアクション（reaction）を1文作る。ここにキャラクターの性格を反映させること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと。直訳のせいで意味が通じない日本語（例:「スナックは離れている」のような、主語と動詞の関係がおかしい文）にしないこと。誰が読んでも自然に意味が通る日本語にすること
@@ -5180,18 +5184,21 @@ async function generateSentenceForWord(item){
   const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくるキャラクター（性格: ${personality}）です。
 英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を自然に使った、短い会話を1つ作ってください。${contextSection}
 
+【最優先ルール・絶対に守ること】opener が過去形（did, was, wereなどを使った質問、または"last year"や"yesterday"のような過去を表す語を含む文）の場合、sentence の動詞も必ず過去形にすること。sentence の中に "last year"（去年）や "yesterday"（昨日）のような過去を示す語があるのに、動詞だけ現在形のまま、というのは絶対にNGです。
+- 悪い例1（NG）: opener「Did you ever wear costumes for school events?」→ sentence「I dress up as a princess last year.」（"last year"があるのに"dress up"が現在形のまま＝NG）
+- 良い例1（OK）: 同じopenerなら → sentence「I dressed up as a princess last year.」（過去形"dressed up"＝OK）
+- 悪い例2（NG）: opener「Did you learn anything surprising in French class?」→ sentence「I find out that French nouns have genders.」（過去形の質問なのに"find out"が現在形のまま＝NG）
+- 良い例2（OK）: 同じopenerなら → sentence「I found out that French nouns have genders.」（過去形"found out"＝OK）
+sentence を書き終えたら、必ずこのルールに違反していないか自分で確認してから出力すること。
+
 会話の作り方（この順番で考えること）：
 1. まず、そのキャラクターらしい話しかけの一文（opener）を考える。opener の中には、対象の単語・熟語「${item.en}」そのものを書かないこと（opener で答えを言ってしまわないこと）
 2. その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る
 
-【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
+【重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
 - 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
 このように、opener で聞かれたことに sentence がまっすぐ答える形にしてください。
-
-【時制も必ず opener に合わせること】opener が過去形の質問なら、sentence も過去形で答えること。現在形のまま答えないこと。
-- 悪い例（NG）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confuse the art teacher.」（現在形のまま＝時制が合っていないのでNG）
-- 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
 4. sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書く。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
