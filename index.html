@@ -115,6 +115,14 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .speak-btn svg{width:20px; height:20px;}
 
+.order-controls{ display:flex; align-items:center; justify-content:center; gap:10px; }
+.undo-btn{
+  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:999px; padding:9px 16px;
+  font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:13px; color:var(--plum-soft);
+  cursor:pointer;
+}
+.undo-btn:active{ transform:scale(0.96); }
+
 .npc-speech{font-size:12px; font-weight:800; color:var(--plum-soft); align-self:flex-start;}
 .sentence-line{font-family:'Fredoka',sans-serif; font-size:clamp(18px,4.6vw,22px); font-weight:600; color:var(--plum); text-align:center; line-height:1.4;}
 .blank-slot{display:inline-block; min-width:64px; padding:1px 6px; border-bottom:3px solid var(--lavender-deep); color:var(--lavender-deep); font-weight:700;}
@@ -223,6 +231,19 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 
 .sparkle{position:fixed; pointer-events:none; font-size:20px; z-index:70; animation:sparkleFly .9s ease-out forwards;}
 @keyframes sparkleFly{0%{transform:translate(0,0) scale(0.4) rotate(0deg); opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(1.1) rotate(180deg); opacity:0;}}
+
+/* narrow screens (iPhone portrait): the jar+daily group can wrap onto a
+   second line, making hud-top taller — push the fixed review/rewards
+   buttons down further so they don't overlap it, and shrink things a
+   little so wrapping happens less often in the first place */
+@media (max-width: 430px){
+  .jar-wrap{ padding:5px 14px 5px 5px; gap:8px; }
+  .jar-svg{ width:38px; height:38px; }
+  .jar-label .title{ font-size:11px; }
+  .daily-wrap{ font-size:11px; padding:6px 10px; gap:6px; }
+  #reviewBtn{ top:100px; }
+  #rewardsBtn{ top:146px; }
+}
 </style>
 </head>
 <body>
@@ -4699,7 +4720,7 @@ async function generateAIExercise(npc){
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
 - opener（話しかけの一文）の中には、対象の単語・熟語「${target.en}」そのものを書かないこと。sentence（返事）の中だけで使うこと（opener で答えを言ってしまわないこと）
-- sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書くこと
+- sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書くこと。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
 - sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
@@ -4773,7 +4794,7 @@ async function loadQuestion(){
   // substring.
   const isTemplateWord = /\bA\b|\bB\b/.test(item.en);
   const tokenCount = (item.sentence || '').split(' ').length;
-  const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 9);
+  const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 6);
   const mode = preferOrder ? 'order' : 'blank';
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
@@ -4800,6 +4821,28 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"「〜かもしれない」という可能性は might で表すよ。" },
   { topic:'助動詞', en:"I ___ stay home than go out in this weather.", choices:["would rather","used to","might","had better"], correct:0,
     explainJa:"「むしろ〜したい」は would rather で表すよ。" },
+  { topic:'助動詞', en:"He ___ finish the report by Friday, according to the schedule.", choices:["should","might","used to","would rather"], correct:0,
+    explainJa:"予定・見込みを表す「〜するはずだ」は should を使うよ。" },
+  { topic:'助動詞', en:"When I was young, I ___ play outside every day.", choices:["used to","would rather","had better","might"], correct:0,
+    explainJa:"過去の習慣は used to で表すよ。" },
+  { topic:'助動詞', en:"___ I use your phone for a minute?", choices:["Could","Used to","Had better","Would rather"], correct:0,
+    explainJa:"ていねいな許可のお願いは Could で始めるよ。" },
+  { topic:'助動詞', en:"There ___ be a storm tonight based on the forecast.", choices:["might","used to","had better","would rather"], correct:0,
+    explainJa:"「〜かもしれない」という可能性は might を使うよ。" },
+  { topic:'助動詞', en:"We ___ leave now if we want to catch the train.", choices:["had better","used to","might","would rather"], correct:0,
+    explainJa:"「〜したほうがいい」は had better で表すよ。" },
+  { topic:'助動詞', en:"___ you please pass the salt?", choices:["Could","Had better","Used to","Might"], correct:0,
+    explainJa:"ていねいなお願いは Could you 〜？を使うよ。" },
+  { topic:'助動詞', en:"As a child, he ___ be afraid of the dark.", choices:["used to","would rather","had better","might"], correct:0,
+    explainJa:"過去の状態は used to で表すよ。" },
+  { topic:'助動詞', en:"You ___ study harder if you want to pass the exam.", choices:["had better","used to","might","would rather"], correct:0,
+    explainJa:"強い忠告は had better で表すよ。" },
+  { topic:'助動詞', en:"It ___ take a while to fix, so be patient.", choices:["might","used to","had better","would rather"], correct:0,
+    explainJa:"可能性は might で表すよ。" },
+  { topic:'助動詞', en:"___ I open the window? It's hot in here.", choices:["Could","Had better","Used to","Might as well"], correct:0,
+    explainJa:"ていねいな許可のお願いは Could で表すよ。" },
+  { topic:'助動詞', en:"I ___ walk than take the bus since it's such a nice day.", choices:["would rather","used to","might","had better"], correct:0,
+    explainJa:"「むしろ〜したい」は would rather で表すよ。" },
 
   // 時制（過去完了・完了進行形）
   { topic:'時制', en:"By the time we arrived, the movie ___.", choices:["had already started","has already started","was already starting","already started"], correct:0,
@@ -4810,6 +4853,30 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"過去のある時点より前の経験は過去完了で表すよ。" },
   { topic:'時制', en:"They ___ on the project for two years when it was finally completed.", choices:["had been working","have been working","were working","had worked"], correct:0,
     explainJa:"過去のある時点まで継続していた動作は過去完了進行形で表すよ。" },
+  { topic:'時制', en:"She ___ her homework before her friends arrived.", choices:["had finished","has finished","was finishing","finished"], correct:0,
+    explainJa:"過去の基準点よりも前に完了したことは過去完了だよ。" },
+  { topic:'時制', en:"We ___ waiting for over an hour when the bus finally came.", choices:["had been","have been","were","had"], correct:0,
+    explainJa:"過去のある時点まで続いていた動作は過去完了進行形だよ。" },
+  { topic:'時制', en:"By the time the police arrived, the thief ___.", choices:["had already escaped","has already escaped","was already escaping","already escaped"], correct:0,
+    explainJa:"過去の基準点より前に完了したことは過去完了だよ。" },
+  { topic:'時制', en:"I realized I ___ my keys at home.", choices:["had left","have left","was leaving","left"], correct:0,
+    explainJa:"気づいた時点よりも前の出来事は過去完了で表すよ。" },
+  { topic:'時制', en:"He ___ football for ten years before he got injured.", choices:["had been playing","has been playing","was playing","played"], correct:0,
+    explainJa:"過去の基準点まで継続していた動作は過去完了進行形だよ。" },
+  { topic:'時制', en:"They ___ the house by the time we got there.", choices:["had already sold","have already sold","were already selling","already sold"], correct:0,
+    explainJa:"過去の基準点より前に完了したことは過去完了だよ。" },
+  { topic:'時制', en:"She was tired because she ___ all night.", choices:["had been studying","has been studying","was studying","studied"], correct:0,
+    explainJa:"疲れた理由となる、それまで継続していた動作は過去完了進行形だよ。" },
+  { topic:'時制', en:"When I checked my phone, I saw that she ___ me three times.", choices:["had called","has called","was calling","called"], correct:0,
+    explainJa:"確認した時点より前の出来事は過去完了だよ。" },
+  { topic:'時制', en:"The children ___ playing outside for hours before it started to rain.", choices:["had been","have been","were","had"], correct:0,
+    explainJa:"雨が降り出す前まで継続していた動作は過去完了進行形だよ。" },
+  { topic:'時制', en:"I ___ that movie before, so I knew what would happen.", choices:["had seen","have seen","was seeing","saw"], correct:0,
+    explainJa:"その時点より前の経験は過去完了だよ。" },
+  { topic:'時制', en:"By the time he turned 20, he ___ three languages.", choices:["had learned","has learned","was learning","learned"], correct:0,
+    explainJa:"基準点より前に完了したことは過去完了だよ。" },
+  { topic:'時制', en:"She ___ for the company for five years when it went bankrupt.", choices:["had been working","has been working","was working","worked"], correct:0,
+    explainJa:"倒産する前まで継続していた動作は過去完了進行形だよ。" },
 
   // 不定詞・動名詞・分詞
   { topic:'分詞・動名詞', en:"The ___ window needs to be repaired.", choices:["broken","breaking","broke","break"], correct:0,
@@ -4820,6 +4887,30 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"avoid も動名詞を目的語にとる動詞だよ。" },
   { topic:'分詞・動名詞', en:"The girl ___ over there is my sister.", choices:["standing","stood","stand","to stand"], correct:0,
     explainJa:"「〜している（女の子）」という能動の意味を持つ形容詞的用法は現在分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"I finished ___ my essay just before the deadline.", choices:["writing","to write","write","wrote"], correct:0,
+    explainJa:"finish は動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The ___ leaves covered the entire garden.", choices:["fallen","falling","fall","falls"], correct:0,
+    explainJa:"「落ちてしまった（葉）」という受け身の意味の形容詞的用法は過去分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"He suggested ___ a picnic this weekend.", choices:["having","to have","have","had"], correct:0,
+    explainJa:"suggest も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"She kept ___ about the accident all day.", choices:["talking","to talk","talk","talked"], correct:0,
+    explainJa:"keep も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"I can't imagine ___ in such a big house.", choices:["living","to live","live","lived"], correct:0,
+    explainJa:"imagine も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The ___ vase was very expensive to replace.", choices:["broken","breaking","broke","break"], correct:0,
+    explainJa:"「壊れた（花びん）」という受け身の意味の形容詞的用法は過去分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"They finished ___ the project ahead of schedule.", choices:["building","to build","build","built"], correct:0,
+    explainJa:"finish は動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The story ___ by the author was very moving.", choices:["written","writing","wrote","write"], correct:0,
+    explainJa:"「（著者に）書かれた」という受け身の意味の形容詞的用法は過去分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"I don't mind ___ early on weekends.", choices:["waking up","to wake up","wake up","woke up"], correct:0,
+    explainJa:"mind も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The number of people ___ this problem is growing.", choices:["facing","faced","face","to face"], correct:0,
+    explainJa:"「〜に直面している（人々）」という能動の意味の形容詞的用法は現在分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"She admitted ___ the vase by accident.", choices:["breaking","to break","break","broke"], correct:0,
+    explainJa:"admit も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The ___ child was finally found safe.", choices:["missing","missed","misses","to miss"], correct:0,
+    explainJa:"「行方不明の（子ども）」という意味の形容詞的用法は現在分詞（missing）を使うよ。" },
 
   // 関係詞
   { topic:'関係詞', en:"This is the town ___ I was born.", choices:["where","when","why","how"], correct:0,
@@ -4830,6 +4921,30 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"「何を〜しても」という複合関係詞は whatever を使うよ。" },
   { topic:'関係詞', en:"___ finishes first will get a prize.", choices:["Whoever","Whatever","Wherever","Whichever"], correct:0,
     explainJa:"「〜する人は誰でも」という複合関係詞は whoever を使うよ。" },
+  { topic:'関係詞', en:"I don't understand the way ___ he solved the problem.", choices:["how","where","when","why"], correct:0,
+    explainJa:"方法を説明する関係副詞は how を使うよ。" },
+  { topic:'関係詞', en:"This is the moment ___ everything changed.", choices:["when","where","why","how"], correct:0,
+    explainJa:"時を説明する関係副詞は when を使うよ。" },
+  { topic:'関係詞', en:"___ wins the race will receive a trophy.", choices:["Whoever","Whatever","Wherever","However"], correct:0,
+    explainJa:"「〜する人は誰でも」は whoever を使うよ。" },
+  { topic:'関係詞', en:"You may sit ___ you like.", choices:["wherever","whoever","whatever","whenever"], correct:0,
+    explainJa:"「どこでも」という複合関係詞は wherever を使うよ。" },
+  { topic:'関係詞', en:"___ hard you try, you must stay calm.", choices:["However","Whatever","Whoever","Wherever"], correct:0,
+    explainJa:"「どんなに〜でも」は however を使うよ。" },
+  { topic:'関係詞', en:"That's the restaurant ___ we had our first date.", choices:["where","when","why","how"], correct:0,
+    explainJa:"場所を説明する関係副詞は where を使うよ。" },
+  { topic:'関係詞', en:"I remember the day ___ we first met.", choices:["when","where","why","how"], correct:0,
+    explainJa:"時を説明する関係副詞は when を使うよ。" },
+  { topic:'関係詞', en:"Nobody knows the reason ___ she left so suddenly.", choices:["why","where","when","how"], correct:0,
+    explainJa:"理由を説明する関係副詞は why を使うよ。" },
+  { topic:'関係詞', en:"___ you choose, make sure it's practical.", choices:["Whichever","Whoever","Wherever","Whenever"], correct:0,
+    explainJa:"「どちらを〜でも」は whichever を使うよ。" },
+  { topic:'関係詞', en:"Please explain ___ this machine works.", choices:["how","where","when","why"], correct:0,
+    explainJa:"方法を説明する関係副詞は how を使うよ。" },
+  { topic:'関係詞', en:"___ you go, I will follow you.", choices:["Wherever","Whoever","Whatever","However"], correct:0,
+    explainJa:"「どこへ〜でも」は wherever を使うよ。" },
+  { topic:'関係詞', en:"I still remember the town ___ I grew up.", choices:["where","when","why","how"], correct:0,
+    explainJa:"場所を説明する関係副詞は where を使うよ。" },
 
   // 比較・受動態
   { topic:'比較・受動態', en:"This bag is twice ___ that one.", choices:["as heavy as","heavier than","the heaviest","so heavy as"], correct:0,
@@ -4840,6 +4955,30 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"「〜ほど…ない」は not as … as を使うよ。" },
   { topic:'比較・受動態', en:"The bridge ___ being repaired now.", choices:["is","was","has","did"], correct:0,
     explainJa:"「〜されているところだ」という受け身の進行形は is/are being + 過去分詞だよ。" },
+  { topic:'比較・受動態', en:"This car is three times ___ that one.", choices:["as expensive as","more expensive than","the most expensive","so expensive as"], correct:0,
+    explainJa:"「〜の3倍…」という倍数表現は three times as … as を使うよ。" },
+  { topic:'比較・受動態', en:"She is ___ tall as her mother.", choices:["as","more","very","too"], correct:0,
+    explainJa:"「〜と同じくらい…」は as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The letter ___ written by hand.", choices:["was","had","has","did"], correct:0,
+    explainJa:"受け身（be動詞 + 過去分詞）の過去形は was/were を使うよ。" },
+  { topic:'比較・受動態', en:"This phone is half ___ expensive as that one.", choices:["as","than","more","so"], correct:0,
+    explainJa:"「〜の半分…」という表現も half as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The cake ___ eaten before we arrived.", choices:["had been","has been","was being","is being"], correct:0,
+    explainJa:"「〜される前に…していた」は過去完了の受け身（had been + 過去分詞）だよ。" },
+  { topic:'比較・受動態', en:"He is not ___ fast as his brother.", choices:["as","more","very","too"], correct:0,
+    explainJa:"「〜ほど…ない」は not as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The room ___ being cleaned when I arrived.", choices:["was","is","had","has"], correct:0,
+    explainJa:"過去の受け身の進行形は was/were being + 過去分詞だよ。" },
+  { topic:'比較・受動態', en:"This building is twice ___ tall as that one.", choices:["as","more","than","so"], correct:0,
+    explainJa:"倍数表現は twice as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The results ___ announced tomorrow.", choices:["will be","are being","have been","were"], correct:0,
+    explainJa:"未来の受け身は will be + 過去分詞だよ。" },
+  { topic:'比較・受動態', en:"The problem ___ solved by the students yesterday.", choices:["was","is","has","had"], correct:0,
+    explainJa:"過去の受け身は was/were + 過去分詞だよ。" },
+  { topic:'比較・受動態', en:"This test is not ___ difficult as the last one.", choices:["as","more","very","too"], correct:0,
+    explainJa:"「〜ほど…ない」は not as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The car ___ being repaired at the moment.", choices:["is","was","has","did"], correct:0,
+    explainJa:"現在の受け身の進行形は is/are being + 過去分詞だよ。" },
 
   // 使役動詞・仮定法
   { topic:'使役・仮定法', en:"My mother ___ me clean my room every weekend.", choices:["makes","lets","has","gets"], correct:0,
@@ -4850,6 +4989,30 @@ const GRAMMAR_QUESTIONS = [
     explainJa:"仮定法過去では、be動詞は主語に関わらず were を使うのが基本だよ。" },
   { topic:'使役・仮定法', en:"I wish I ___ more time to study.", choices:["had","have","has","having"], correct:0,
     explainJa:"「〜だったらいいのに」という仮定法過去の wish は過去形で表すよ。" },
+  { topic:'使役・仮定法', en:"I ___ my car washed at the shop yesterday.", choices:["had","made","let","did"], correct:0,
+    explainJa:"「〜してもらう」は have + 目的語 + 過去分詞で表すよ。" },
+  { topic:'使役・仮定法', en:"She ___ her son to clean his room every day.", choices:["gets","makes","lets","had"], correct:0,
+    explainJa:"「〜させる」で to不定詞を続けるのは get + 目的語 + to不定詞だよ。makeやletは原形不定詞を使うよ。" },
+  { topic:'使役・仮定法', en:"The coach ___ the players practice every morning.", choices:["makes","gets","allows","asks"], correct:0,
+    explainJa:"あとに原形動詞（practice）が続くのは make + 目的語 + 原形動詞だよ。" },
+  { topic:'使役・仮定法', en:"My parents ___ me to study abroad.", choices:["allowed","made","let","had"], correct:0,
+    explainJa:"あとに to不定詞（to study）が続くのは allow + 目的語 + to不定詞だよ。" },
+  { topic:'使役・仮定法', en:"He ___ his assistant book the flights.", choices:["had","asked","allowed","forced"], correct:0,
+    explainJa:"あとに原形動詞（book）が続くのは have + 目的語 + 原形動詞だよ。" },
+  { topic:'使役・仮定法', en:"They ___ us to wait outside.", choices:["told","made","let","had"], correct:0,
+    explainJa:"あとに to不定詞（to wait）が続くのは tell + 目的語 + to不定詞だよ。" },
+  { topic:'使役・仮定法', en:"If she ___ here, she would help us.", choices:["were","was","is","be"], correct:0,
+    explainJa:"仮定法過去の be動詞は were を使うのが基本だよ。" },
+  { topic:'使役・仮定法', en:"I wish I ___ taller.", choices:["were","am","was","be"], correct:0,
+    explainJa:"仮定法過去の wish のあとの be動詞は were を使うのが基本だよ。" },
+  { topic:'使役・仮定法', en:"If I ___ more money, I would travel the world.", choices:["had","have","has","having"], correct:0,
+    explainJa:"仮定法過去（今の事実に反する仮定）は if + 過去形だよ。" },
+  { topic:'使役・仮定法', en:"She wishes she ___ studied harder in school.", choices:["had","has","have","having"], correct:0,
+    explainJa:"過去の後悔を表す wish は had + 過去分詞（仮定法過去完了）を使うよ。" },
+  { topic:'使役・仮定法', en:"If he ___ earlier, he wouldn't have missed the train.", choices:["had left","left","has left","leaves"], correct:0,
+    explainJa:"過去の事実に反する仮定（仮定法過去完了）は if + had + 過去分詞だよ。" },
+  { topic:'使役・仮定法', en:"If only I ___ what to say.", choices:["knew","know","known","knowing"], correct:0,
+    explainJa:"「〜であればなあ」という仮定法過去は過去形を使うよ。" },
 ];
 
 let questionsSinceGrammar = 0;
@@ -4876,11 +5039,14 @@ function renderGrammarQuestion(){
     <div id="feedbackSlot"></div>
   `;
   const cw = document.getElementById('grammarChoices');
-  q.choices.forEach((choice,i)=>{
+  // shuffle the choice order (with the correct index remapped) so the
+  // right answer isn't always the first button
+  const order = shuffle(q.choices.map((c,i)=>i));
+  order.forEach(origIdx=>{
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
-    btn.textContent = choice;
-    btn.onclick = ()=> handleGrammarAnswer(btn, i===q.correct, q);
+    btn.textContent = q.choices[origIdx];
+    btn.onclick = ()=> handleGrammarAnswer(btn, origIdx===q.correct, q);
     cw.appendChild(btn);
   });
 }
@@ -4901,7 +5067,8 @@ function handleGrammarAnswer(btn, correct, q){
        <div class="ja-hint" style="margin-top:10px;">${q.explainJa}</div>`;
   } else {
     btn.classList.add('wrong');
-    document.querySelectorAll('#grammarChoices .choice-btn').forEach((b,i)=>{ if(i===q.correct) b.classList.add('correct'); });
+    const correctText = q.choices[q.correct];
+    document.querySelectorAll('#grammarChoices .choice-btn').forEach(b=>{ if(b.textContent===correctText) b.classList.add('correct'); });
     quizCard.classList.add('flash-bad');
     playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
@@ -4928,13 +5095,21 @@ function prefetchUpcoming(){
 const pendingGenerations = new Map(); // en -> in-flight Promise, avoids duplicate concurrent requests
 
 function applyGeneratedContent(item, data){
-  item.sentence = dedupeAdjacentRepeat(data.sentence, data.usedPhrase || item.en);
+  let usedPhrase = data.usedPhrase || item.en;
+  // safety net: if the AI included extra surrounding words despite being
+  // told not to (e.g. "especially the ideas" instead of just "especially"),
+  // discard it and fall back to the plain base form instead
+  const baseWordCount = item.en.trim().split(/\s+/).length;
+  const usedWordCount = usedPhrase.trim().split(/\s+/).length;
+  if(usedWordCount > baseWordCount + 1) usedPhrase = item.en;
+
+  item.sentence = dedupeAdjacentRepeat(data.sentence, usedPhrase);
   item.sentenceJa = data.sentenceJa;
   item.opener = data.opener || '';
   item.openerJa = data.openerJa || '';
   item.reaction = data.reaction || '';
   item.reactionJa = data.reactionJa || '';
-  item.usedPhrase = data.usedPhrase || item.en;
+  item.usedPhrase = usedPhrase;
 }
 
 // occasionally the AI accidentally repeats the target phrase right next
@@ -4976,7 +5151,7 @@ async function generateAndCache(item){
   finally{ pendingGenerations.delete(item.en); }
 }
 
-const THINKING_MESSAGES = ['ことばを考え中', 'もうすこしまってね', 'いい文章をさがし中'];
+const THINKING_MESSAGES = ['ことばを考え中', 'もうすこしまってね', 'ちょっと待ってね'];
 
 async function ensureExerciseContent(item){
   if(item.sentence) return; // curated word, or already generated/prefetched earlier this session
@@ -5013,7 +5188,7 @@ async function generateSentenceForWord(item){
 - 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
-4. sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書く
+4. sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書く。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
 5. sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 条件：
@@ -5077,7 +5252,7 @@ function renderBlankExercise(item){
   options.forEach(opt=>{
     const chip = document.createElement('div');
     chip.className = 'choice-btn choice-hint';
-    chip.textContent = opt.en===item.en ? (item.usedPhrase || item.en) : opt.en;
+    chip.textContent = opt.en;
     chip.dataset.correct = opt.en===item.en ? '1':'0';
     cw.appendChild(chip);
   });
@@ -5094,15 +5269,16 @@ function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
   questionsSinceGrammar++;
   const slot = document.getElementById('blankSlot');
-  if(slot) slot.textContent = item.usedPhrase || item.en;
+  if(slot) slot.textContent = item.en;
   input.disabled = true;
   document.getElementById('typeAnswerSubmit').disabled = true;
   document.querySelectorAll('#choices .choice-hint').forEach(c=>{
     if(c.dataset.correct === '1') c.classList.add('correct');
   });
 
-  const expected = (item.usedPhrase || item.en).trim().toLowerCase();
-  const correct = typedValue.trim().toLowerCase() === expected;
+  const typed = typedValue.trim().toLowerCase();
+  const acceptable = [item.en, item.usedPhrase].filter(Boolean).map(s=>s.trim().toLowerCase());
+  const correct = acceptable.includes(typed);
 
   if(correct){
     input.classList.add('correct');
@@ -5128,7 +5304,7 @@ function handleBlankAnswer(input, typedValue, item){
     quizCard.classList.add('flash-bad');
     playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
-      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.usedPhrase || item.en}</span></div>`;
+      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.en}</span></div>`;
     recordMistake(item.en);
   }
   nextBtn.classList.add('show');
@@ -5144,14 +5320,24 @@ function renderOrderExercise(item){
     <span class="reply-label">きみの返事 ▼</span>
     <div class="ja-hint">${item.sentenceJa}</div>
     <div class="build-line" id="buildLine"></div>
+    <div class="order-controls">
+      <button class="undo-btn" id="undoBtn">↩️ ひとつ戻す</button>
+      <button class="speak-btn" id="speakBtn" aria-label="お手本を聞く">
+        <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </button>
+    </div>
     <div class="chip-pool" id="chipPool"></div>
-    <button class="speak-btn" id="speakBtn" aria-label="お手本を聞く" style="align-self:center;">
-      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-    </button>
     <div id="feedbackSlot"></div>
     <div id="reactionSlot"></div>
   `;
   document.getElementById('speakBtn').onclick = ()=> speakEnglish(item.sentence);
+  document.getElementById('undoBtn').onclick = ()=>{
+    if(nextBtn.classList.contains('show')) return; // locked after check
+    if(built.length === 0) return;
+    built.pop();
+    renderChips();
+    renderBuild();
+  };
 
   const buildLine = document.getElementById('buildLine');
   const chipPool = document.getElementById('chipPool');
