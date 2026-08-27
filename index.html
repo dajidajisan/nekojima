@@ -260,17 +260,17 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
     <div class="daily-wrap">
       <span>📅 <span id="dailyCount">0</span>/<span id="dailyGoalLabel">15</span></span>
       <span>🔥<span id="streakCount">0</span>日</span>
+      <span class="coin-inline">
+        <svg class="coin-icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg>
+        <span class="coin-count" id="coinCount">0</span>
+      </span>
     </div>
-  </div>
-  <div class="coin-wrap">
-    <span class="coin-icon">🪙</span>
-    <span class="coin-count" id="coinCount">0</span>
   </div>
 </div>
 <div style="position:fixed; top:14px; left:0; right:0; display:flex; flex-direction:column; align-items:center; gap:4px; z-index:19; pointer-events:none;">
   <span style="font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:#fff; text-shadow:0 2px 6px rgba(74,59,92,0.35);">🐾 ねこじま</span>
-  <div class="hint-pill" id="hintPill">スティックで歩いて、NPCに近づいてね</div>
 </div>
+<div class="hint-pill" id="hintPill" style="display:none;"></div>
 
 <button id="interactBtn">💬 はなしかける</button>
 
@@ -324,15 +324,9 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 #reviewBtn{ position:fixed; }
 
-.coin-wrap{
-  display:flex; align-items:center; gap:6px;
-  background:rgba(255,255,255,0.82); backdrop-filter:blur(6px);
-  border-radius:999px; padding:8px 14px;
-  box-shadow:0 4px 14px rgba(122,106,147,0.2);
-  pointer-events:auto;
-}
-.coin-icon{ font-size:16px; }
-.coin-count{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:var(--plum); }
+.coin-inline{ display:inline-flex; align-items:center; gap:4px; margin-left:2px; }
+.coin-icon-svg{ width:15px; height:15px; }
+.coin-count{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:14px; color:var(--plum); }
 
 .level-badge{
   display:inline-block; background:linear-gradient(135deg, var(--lavender), var(--lavender-deep));
@@ -4442,12 +4436,9 @@ document.getElementById('npcProfileBtn').addEventListener('click', ()=>{
   pTag.textContent = def.personality || 'げんき';
   pTag.className = 'rarity-pill ' + (PERSONALITY_COLOR[def.personality] || 'common');
   document.getElementById('profileBio').textContent = def.bio || 'まだ自己紹介はないみたい。';
-  const cats = def.cats && def.cats.length
-    ? def.cats
-    : [...new Set(activeNPC.vocabList.map(v=>v.cat))];
+  const worldChip = def.world ? `<span class="nc-choice active" style="cursor:default;">🌏 ${WORLD_LABELS[def.world] || def.world}</span>` : '';
   const wordCountTag = `<span class="nc-choice active" style="cursor:default;">📖 ${activeNPC.vocabList.length}語 たんとう</span>`;
-  document.getElementById('profileCats').innerHTML = wordCountTag +
-    cats.slice(0,4).map(c=>`<span class="nc-choice active" style="cursor:default;">${c}</span>`).join('');
+  document.getElementById('profileCats').innerHTML = wordCountTag + worldChip;
   npcProfileOverlay.classList.add('show');
 });
 document.getElementById('closeNpcProfile').addEventListener('click', ()=>{
@@ -4720,7 +4711,7 @@ async function generateAIExercise(npc){
 - 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 - 最後にキャラが返す短いリアクション（reaction）を1文作る。ここにキャラクターの性格を反映させること
-- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
+- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと。直訳のせいで意味が通じない日本語（例:「スナックは離れている」のような、主語と動詞の関係がおかしい文）にしないこと。誰が読んでも自然に意味が通る日本語にすること
 - 日本語訳の文末表現にも、そのキャラクターの性格・口調を反映させること
 - 前に使った例文「${target.sentence}」とは違う場面・文脈にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
@@ -4753,6 +4744,8 @@ async function loadQuestion(){
   nextBtn.classList.remove('show');
   nextBtn.textContent = 'つぎへ →';
 
+  if(maybeShowGrammarQuestion()) return; // 10問に1回、文法チェックを割り込ませる
+
   if(quizIndex >= activeQueue.length){
     npcSub.textContent = 'ありがとう！';
     quizBody.innerHTML = `<div class="npc-done-panel">
@@ -4780,13 +4773,145 @@ async function loadQuestion(){
   // substring.
   const isTemplateWord = /\bA\b|\bB\b/.test(item.en);
   const tokenCount = (item.sentence || '').split(' ').length;
-  const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 6);
+  const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 9);
   const mode = preferOrder ? 'order' : 'blank';
   mode === 'blank' ? renderBlankExercise(item) : renderOrderExercise(item);
 
   nextBtn.onclick = ()=>{ quizIndex++; loadQuestion(); };
 }
 let loadQuestionRequestId = 0;
+
+/* =========================================================
+   GRAMMAR CHECKPOINTS — every 10 questions, a 4-choice grammar
+   question interrupts the normal vocab flow (without consuming a
+   vocab item from the queue; the same vocab item resumes right after).
+   Covers: 助動詞 / 時制（過去完了・完了進行形） / 不定詞・動名詞・分詞 /
+   関係詞 / 比較・受動態 / 使役動詞・仮定法
+========================================================= */
+const GRAMMAR_QUESTIONS = [
+  // 助動詞
+  { topic:'助動詞', en:"You ___ see a doctor if the pain continues.", choices:["had better","would rather","used to","might as well"], correct:0,
+    explainJa:"「〜したほうがいい」という強い忠告は had better で表すよ。" },
+  { topic:'助動詞', en:"I ___ live in Osaka when I was a child.", choices:["used to","would rather","had better","might"], correct:0,
+    explainJa:"過去の習慣や状態（今はもう違う）は used to で表すよ。" },
+  { topic:'助動詞', en:"___ you help me carry these boxes?", choices:["Could","Used to","Had better","Might as well"], correct:0,
+    explainJa:"ていねいなお願いは Could で始めるのが自然だよ。" },
+  { topic:'助動詞', en:"It ___ rain later, so bring an umbrella.", choices:["might","used to","had better","would rather"], correct:0,
+    explainJa:"「〜かもしれない」という可能性は might で表すよ。" },
+  { topic:'助動詞', en:"I ___ stay home than go out in this weather.", choices:["would rather","used to","might","had better"], correct:0,
+    explainJa:"「むしろ〜したい」は would rather で表すよ。" },
+
+  // 時制（過去完了・完了進行形）
+  { topic:'時制', en:"By the time we arrived, the movie ___.", choices:["had already started","has already started","was already starting","already started"], correct:0,
+    explainJa:"過去のある時点よりも前に完了していたことは過去完了（had + 過去分詞）で表すよ。" },
+  { topic:'時制', en:"She ___ for three hours when I called her.", choices:["had been studying","has been studying","was studying","studied"], correct:0,
+    explainJa:"過去のある時点まで続いていた動作は過去完了進行形（had been + -ing）だよ。" },
+  { topic:'時制', en:"I ___ sushi before I visited Japan.", choices:["had never eaten","have never eaten","never ate","was never eating"], correct:0,
+    explainJa:"過去のある時点より前の経験は過去完了で表すよ。" },
+  { topic:'時制', en:"They ___ on the project for two years when it was finally completed.", choices:["had been working","have been working","were working","had worked"], correct:0,
+    explainJa:"過去のある時点まで継続していた動作は過去完了進行形で表すよ。" },
+
+  // 不定詞・動名詞・分詞
+  { topic:'分詞・動名詞', en:"The ___ window needs to be repaired.", choices:["broken","breaking","broke","break"], correct:0,
+    explainJa:"「壊れた（窓）」のように受け身の意味を持つ形容詞的用法は過去分詞を使うよ。" },
+  { topic:'分詞・動名詞', en:"I enjoy ___ books on rainy days.", choices:["reading","to read","read","reads"], correct:0,
+    explainJa:"enjoy は動名詞（-ing）を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"She avoided ___ him about the mistake.", choices:["telling","to tell","tell","told"], correct:0,
+    explainJa:"avoid も動名詞を目的語にとる動詞だよ。" },
+  { topic:'分詞・動名詞', en:"The girl ___ over there is my sister.", choices:["standing","stood","stand","to stand"], correct:0,
+    explainJa:"「〜している（女の子）」という能動の意味を持つ形容詞的用法は現在分詞を使うよ。" },
+
+  // 関係詞
+  { topic:'関係詞', en:"This is the town ___ I was born.", choices:["where","when","why","how"], correct:0,
+    explainJa:"場所を説明する関係副詞は where を使うよ。" },
+  { topic:'関係詞', en:"Tell me the reason ___ you were late.", choices:["why","where","when","what"], correct:0,
+    explainJa:"理由を説明する関係副詞は why を使うよ。" },
+  { topic:'関係詞', en:"___ you decide to do, I will support you.", choices:["Whatever","Wherever","Whoever","However"], correct:0,
+    explainJa:"「何を〜しても」という複合関係詞は whatever を使うよ。" },
+  { topic:'関係詞', en:"___ finishes first will get a prize.", choices:["Whoever","Whatever","Wherever","Whichever"], correct:0,
+    explainJa:"「〜する人は誰でも」という複合関係詞は whoever を使うよ。" },
+
+  // 比較・受動態
+  { topic:'比較・受動態', en:"This bag is twice ___ that one.", choices:["as heavy as","heavier than","the heaviest","so heavy as"], correct:0,
+    explainJa:"「〜の2倍…」という倍数表現は twice as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The window ___ broken by the storm last night.", choices:["was","had","has","did"], correct:0,
+    explainJa:"受け身（be動詞 + 過去分詞）の過去形は was/were を使うよ。" },
+  { topic:'比較・受動態', en:"He is not ___ tall as his brother.", choices:["as","more","very","too"], correct:0,
+    explainJa:"「〜ほど…ない」は not as … as を使うよ。" },
+  { topic:'比較・受動態', en:"The bridge ___ being repaired now.", choices:["is","was","has","did"], correct:0,
+    explainJa:"「〜されているところだ」という受け身の進行形は is/are being + 過去分詞だよ。" },
+
+  // 使役動詞・仮定法
+  { topic:'使役・仮定法', en:"My mother ___ me clean my room every weekend.", choices:["makes","lets","has","gets"], correct:0,
+    explainJa:"「（強制的に）〜させる」は make + 目的語 + 原形動詞で表すよ。" },
+  { topic:'使役・仮定法', en:"I ___ my car repaired yesterday.", choices:["had","made","let","did"], correct:0,
+    explainJa:"「〜してもらう」は have + 目的語 + 過去分詞で表すよ。" },
+  { topic:'使役・仮定法', en:"If I ___ you, I would apologize.", choices:["were","was","am","be"], correct:0,
+    explainJa:"仮定法過去では、be動詞は主語に関わらず were を使うのが基本だよ。" },
+  { topic:'使役・仮定法', en:"I wish I ___ more time to study.", choices:["had","have","has","having"], correct:0,
+    explainJa:"「〜だったらいいのに」という仮定法過去の wish は過去形で表すよ。" },
+];
+
+let questionsSinceGrammar = 0;
+let lastGrammarIndex = -1;
+
+function maybeShowGrammarQuestion(){
+  if(questionsSinceGrammar < 9) return false;
+  questionsSinceGrammar = 0;
+  renderGrammarQuestion();
+  return true;
+}
+
+function renderGrammarQuestion(){
+  let idx;
+  do{ idx = Math.floor(Math.random()*GRAMMAR_QUESTIONS.length); }
+  while(idx === lastGrammarIndex && GRAMMAR_QUESTIONS.length > 1);
+  lastGrammarIndex = idx;
+  const q = GRAMMAR_QUESTIONS[idx];
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag order" style="background:var(--lavender-deep); color:#fff;">📘 文法チェック（${q.topic}）</span>
+    <div class="sentence-line">${q.en.replace('___', '<span class="blank-slot" id="blankSlot">＿＿＿</span>')}</div>
+    <div class="choices" id="grammarChoices"></div>
+    <div id="feedbackSlot"></div>
+  `;
+  const cw = document.getElementById('grammarChoices');
+  q.choices.forEach((choice,i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = choice;
+    btn.onclick = ()=> handleGrammarAnswer(btn, i===q.correct, q);
+    cw.appendChild(btn);
+  });
+}
+
+function handleGrammarAnswer(btn, correct, q){
+  totalAnswered++;
+  document.querySelectorAll('#grammarChoices .choice-btn').forEach(b=> b.classList.add('disabled'));
+  const slot = document.getElementById('blankSlot');
+  if(slot) slot.textContent = q.choices[q.correct];
+
+  if(correct){
+    btn.classList.add('correct');
+    quizCard.classList.add('flash-good');
+    playCorrectSound();
+    addCoins(2);
+    document.getElementById('feedbackSlot').innerHTML =
+      `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>
+       <div class="ja-hint" style="margin-top:10px;">${q.explainJa}</div>`;
+  } else {
+    btn.classList.add('wrong');
+    document.querySelectorAll('#grammarChoices .choice-btn').forEach((b,i)=>{ if(i===q.correct) b.classList.add('correct'); });
+    quizCard.classList.add('flash-bad');
+    playWrongSound();
+    document.getElementById('feedbackSlot').innerHTML =
+      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span></div>
+       <div class="ja-hint" style="margin-top:10px;">${q.explainJa}</div>`;
+  }
+  nextBtn.textContent = 'つぎへ →';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> loadQuestion(); // resumes at the same vocab item (quizIndex unchanged)
+}
 
 function prefetchUpcoming(){
   // only prefetch a single item, one ahead — called right after a correct
@@ -4895,7 +5020,7 @@ async function generateSentenceForWord(item){
 - 中学生にもわかる、やさしい英文にすること
 - opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
 - 文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
-- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
+- 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと。直訳のせいで意味が通じない日本語（例:「スナックは離れている」のような、主語と動詞の関係がおかしい文）にしないこと。誰が読んでも自然に意味が通る日本語にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
 {"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
 
@@ -4967,6 +5092,7 @@ function renderBlankExercise(item){
 
 function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
+  questionsSinceGrammar++;
   const slot = document.getElementById('blankSlot');
   if(slot) slot.textContent = item.usedPhrase || item.en;
   input.disabled = true;
@@ -5066,6 +5192,7 @@ function renderOrderExercise(item){
 
   function checkOrder(){
     totalAnswered++;
+    questionsSinceGrammar++;
     const answer = built.map(idx=>pool[idx]).join(' ');
     const correct = answer === item.sentence;
     const buildChips = buildLine.querySelectorAll('.build-chip');
