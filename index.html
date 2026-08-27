@@ -158,8 +158,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   50%{ transform:scale(1.08) rotate(4deg); }
 }
 .omikuji-result{
-  font-family:'Fredoka',sans-serif; font-size:36px; font-weight:700; color:var(--lavender-deep);
-  animation:omikujiReveal .35s ease;
+  font-family:'Fredoka',sans-serif; font-size:clamp(24px,6vw,32px); font-weight:700; color:var(--lavender-deep);
+  animation:omikujiReveal .35s ease; text-align:center;
 }
 @keyframes omikujiReveal{
   0%{ transform:scale(0.4); opacity:0; }
@@ -244,21 +244,23 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 <canvas id="gameCanvas"></canvas>
 
 <div class="hud-top">
-  <div class="jar-wrap">
-    <svg class="jar-svg" viewBox="0 0 64 64">
-      <path d="M20 14 L20 10 Q20 6 24 6 L40 6 Q44 6 44 10 L44 14" fill="none" stroke="#C9A96E" stroke-width="3" stroke-linecap="round"/>
-      <rect x="17" y="12" width="30" height="6" rx="2" fill="#C9A96E"/>
-      <path d="M19 18 Q17 18 17 21 L15 52 Q15 58 22 58 L42 58 Q49 58 49 52 L47 21 Q47 18 45 18 Z" fill="#E9F7FF" stroke="#CFE7F5" stroke-width="1.5"/>
-      <g id="jarOrbs"></g>
-    </svg>
-    <div class="jar-label">
-      <span class="title">ことだまジャー <span id="levelBadge" class="level-badge">Lv.1</span></span>
-      <span class="count"><span id="wordPercent">0%</span></span>
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <div class="jar-wrap">
+      <svg class="jar-svg" viewBox="0 0 64 64">
+        <path d="M20 14 L20 10 Q20 6 24 6 L40 6 Q44 6 44 10 L44 14" fill="none" stroke="#C9A96E" stroke-width="3" stroke-linecap="round"/>
+        <rect x="17" y="12" width="30" height="6" rx="2" fill="#C9A96E"/>
+        <path d="M19 18 Q17 18 17 21 L15 52 Q15 58 22 58 L42 58 Q49 58 49 52 L47 21 Q47 18 45 18 Z" fill="#E9F7FF" stroke="#CFE7F5" stroke-width="1.5"/>
+        <g id="jarOrbs"></g>
+      </svg>
+      <div class="jar-label">
+        <span class="title">ことだまジャー <span id="levelBadge" class="level-badge">Lv.1</span></span>
+        <span class="count"><span id="wordPercent">0%</span></span>
+      </div>
     </div>
-  </div>
-  <div class="daily-wrap">
-    <span>📅 <span id="dailyCount">0</span>/<span id="dailyGoalLabel">15</span></span>
-    <span>🔥<span id="streakCount">0</span>日</span>
+    <div class="daily-wrap">
+      <span>📅 <span id="dailyCount">0</span>/<span id="dailyGoalLabel">15</span></span>
+      <span>🔥<span id="streakCount">0</span>日</span>
+    </div>
   </div>
   <div class="coin-wrap">
     <span class="coin-icon">🪙</span>
@@ -4596,8 +4598,7 @@ function renderFortuneResult(landmark){
   const pick = FORTUNES[Math.floor(Math.random()*FORTUNES.length)];
   quizBody.innerHTML = `
     <span class="exercise-tag blank" style="background:var(--lavender-deep);">🔮 きょうの運勢</span>
-    <div class="omikuji-result">${pick.luck}</div>
-    <div class="ja-hint" style="margin-top:-8px;">${pick.luckEn}</div>
+    <div class="omikuji-result">${pick.luck}（${pick.luckEn}）</div>
     <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
     <button class="speak-btn" id="lmSpeak" style="align-self:center;">
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
@@ -4706,12 +4707,17 @@ async function generateAIExercise(npc){
 - opener・sentence・reaction は、それぞれ12語以内の短い一文にすること（長い文にしないこと）
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- opener（話しかけの一文）の中には、対象の単語・熟語「${target.en}」そのものを書かないこと。sentence（返事）の中だけで使うこと（opener で答えを言ってしまわないこと）
 - sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書くこと
 - sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
 - 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
+
+【時制も必ず opener に合わせること】opener が過去形の質問なら、sentence も過去形で答えること。現在形のまま答えないこと。
+- 悪い例（NG）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confuse the art teacher.」（現在形のまま＝時制が合っていないのでNG）
+- 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 - 最後にキャラが返す短いリアクション（reaction）を1文作る。ここにキャラクターの性格を反映させること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと
@@ -4724,14 +4730,19 @@ async function generateAIExercise(npc){
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
     const parsed = extractJSON(text);
-    if(!parsed || !parsed.sentence || !parsed.sentenceJa) return null;
+    if(!parsed || !parsed.sentence || !parsed.sentenceJa){
+      console.error('generateAIExercise: failed to use AI response for word', target.en, '| raw text:', text, '| parsed:', parsed);
+      return null;
+    }
     return {
       en: target.en, ja: target.ja, cat: target.cat,
       opener: parsed.opener || '', openerJa: parsed.openerJa || '',
       sentence: parsed.sentence, sentenceJa: parsed.sentenceJa,
+      usedPhrase: parsed.usedPhrase || target.en,
       reaction: parsed.reaction || '', reactionJa: parsed.reactionJa || ''
     };
   } catch(e){
+    console.error('generateAIExercise: threw for word', target.en, e);
     return null;
   }
 }
@@ -4789,19 +4800,7 @@ function prefetchUpcoming(){
 }
 
 /* ---------- generate example sentences on demand for imported words ---------- */
-let sentenceCache = {}; // en -> {sentence, sentenceJa, opener, openerJa, reaction, reactionJa}
-const pendingGenerations = new Map(); // en -> in-flight Promise, avoids duplicate requests
-
-async function loadSentenceCache(){
-  try{
-    const res = await window.storage.get('neko_sentence_cache');
-    if(res && res.value) sentenceCache = JSON.parse(res.value);
-  } catch(e){ /* none yet */ }
-}
-async function saveSentenceCache(){
-  try{ await window.storage.set('neko_sentence_cache', JSON.stringify(sentenceCache), false); }
-  catch(e){ /* storage unavailable */ }
-}
+const pendingGenerations = new Map(); // en -> in-flight Promise, avoids duplicate concurrent requests
 
 function applyGeneratedContent(item, data){
   item.sentence = dedupeAdjacentRepeat(data.sentence, data.usedPhrase || item.en);
@@ -4832,14 +4831,12 @@ function fallbackContent(item){
   };
 }
 
-// generates (or reuses a cached / in-flight) result for one word, with no
-// UI side effects — safe to call for background prefetching
+// generates (or reuses an in-flight) result for one word, with no UI
+// side effects — safe to call for background prefetching. No persistent
+// cross-session cache anymore: each fresh encounter of a word gets a
+// newly-generated sentence for better variety.
 async function generateAndCache(item){
-  if(item.sentence) return;
-  if(sentenceCache[item.en]){
-    applyGeneratedContent(item, sentenceCache[item.en]);
-    return;
-  }
+  if(item.sentence) return; // already generated earlier this session
   if(pendingGenerations.has(item.en)){
     await pendingGenerations.get(item.en);
     return;
@@ -4848,8 +4845,6 @@ async function generateAndCache(item){
     const generated = await generateSentenceForWord(item);
     const data = generated || fallbackContent(item);
     applyGeneratedContent(item, data);
-    sentenceCache[item.en] = data;
-    saveSentenceCache();
   })();
   pendingGenerations.set(item.en, p);
   try{ await p; }
@@ -4859,11 +4854,7 @@ async function generateAndCache(item){
 const THINKING_MESSAGES = ['ことばを考え中', 'もうすこしまってね', 'いい文章をさがし中'];
 
 async function ensureExerciseContent(item){
-  if(item.sentence) return; // curated word, or already generated/prefetched
-  if(sentenceCache[item.en]){
-    applyGeneratedContent(item, sentenceCache[item.en]);
-    return;
-  }
+  if(item.sentence) return; // curated word, or already generated/prefetched earlier this session
 
   const msg = THINKING_MESSAGES[Math.floor(Math.random()*THINKING_MESSAGES.length)];
   quizBody.innerHTML = `<div class="npc-done-panel">
@@ -4884,13 +4875,17 @@ async function generateSentenceForWord(item){
 英検準2級レベルの単語・熟語「${item.en}」（日本語の意味: ${item.ja}）を自然に使った、短い会話を1つ作ってください。${contextSection}
 
 会話の作り方（この順番で考えること）：
-1. まず、そのキャラクターらしい話しかけの一文（opener）を考える
+1. まず、そのキャラクターらしい話しかけの一文（opener）を考える。opener の中には、対象の単語・熟語「${item.en}」そのものを書かないこと（opener で答えを言ってしまわないこと）
 2. その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る
 
 【最重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
 - 悪い例（NG）: opener「Do you like drawing?」→ sentence「I recently started playing tennis.」（絵の話をしているのにテニスの話にすり替わっている＝NG）
 - 良い例（OK）: opener「Do you like drawing?」→ sentence「Yes, I recently started drawing every day.」（同じ話題のまま、指定の単語を使って具体的に答えている＝OK）
 このように、opener で聞かれたことに sentence がまっすぐ答える形にしてください。
+
+【時制も必ず opener に合わせること】opener が過去形の質問なら、sentence も過去形で答えること。現在形のまま答えないこと。
+- 悪い例（NG）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confuse the art teacher.」（現在形のまま＝時制が合っていないのでNG）
+- 良い例（OK）: opener「Do you think the missing crayons confused anyone?」（過去形）→ sentence「Yes, the missing crayons confused the art teacher.」（過去形で答えている＝OK）
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
 4. sentence の中で実際に使った単語・熟語の形（活用後の形。例:「be good at」→ sentence内で"is good at"と書いたなら"is good at"）を usedPhrase として正確に書く
@@ -4908,9 +4903,13 @@ async function generateSentenceForWord(item){
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
     const parsed = extractJSON(text);
-    if(!parsed || !parsed.sentence || !parsed.sentenceJa) return null;
+    if(!parsed || !parsed.sentence || !parsed.sentenceJa){
+      console.error('generateSentenceForWord: failed to use AI response for word', item.en, '| raw text:', text, '| parsed:', parsed);
+      return null;
+    }
     return parsed;
   } catch(e){
+    console.error('generateSentenceForWord: threw for word', item.en, e);
     return null;
   }
 }
@@ -4953,7 +4952,7 @@ function renderBlankExercise(item){
   options.forEach(opt=>{
     const chip = document.createElement('div');
     chip.className = 'choice-btn choice-hint';
-    chip.textContent = opt.en;
+    chip.textContent = opt.en===item.en ? (item.usedPhrase || item.en) : opt.en;
     chip.dataset.correct = opt.en===item.en ? '1':'0';
     cw.appendChild(chip);
   });
@@ -4969,14 +4968,15 @@ function renderBlankExercise(item){
 function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
   const slot = document.getElementById('blankSlot');
-  if(slot) slot.textContent = item.en;
+  if(slot) slot.textContent = item.usedPhrase || item.en;
   input.disabled = true;
   document.getElementById('typeAnswerSubmit').disabled = true;
   document.querySelectorAll('#choices .choice-hint').forEach(c=>{
     if(c.dataset.correct === '1') c.classList.add('correct');
   });
 
-  const correct = typedValue.trim().toLowerCase() === item.en.trim().toLowerCase();
+  const expected = (item.usedPhrase || item.en).trim().toLowerCase();
+  const correct = typedValue.trim().toLowerCase() === expected;
 
   if(correct){
     input.classList.add('correct');
@@ -5002,7 +5002,7 @@ function handleBlankAnswer(input, typedValue, item){
     quizCard.classList.add('flash-bad');
     playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
-      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.en}</span></div>`;
+      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.usedPhrase || item.en}</span></div>`;
     recordMistake(item.en);
   }
   nextBtn.classList.add('show');
@@ -5197,11 +5197,9 @@ function burstSparkles(btn){
 }
 
 // show the save-code screen (if needed), then restore mastered words,
-// mistake history, coins, cat collection, and the AI sentence cache for
-// that code
+// mistake history, coins, and the cat collection for that code
 ensurePlayerCode().then(()=>{
   loadProgress();
-  loadSentenceCache();
 });
 applyDayNight();
 updateIslandUI();
