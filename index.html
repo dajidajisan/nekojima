@@ -3360,29 +3360,30 @@ function makeCharacter({ bodyColor, earColor, earType }){
   const bellyColor = lighten(bodyColor, 55);
 
   // rounder, more continuous body — overlaps further into the head so
-  // the silhouette reads as one soft round shape rather than two
-  // separate spheres (closer to the 'nekonoke nihonshi' round-mochi look)
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.58,20,16), toon(bodyColor));
-  body.scale.set(1.0, 0.9, 0.95);
-  body.position.y = 0.5;
+  // body and head much closer in size now (was a a big-head 'chibi'
+  // ratio before) — this reads as a more uniform oval silhouette even
+  // from normal gameplay camera distance, where fine facial details
+  // don't register
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.66,20,16), toon(bodyColor));
+  body.scale.set(1.0, 0.92, 0.95);
+  body.position.y = 0.56;
   g.add(body);
 
   // cream belly patch
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,12), toon(bellyColor));
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.33,16,12), toon(bellyColor));
   belly.scale.set(0.9,0.75,0.55);
-  belly.position.set(0, 0.42, 0.32);
+  belly.position.set(0, 0.48, 0.36);
   g.add(belly);
 
   // paws (front, sitting pose)
   [-1,1].forEach(side=>{
-    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.14,12,10), toon(bodyColor));
-    paw.position.set(side*0.24, 0.16, 0.42);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.15,12,10), toon(bodyColor));
+    paw.position.set(side*0.26, 0.18, 0.46);
     g.add(paw);
   });
 
-  // big chibi head (bigger than the body = cuter proportions)
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.72,22,18), toon(bodyColor));
-  head.position.y = 1.24;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.6,22,18), toon(bodyColor));
+  head.position.y = 1.1;
   g.add(head);
 
   // ears vary by type
@@ -3399,32 +3400,27 @@ function makeCharacter({ bodyColor, earColor, earType }){
       g.add(ear, earInner);
     });
   } else if(earType === 'cat'){
-    // simple solid-color triangle ears, no separate inner-ear patch —
-    // matching the flat, minimal 'nekonoke nihonshi' style
+    // smaller, rounder-tipped solid-color ears, sitting lower/closer to
+    // the now-smaller head — a softer, less pointy silhouette
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.32,8), toon(bodyColor));
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.19,0.22,8), toon(bodyColor));
       ear.scale.set(1,1,0.5);
-      ear.position.set(side*0.42, 1.95, -0.02);
+      ear.position.set(side*0.33, 1.62, -0.02);
       ear.rotation.z = side*0.08;
       g.add(ear);
     });
     // pink nose only — no drawn mouth or whiskers, keeping the face as
     // just two simple round eyes on one clean round silhouette
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.045,0.06,6), toon(0xFF8FA3));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.04,0.05,6), toon(0xFF8FA3));
     nose.rotation.x = Math.PI/2;
-    nose.position.set(0, 1.2, 0.78);
+    nose.position.set(0, 1.07, 0.66);
     g.add(nose);
-    // tail: a few segments curving up and back
-    const tailMat = toon(bodyColor);
-    const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.56,8), tailMat);
-    seg1.position.set(0, 0.6, -0.54);
-    seg1.rotation.x = -1.15;
-    const seg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.09,0.46,8), tailMat);
-    seg2.position.set(0, 1.0, -0.82);
-    seg2.rotation.x = -0.3;
-    const tailTip = new THREE.Mesh(new THREE.SphereGeometry(0.08,10,10), toon(earColor));
-    tailTip.position.set(0, 1.22, -0.66);
-    g.add(seg1, seg2, tailTip);
+    // a single small round tail (simplified from the previous curved
+    // 2-segment tail) — less visual complexity, more of a difference
+    // from the earlier design
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16,12,10), toon(bodyColor));
+    tail.position.set(0, 0.55, -0.6);
+    g.add(tail);
   } else if(earType === 'bear'){
     [-1,1].forEach(side=>{
       const ear = new THREE.Mesh(new THREE.SphereGeometry(0.2,14,12), toon(bodyColor));
@@ -3448,18 +3444,19 @@ function makeCharacter({ bodyColor, earColor, earType }){
 
   // cheeks
   [-1,1].forEach(side=>{
-    const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.13,12), new THREE.MeshBasicMaterial({color:0xFFB3C1}));
-    cheek.position.set(side*0.42, 1.11, 0.6);
+    const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.11,12), new THREE.MeshBasicMaterial({color:0xFFB3C1}));
+    cheek.position.set(side*0.35, 1.0, 0.5);
     cheek.rotation.y = side*-0.5;
     g.add(cheek);
   });
 
-  // big simple round eyes (flat dots, closer to the clean line-art look)
-  const eyeGeo = new THREE.CircleGeometry(0.115,16);
+  // simple round eyes — a bit smaller than before, closer to the
+  // understated dot-eyes seen in flat minimal cat-mascot designs
+  const eyeGeo = new THREE.CircleGeometry(0.095,16);
   const eyeMat = new THREE.MeshBasicMaterial({color:0x2E2A3A});
   [-1,1].forEach(side=>{
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(side*0.26, 1.3, 0.665);
+    eye.position.set(side*0.22, 1.15, 0.555);
     eye.rotation.y = side*-0.15;
     g.add(eye);
   });
@@ -3509,7 +3506,7 @@ function spawnNPC(def){
   const npTex = new THREE.CanvasTexture(npCanvas);
   const nameplate = new THREE.Sprite(new THREE.SpriteMaterial({ map:npTex, transparent:true }));
   nameplate.scale.set(1.1, 0.36, 1);
-  nameplate.position.set(0, 2.5, 0);
+  nameplate.position.set(0, 2.24, 0);
   mesh.add(nameplate);
 
   // floating "!" marker
@@ -3523,7 +3520,7 @@ function spawnNPC(def){
   const tex = new THREE.CanvasTexture(markerCanvas);
   const marker = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true }));
   marker.scale.set(0.55,0.55,1);
-  marker.position.set(0,3.05,0);
+  marker.position.set(0,2.79,0);
   mesh.add(marker);
 
   const vocabList = def.wordList || VOCAB.filter(v => (def.cats||[]).includes(v.cat));
@@ -3789,7 +3786,7 @@ function animate(){
   npcs.forEach(n=>{
     if(!n.mesh.visible) return; // belongs to a different world, not shown right now
     n.mesh.position.y = Math.abs(Math.sin(t*1.8 + n.def.pos[0]))*0.05;
-    n.marker.position.y = 3.05 + Math.sin(t*3 + n.def.pos[0])*0.08;
+    n.marker.position.y = 2.79 + Math.sin(t*3 + n.def.pos[0])*0.08;
     n.marker.visible = !allMastered(n);
     const dist = player.position.distanceTo(n.mesh.position);
     if(dist < closestDist){ closestDist = dist; closest = n; closestKind = 'npc'; }
@@ -4573,15 +4570,24 @@ async function generateSmallTalk(npc){
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
     const parsed = extractJSON(text);
-    if(!parsed || !Array.isArray(parsed.turns) || parsed.turns.length < 2) return null;
-    if(parsed.turns.some(t => !t.opener || !t.reply)) return null;
+    if(!parsed || !Array.isArray(parsed.turns) || parsed.turns.length < 2){
+      console.error('generateSmallTalk: invalid structure, falling back. raw text:', text, '| parsed:', parsed);
+      return null;
+    }
+    if(parsed.turns.some(t => !t.opener || !t.reply)){
+      console.error('generateSmallTalk: a turn is missing opener/reply, falling back. turns:', parsed.turns);
+      return null;
+    }
+    console.log('generateSmallTalk: succeeded with', parsed.turns.length, 'turns');
     return parsed.turns;
   } catch(e){
+    console.error('generateSmallTalk: threw', e);
     return null;
   }
 }
 
 function renderSmallTalkTurn(turns, turnIndex, onDone){
+  console.log('renderSmallTalkTurn: showing turn', turnIndex, 'of', turns.length);
   const chat = turns[turnIndex];
   quizBody.innerHTML = `
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
