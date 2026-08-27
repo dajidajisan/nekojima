@@ -627,7 +627,10 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   <div class="npc-create-card" style="max-width:520px;">
     <button class="close-x" id="closeRewards">✕</button>
     <h2>🎁 ごほうび</h2>
-    <div class="rewards-coin-row">🪙 いま <span id="rewardsCoinCount">0</span> まい</div>
+    <div class="rewards-coin-row">
+      <svg class="coin-icon-svg" viewBox="0 0 24 24" style="width:20px; height:20px; vertical-align:-4px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg>
+      いま <span id="rewardsCoinCount">0</span> まい
+    </div>
 
     <div class="reward-section">
       <div class="reward-section-title">😺 ねこ図鑑</div>
@@ -4733,7 +4736,7 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 - 【重要】sentence は主語・動詞がそろった、文法的に完全な一文にすること。単語が途中で抜け落ちて意味が通じない文（例: "I ___ any whispers."のように動詞が抜けている）を作らないこと
 - 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
 - opener（話しかけの一文）の中には、対象の単語・熟語「${target.en}」そのものを書かないこと。sentence（返事）の中だけで使うこと（opener で答えを言ってしまわないこと）
-- sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書くこと。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
+- 【最重要】sentence の中で、指定の単語・熟語を実際に使った部分（活用後の形も含む）を **（アスタリスク2つ）で囲むこと。例: sentenceが "It was unlikely to rain." なら "It **was unlikely to** rain." のように書く。囲む部分は sentence の中に実際に書いてある文字とまったく同じにすること（別の場所に書き換えたり、報告用に新しく書き直したりしないこと）
 - sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 【重要】sentence は opener の質問・話題に対する、具体的で筋の通った答えになっていなければいけません。単語を無理やり押し込んだだけの、話がかみ合わない文にしないこと。
@@ -4745,7 +4748,7 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 - 日本語訳の文末表現にも、そのキャラクターの性格・口調を反映させること
 - 前に使った例文「${target.sentence}」とは違う場面・文脈にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
-{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
+{"opener":"英文","openerJa":"その日本語訳","sentence":"英文（対象の部分を**で囲む）","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
 
   try{
     const data = await callClaudeProxy(prompt);
@@ -4755,11 +4758,24 @@ sentence を書き終えたら、必ずこのルールに違反していない�
       console.error('generateAIExercise: failed to use AI response for word', target.en, '| raw text:', text, '| parsed:', parsed);
       return null;
     }
+    // extract the **marked** phrase directly from the sentence, same as
+    // applyGeneratedContent does — keeps this bonus-exercise path in sync
+    // with the main generation path
+    let rawSentence = parsed.sentence || '';
+    let usedPhrase = target.en;
+    const markMatch = rawSentence.match(/\*\*(.+?)\*\*/);
+    if(markMatch){
+      usedPhrase = markMatch[1].trim();
+      rawSentence = rawSentence.replace(/\*\*(.+?)\*\*/, '$1');
+    }
+    const baseWordCount = target.en.trim().split(/\s+/).length;
+    if(usedPhrase.trim().split(/\s+/).length > baseWordCount + 1) usedPhrase = target.en;
+
     return {
       en: target.en, ja: target.ja, cat: target.cat,
       opener: parsed.opener || '', openerJa: parsed.openerJa || '',
-      sentence: parsed.sentence, sentenceJa: parsed.sentenceJa,
-      usedPhrase: parsed.usedPhrase || target.en,
+      sentence: dedupeAdjacentRepeat(rawSentence, usedPhrase), sentenceJa: parsed.sentenceJa,
+      usedPhrase,
       reaction: parsed.reaction || '', reactionJa: parsed.reactionJa || ''
     };
   } catch(e){
@@ -5105,15 +5121,27 @@ function prefetchUpcoming(){
 const pendingGenerations = new Map(); // en -> in-flight Promise, avoids duplicate concurrent requests
 
 function applyGeneratedContent(item, data){
-  let usedPhrase = data.usedPhrase || item.en;
-  // safety net: if the AI included extra surrounding words despite being
-  // told not to (e.g. "especially the ideas" instead of just "especially"),
+  // extract the **marked** phrase directly from the sentence text itself,
+  // rather than trusting a separately-reported usedPhrase field — this
+  // guarantees the highlighted phrase can never drift out of sync with
+  // what's actually written in the sentence (the root cause of repeated
+  // tense/inflection mismatch bugs)
+  let rawSentence = data.sentence || '';
+  let usedPhrase = item.en;
+  const markMatch = rawSentence.match(/\*\*(.+?)\*\*/);
+  if(markMatch){
+    usedPhrase = markMatch[1].trim();
+    rawSentence = rawSentence.replace(/\*\*(.+?)\*\*/, '$1');
+  }
+
+  // safety net: if the marked phrase is wildly longer than the target
+  // word/phrase (the AI marked a whole clause instead of just the word),
   // discard it and fall back to the plain base form instead
   const baseWordCount = item.en.trim().split(/\s+/).length;
   const usedWordCount = usedPhrase.trim().split(/\s+/).length;
   if(usedWordCount > baseWordCount + 1) usedPhrase = item.en;
 
-  item.sentence = dedupeAdjacentRepeat(data.sentence, usedPhrase);
+  item.sentence = dedupeAdjacentRepeat(rawSentence, usedPhrase);
   item.sentenceJa = data.sentenceJa;
   item.opener = data.opener || '';
   item.openerJa = data.openerJa || '';
@@ -5201,7 +5229,7 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 このように、opener で聞かれたことに sentence がまっすぐ答える形にしてください。
 
 3. 最後に、その返事を受けてキャラクターが返す短いリアクション（reaction）を1文作る
-4. sentence の中で実際に使った単語・熟語の形（活用後の形のみ。例:「be good at」→"is good at"、「confuse」→"confused"）を usedPhrase として書く。usedPhrase には、対象の単語・熟語そのものの活用形だけを書き、前後の他の単語（especially, the, a など）は絶対に含めないこと
+4. 【最重要】sentence の中で、指定の単語・熟語を実際に使った部分（活用後の形も含む）を **（アスタリスク2つ）で囲むこと。例: sentenceが "It was unlikely to rain." なら "It **was unlikely to** rain." のように書く。囲む部分は sentence の中に実際に書いてある文字とまったく同じにすること
 5. sentence の中で、その単語・熟語を2回連続で繰り返さないこと（例:「a virus virus that」のような誤りをしないこと）
 
 条件：
@@ -5213,7 +5241,7 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 - 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
 - 日本語訳（openerJa, sentenceJa, reactionJa）は必ず完全な自然な日本語だけで書き、英単語や英熟語をそのまま日本語文の中に混ぜないこと。直訳のせいで意味が通じない日本語（例:「スナックは離れている」のような、主語と動詞の関係がおかしい文）にしないこと。誰が読んでも自然に意味が通る日本語にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号（\`\`\`）は絶対に付けないでください：
-{"opener":"英文","openerJa":"その日本語訳","sentence":"英文","sentenceJa":"その日本語訳","usedPhrase":"sentence内で実際に使った形","reaction":"英文","reactionJa":"その日本語訳"}`;
+{"opener":"英文","openerJa":"その日本語訳","sentence":"英文（対象の部分を**で囲む）","sentenceJa":"その日本語訳","reaction":"英文","reactionJa":"その日本語訳"}`;
 
   try{
     const data = await callClaudeProxy(prompt);
@@ -5268,7 +5296,7 @@ function renderBlankExercise(item){
   options.forEach(opt=>{
     const chip = document.createElement('div');
     chip.className = 'choice-btn choice-hint';
-    chip.textContent = opt.en;
+    chip.textContent = opt.en===item.en ? (item.usedPhrase || item.en) : opt.en;
     chip.dataset.correct = opt.en===item.en ? '1':'0';
     cw.appendChild(chip);
   });
@@ -5284,7 +5312,7 @@ function renderBlankExercise(item){
 function handleBlankAnswer(input, typedValue, item){
   totalAnswered++;
   const slot = document.getElementById('blankSlot');
-  if(slot) slot.textContent = item.en;
+  if(slot) slot.textContent = item.usedPhrase || item.en;
   input.disabled = true;
   document.getElementById('typeAnswerSubmit').disabled = true;
   document.querySelectorAll('#choices .choice-hint').forEach(c=>{
@@ -5319,7 +5347,7 @@ function handleBlankAnswer(input, typedValue, item){
     quizCard.classList.add('flash-bad');
     playWrongSound();
     document.getElementById('feedbackSlot').innerHTML =
-      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.en}</span></div>`;
+      `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.usedPhrase || item.en}</span></div>`;
     recordMistake(item.en);
   }
   nextBtn.classList.add('show');
