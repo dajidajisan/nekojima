@@ -270,7 +270,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 <canvas id="gameCanvas"></canvas>
 
 <div class="hud-top">
-  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+  <div style="display:flex; flex-direction:column; align-items:flex-start; gap:6px;">
     <div class="jar-wrap">
       <svg class="jar-svg" viewBox="0 0 64 64">
         <path d="M20 14 L20 10 Q20 6 24 6 L40 6 Q44 6 44 10 L44 14" fill="none" stroke="#C9A96E" stroke-width="3" stroke-linecap="round"/>
@@ -2709,17 +2709,17 @@ const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
     theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
-    landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4] },
+    landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4], future:[9,14] },
   },
   {
     id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:250, status:'ready',
     theme:{ groundDay:0xC7C9D4, groundNight:0x33364A, path:0x9098A8, wall:0xE4E6EE, roofs:[0x6B7A99,0x8993B0,0x5E6B87], buildingScaleY:2.1, natureVisible:false },
-    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14] },
+    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14], future:[-8,-16] },
   },
   {
     id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
-    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9] },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9], future:[6,15] },
   },
   {
     id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
@@ -2767,6 +2767,7 @@ function travelToIsland(id){
 
   // show/hide trees & co.
   natureGroup.visible = theme.natureVisible;
+  cityGroup.visible = (id === 'city');
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
   // a distinct ~50-word slice), so switching worlds shows/hides the
@@ -3150,6 +3151,180 @@ function makeDriftwood(x,z,rotY,scale=1){
 [[-28,2,0.4,1],[26,10,1.2,0.9],[-16,-27,0.8,1],[23,-27,-0.5,0.85]]
   .forEach(([x,z,r,s]) => natureGroup.add(makeDriftwood(x,z,r,s)));
 
+/* =========================================================
+   CITY-ONLY FUTURISTIC SCENERY — neon, glass, monorail, hovering
+   vehicles. Lives in its own group, toggled visible only when the
+   player is in みらいシティ (see travelToIsland).
+========================================================= */
+const cityGroup = new THREE.Group();
+cityGroup.visible = false;
+scene.add(cityGroup);
+
+// glass/chrome neon-trimmed tower — rounded body, glowing rings, spire
+function makeNeonTower(x,z,h,neonColor){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.05,1.3,h,10),
+    new THREE.MeshPhongMaterial({color:0xC7CBE0, transparent:true, opacity:0.72, shininess:140, specular:0xffffff})
+  );
+  body.position.y = h/2;
+  g.add(body);
+  const ringCount = Math.max(1, Math.floor(h/2.2));
+  for(let i=1;i<=ringCount;i++){
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.12,0.045,6,20), new THREE.MeshBasicMaterial({color:neonColor}));
+    ring.rotation.x = Math.PI/2;
+    ring.position.y = i*(h/(ringCount+1));
+    g.add(ring);
+  }
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.05,1.4,6), new THREE.MeshBasicMaterial({color:neonColor}));
+  spire.position.y = h+0.7;
+  g.add(spire);
+  const spireTip = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,10), new THREE.MeshBasicMaterial({color:neonColor}));
+  spireTip.position.y = h+1.4;
+  g.add(spireTip);
+  g.add(makeBlobShadow(1.6));
+  g.position.set(x,0,z);
+  return g;
+}
+[[16,16,7.5,0x6BCBFF],[-17,-16,8.5,0x9B6BFF],[20,-6,6.5,0x6BCBFF],[-6,20,7,0xFF6BC4]]
+  .forEach(([x,z,h,c]) => cityGroup.add(makeNeonTower(x,z,h,c)));
+
+// asymmetric cantilevered platform: a box "growing" sideways off a thin
+// pole — the floating, ungrounded look mentioned in the reference
+function makeFloatingPlatform(x,z,rotY){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.16,3.2,8), new THREE.MeshPhongMaterial({color:0xD8DCE8, shininess:100}));
+  pole.position.y = 1.6;
+  g.add(pole);
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.25,1.8), new THREE.MeshPhongMaterial({color:0xEFF1F8, shininess:120}));
+  slab.position.set(1.3,3.1,0);
+  g.add(slab);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.04,0.04), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  trim.position.set(1.3,2.97,0.9);
+  g.add(trim);
+  g.add(makeBlobShadow(1.2));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+[[10,-14,0.4],[-14,4,1.9]].forEach(([x,z,r]) => cityGroup.add(makeFloatingPlatform(x,z,r)));
+
+// glowing neon strips embedded along the ground, scattered near paths
+function makeNeonStrip(x,z,rotY,len,color){
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.03,len), new THREE.MeshBasicMaterial({color}));
+  strip.position.set(x,0.03,z);
+  strip.rotation.y = rotY;
+  return strip;
+}
+[[-3,-3,0,3,0x6BCBFF],[5,3,0.5,2.4,0x9B6BFF],[-8,8,1.1,2.8,0xFF6BC4],[12,2,0.3,2.2,0x6BCBFF],
+ [-4,-13,0.8,2.6,0x9B6BFF],[3,-9,1.4,2,0x6BCBFF]]
+  .forEach(([x,z,r,l,c]) => cityGroup.add(makeNeonStrip(x,z,r,l,c)));
+
+// simple hovering pod vehicles, gently bobbing in place
+const hoverVehicles = [];
+function makeHoverVehicle(x,y,z,color){
+  const g = new THREE.Group();
+  const pod = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,12), new THREE.MeshPhongMaterial({color, shininess:150, specular:0xffffff}));
+  pod.scale.set(1.3,0.55,1);
+  g.add(pod);
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.3,14,10), new THREE.MeshPhongMaterial({color:0xBFE6FF, transparent:true, opacity:0.6, shininess:150}));
+  canopy.scale.set(1,0.8,1);
+  canopy.position.y = 0.2;
+  g.add(canopy);
+  const glow = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.03,6,16), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  glow.rotation.x = Math.PI/2;
+  glow.position.y = -0.18;
+  g.add(glow);
+  g.position.set(x,y,z);
+  cityGroup.add(g);
+  hoverVehicles.push({ mesh:g, baseY:y, phase:Math.random()*10 });
+}
+makeHoverVehicle(-10,4.2,-9,0xFF8FA3);
+makeHoverVehicle(14,5.5,8,0x6FE0C2);
+makeHoverVehicle(-2,6.2,15,0xFFD873);
+
+// monorail: an elevated loop with glowing rail + a moving car
+const monorailPoints = [[-14,-14],[0,-17],[14,-12],[18,4],[8,16],[-10,14],[-18,0],[-14,-14]];
+function makeMonorail(){
+  const g = new THREE.Group();
+  const trackMat = new THREE.MeshPhongMaterial({color:0xD8DCE8, shininess:110});
+  const pillarMat = new THREE.MeshLambertMaterial({color:0xAEB4C7});
+  for(let i=0;i<monorailPoints.length-1;i++){
+    const [x1,z1] = monorailPoints[i], [x2,z2] = monorailPoints[i+1];
+    const midX=(x1+x2)/2, midZ=(z1+z2)/2;
+    const len = Math.hypot(x2-x1,z2-z1);
+    const angle = Math.atan2(x2-x1,z2-z1);
+    const track = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.16,len+0.4), trackMat);
+    track.position.set(midX,4.6,midZ);
+    track.rotation.y = -angle;
+    g.add(track);
+    const glowLine = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.03,len+0.4), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    glowLine.position.set(midX,4.52,midZ);
+    glowLine.rotation.y = -angle;
+    g.add(glowLine);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.2,4.6,8), pillarMat);
+    pillar.position.set(x1,2.3,z1);
+    g.add(pillar);
+  }
+  return g;
+}
+cityGroup.add(makeMonorail());
+
+const monorailCar = new THREE.Group();
+{
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry ? new THREE.CylinderGeometry(0.32,0.32,1.4,10) : new THREE.CylinderGeometry(0.32,0.32,1.4,10),
+    new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:140}));
+  body.rotation.z = Math.PI/2;
+  monorailCar.add(body);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.42,0.06,0.06), new THREE.MeshBasicMaterial({color:0x9B6BFF}));
+  monorailCar.add(stripe);
+}
+monorailCar.position.y = 4.75;
+cityGroup.add(monorailCar);
+let monorailT = 0; // 0..1 progress along the whole loop
+
+// neon digital canal + chrome bridge (separate from the meadow's river,
+// only shown in the city)
+function makeDigitalCanal(){
+  const g = new THREE.Group();
+  const points = [[-20,-6],[-10,-8],[0,-4],[10,-8],[20,-5]];
+  for(let i=0;i<points.length-1;i++){
+    const [x1,z1] = points[i], [x2,z2] = points[i+1];
+    const midX=(x1+x2)/2, midZ=(z1+z2)/2;
+    const len = Math.hypot(x2-x1,z2-z1);
+    const angle = Math.atan2(x2-x1,z2-z1);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(3,len+0.5), new THREE.MeshBasicMaterial({color:0x1A2A4A}));
+    water.rotation.x = -Math.PI/2;
+    water.rotation.z = -angle;
+    water.position.set(midX,0.02,midZ);
+    g.add(water);
+    const edge = new THREE.Mesh(new THREE.PlaneGeometry(3.15,len+0.5), new THREE.MeshBasicMaterial({color:0x6BCBFF, transparent:true, opacity:0.5}));
+    edge.rotation.x = -Math.PI/2;
+    edge.rotation.z = -angle;
+    edge.position.set(midX,0.015,midZ);
+    g.add(edge);
+  }
+  return g;
+}
+cityGroup.add(makeDigitalCanal());
+
+function makeChromeBridge(x,z,rotY){
+  const g = new THREE.Group();
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.12,4.4), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:130}));
+  deck.position.y = 0.12;
+  g.add(deck);
+  [-1,1].forEach(side=>{
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.35,4.4), new THREE.MeshBasicMaterial({color:0x6BCBFF, transparent:true, opacity:0.7}));
+    rail.position.set(side*1.05,0.3,0);
+    g.add(rail);
+  });
+  g.add(makeBlobShadow(2.6));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+cityGroup.add(makeChromeBridge(-5,-6,Math.PI*0.06));
+
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
 function makeButterfly(x,z){
@@ -3292,10 +3467,33 @@ function makePraisePedestal(x,z){
   return { group:g, marker, star };
 }
 
+function makeFutureOrb(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.62,0.5,12), new THREE.MeshLambertMaterial({color:0xE4E6EE}));
+  base.position.y = 0.25;
+  g.add(base);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55,0.05,8,24), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = 0.85;
+  g.add(ring);
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.34,20,16), new THREE.MeshPhongMaterial({color:0x8993B0, transparent:true, opacity:0.55, shininess:100}));
+  orb.position.y = 1.25;
+  g.add(orb);
+  const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.14,0), new THREE.MeshBasicMaterial({color:0x9B6BFF}));
+  core.position.y = 1.25;
+  g.add(core);
+  const marker = makeFloatingMarker('🔭', 2.1);
+  g.add(marker);
+  g.add(makeBlobShadow(1.0));
+  g.position.set(x,0,z);
+  return { group:g, marker, orb, core };
+}
+
 const landmarks = [
   { ...makeComedyStage(-15,3), id:'comedy', type:'comedy', title:'コメディポイント', sub:'えいごジョークを聞く', emoji:'😂', bg:'FFD873', label:'😂 ジョークを聞く' },
   { ...makeFortuneTent(13,-11), id:'fortune', type:'fortune', title:'占いポイント', sub:'きょうの運勢', emoji:'🔮', bg:'B9A6E8', label:'🔮 占ってもらう' },
   { ...makePraisePedestal(-3,-4), id:'praise', type:'praise', title:'ほめポイント', sub:'とにかくほめてもらう', emoji:'💖', bg:'FF8FA3', label:'💖 ほめてもらう' },
+  { ...makeFutureOrb(9,14), id:'future', type:'future', title:'未来予想ポイント', sub:'未来のことを予想する', emoji:'🔭', bg:'6BCBFF', label:'🔭 未来を のぞく' },
 ];
 landmarks.forEach(l => scene.add(l.group));
 
@@ -3821,6 +4019,16 @@ const interactBtn = document.getElementById('interactBtn');
 const hintPill = document.getElementById('hintPill');
 setTimeout(()=> hintPill.classList.add('hide'), 4500);
 
+// returns [x,z] along the monorail loop at progress t (0..1)
+function monorailPointAt(t){
+  const totalSegs = monorailPoints.length - 1;
+  const scaled = t * totalSegs;
+  const i = Math.min(totalSegs-1, Math.floor(scaled));
+  const localT = scaled - i;
+  const [x1,z1] = monorailPoints[i], [x2,z2] = monorailPoints[i+1];
+  return [x1 + (x2-x1)*localT, z1 + (z2-z1)*localT, Math.atan2(x2-x1, z2-z1)];
+}
+
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -3914,6 +4122,19 @@ function animate(){
     const dx = player.position.x - nearNPC.mesh.position.x;
     const dz = player.position.z - nearNPC.mesh.position.z;
     nearNPC.mesh.rotation.y = Math.atan2(dx, dz);
+  }
+
+  // city-only animations (monorail car + hovering vehicles)
+  if(cityGroup.visible){
+    monorailT = (monorailT + dt*0.045) % 1;
+    const [mx,mz,mAngle] = monorailPointAt(monorailT);
+    monorailCar.position.x = mx;
+    monorailCar.position.z = mz;
+    monorailCar.rotation.y = -mAngle;
+    hoverVehicles.forEach(v=>{
+      v.mesh.position.y = v.baseY + Math.sin(t*1.2 + v.phase)*0.25;
+      v.mesh.rotation.y = t*0.3 + v.phase;
+    });
   }
 
   // camera follow (third person, behind player)
@@ -4660,14 +4881,6 @@ const SMALL_TALK_FALLBACK = [
   ],
 ];
 
-// TEMPORARY debug indicator (top-left) so we can see what's happening
-// with small-talk generation without needing dev tools — remove once
-// confirmed working reliably.
-const stDebugEl = document.createElement('div');
-stDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:90vw;';
-stDebugEl.textContent = '';
-document.body.appendChild(stDebugEl);
-
 async function generateSmallTalk(npc){
   const personality = npc.def.personality || 'げんき';
   const likes = npc.def.likes || '';
@@ -4690,24 +4903,15 @@ async function generateSmallTalk(npc){
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
     const parsed = extractJSON(text);
-    if(!parsed || !Array.isArray(parsed.turns) || parsed.turns.length < 2){
-      stDebugEl.textContent = '🗨️ AI失敗(構造) → fallback使用';
-      return null;
-    }
-    if(parsed.turns.some(t => !t.opener || !t.reply)){
-      stDebugEl.textContent = '🗨️ AI失敗(欠落) → fallback使用';
-      return null;
-    }
-    stDebugEl.textContent = `🗨️ AI成功: turns=${parsed.turns.length}`;
+    if(!parsed || !Array.isArray(parsed.turns) || parsed.turns.length < 2) return null;
+    if(parsed.turns.some(t => !t.opener || !t.reply)) return null;
     return parsed.turns;
   } catch(e){
-    stDebugEl.textContent = '🗨️ AI例外 → fallback使用: ' + e.message;
     return null;
   }
 }
 
 function renderSmallTalkTurn(turns, turnIndex, onDone){
-  stDebugEl.textContent += ` | 表示中: turn ${turnIndex+1}/${turns.length}`;
   const chat = turns[turnIndex];
   quizBody.innerHTML = `
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
@@ -4883,10 +5087,69 @@ function renderLandmarkContent(landmark){
     nextBtn.textContent = 'もう一回 🎲';
     nextBtn.classList.add('show');
     nextBtn.onclick = ()=> renderLandmarkContent(landmark);
+
+  } else if(landmark.type === 'future'){
+    renderFuturePrediction(landmark);
   }
 }
 
 // step 1: show a tappable fortune-slip icon — nothing is revealed yet
+const FUTURE_FIELDS = ['交通・移動','医療・健康','宇宙','環境・エネルギー','ロボット・AI','食べ物','教育','おうちの暮らし'];
+const FUTURE_FALLBACK = [
+  { field:'交通・移動', en:"In the future, cars will fly through the sky.", ja:"未来には、車が空を飛ぶようになるよ。", keyWord:"fly through", explain:"「fly through」で『〜の中を飛んでいく』という意味だよ。" },
+  { field:'医療・健康', en:"Doctors will heal people with tiny robots.", ja:"お医者さんは、小さなロボットで人を治すようになるよ。", keyWord:"heal", explain:"「heal」は『（病気やけがを）治す』という意味の動詞だよ。" },
+  { field:'宇宙', en:"People will live on the moon someday.", ja:"人はいつか月に住むようになるよ。", keyWord:"someday", explain:"「someday」は『いつか』という意味の副詞だよ。" },
+];
+
+async function generateFuturePrediction(){
+  const field = FUTURE_FIELDS[Math.floor(Math.random()*FUTURE_FIELDS.length)];
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、未来予想が得意なキャラクターです。
+「${field}」の分野について、未来にはこんなことができるようになる、という予想を英語で1文作ってください。
+条件：
+- 英検準2級レベルの、10語以内のやさしい英文にすること
+- will や be going to など、未来を表す表現を使うこと
+- 現実離れしすぎない、子どもが楽しく想像できる内容にすること
+- 文中で使われている単語・熟語のうち、学習にちょうどいいものを1つ選び、keyWord としてそのまま書き出し、その意味・使い方を日本語でやさしく説明すること
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"en":"英文","ja":"その日本語訳","keyWord":"文中の単語・熟語","explain":"その単語の意味・使い方の説明（日本語）"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.en || !parsed.ja) return null;
+    return { field, ...parsed };
+  } catch(e){
+    return null;
+  }
+}
+
+async function renderFuturePrediction(landmark){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">🔭</div>
+    <p>未来をのぞき中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const generated = await generateFuturePrediction();
+  const pick = generated || FUTURE_FALLBACK[Math.floor(Math.random()*FUTURE_FALLBACK.length)];
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#6BCBFF;">🔭 未来予想（${pick.field}）</span>
+    <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
+    <button class="speak-btn" id="lmSpeak" style="align-self:center;">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    </button>
+    <div class="ja-hint">${pick.ja}</div>
+    ${vocabCallout(pick.keyWord, pick.explain)}
+  `;
+  document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+  speakEnglish(pick.en);
+  burstSparkles(document.getElementById('lmSpeak'));
+  nextBtn.textContent = 'もう一回 🔭';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderFuturePrediction(landmark);
+}
+
 function renderFortuneDraw(landmark){
   nextBtn.classList.remove('show');
   quizBody.innerHTML = `
