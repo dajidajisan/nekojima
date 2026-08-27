@@ -46,7 +46,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 
 /* ---------- INTERACT BUTTON ---------- */
 #interactBtn{
-  position:fixed; right:30px; bottom:96px; z-index:25;
+  position:fixed; right:14px; bottom:26px; z-index:25;
   background:linear-gradient(135deg, var(--coral), var(--coral-deep));
   color:#fff; border:none; border-radius:999px; padding:16px 22px;
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:15px;
@@ -147,6 +147,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .feedback-banner{
   align-self:center; text-align:center; font-family:'Fredoka',sans-serif; font-weight:700;
   font-size:15.5px; padding:7px 16px; border-radius:999px; animation:feedbackPop .3s ease;
+  margin-top:14px;
 }
 .feedback-banner .ja{ font-family:'M PLUS Rounded 1c',sans-serif; font-size:11.5px; margin-left:5px; }
 .feedback-banner.correct{ background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; }
@@ -334,8 +335,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:12.5px; color:var(--plum);
   box-shadow:0 4px 14px rgba(122,106,147,0.2); cursor:pointer;
 }
-#reviewBtn{ bottom:72px; }
-#rewardsBtn{ bottom:26px; }
+#reviewBtn{ top:14px; }
+#rewardsBtn{ top:60px; }
 .mistake-badge{
   display:none; align-items:center; justify-content:center;
   position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
@@ -2706,16 +2707,27 @@ const ISLANDS = [
 
 let currentIslandId = 'meadow';
 
+// ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
+// of mastered-word count. Only the actual travel permission is bypassed —
+// unlockStatusFor (used for the displayed "◯語ひつよう" text) is untouched.
+// Set back to false before shipping to real players.
+const TESTING_UNLOCK_ALL_ISLANDS = true;
+
 // unlockAt is a mastered-word-count threshold (not a level number), so it
 // stays stable even if WORDS_PER_LEVEL is tuned later.
 function unlockStatusFor(island){
   if(island.status === 'comingSoon') return 'comingSoon';
   return masteredWords.size >= island.unlockAt ? 'unlocked' : 'locked';
 }
+function canActuallyTravel(island){
+  if(island.status === 'comingSoon') return false; // still off-limits even while testing
+  if(TESTING_UNLOCK_ALL_ISLANDS) return true;
+  return unlockStatusFor(island) === 'unlocked';
+}
 
 function travelToIsland(id){
   const island = ISLANDS.find(i=>i.id===id);
-  if(!island || unlockStatusFor(island) !== 'unlocked') return;
+  if(!island || !canActuallyTravel(island)) return;
   currentIslandId = id;
   const theme = island.theme;
 
@@ -2792,7 +2804,7 @@ function renderIslandList(){
   listEl.querySelectorAll('.island-card').forEach(card=>{
     card.addEventListener('click', ()=>{
       const island = ISLANDS.find(i=>i.id===card.dataset.id);
-      if(unlockStatusFor(island) !== 'unlocked' || island.id === currentIslandId) return;
+      if(!canActuallyTravel(island) || island.id === currentIslandId) return;
       travelToIsland(island.id);
       islandOverlay.classList.remove('show');
     });
@@ -2800,9 +2812,32 @@ function renderIslandList(){
 }
 
 /* ---------- ground + path ---------- */
+function makeGrassTexture(){
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,256,256);
+  for(let i=0;i<2200;i++){
+    const x = Math.random()*256, y = Math.random()*256;
+    const len = 3 + Math.random()*6;
+    const angle = Math.random()*Math.PI;
+    const shade = 150 + Math.random()*95; // varying lightness -> tints as light/dark patches once multiplied by the theme color
+    ctx.strokeStyle = `rgba(${Math.round(shade*0.75)},${Math.round(shade)},${Math.round(shade*0.7)},0.55)`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(angle)*len, y - Math.sin(angle)*len);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(26,26);
+  return tex;
+}
 const ground = new THREE.Mesh(
   new THREE.CircleGeometry(34, 48),
-  new THREE.MeshLambertMaterial({ color:0xBFEFDD })
+  new THREE.MeshLambertMaterial({ color:0xBFEFDD, map:makeGrassTexture() })
 );
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
@@ -3755,6 +3790,11 @@ function animate(){
     nearLandmark = null;
     interactBtn.classList.remove('show');
     wasNearSomething = false;
+  }
+  if(nearNPC){
+    const dx = player.position.x - nearNPC.mesh.position.x;
+    const dz = player.position.z - nearNPC.mesh.position.z;
+    nearNPC.mesh.rotation.y = Math.atan2(dx, dz);
   }
 
   // camera follow (third person, behind player)
@@ -4732,6 +4772,9 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 - opener・sentence・reaction は、それぞれ8語以内のごく短い一文にすること（長い文にしないこと。特にsentenceは短いほど良い）
 - まずキャラが何か話しかける一文（opener）を作る
 - その話しかけに対する返事として、指定の単語・熟語を使った一文（sentence）を作る。文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- 「do me a favor」のように me/you などの代名詞を含む熟語は、話の流れに合わせて自然な代名詞（you, him, her など）に置きかえてよい。文脈と合わない代名詞をそのまま使わないこと
+- 悪い例（NG）: 「手伝ってくれる？」と聞かれた返事で「I will do me a favor now.」（お願いする側とされる側が逆でおかしい＝NG）
+- 良い例（OK）: 同じ場面なら「I will do you a favor now.」（手伝う相手を正しくyouにしている＝OK）
 - 【重要】対象の単語の品詞は絶対に変えないこと。名詞（例: belief）を動詞（believe）に、動詞を名詞に変えるなど、別の品詞の単語に置きかえてはいけない。活用形を変えるのはOKだが、品詞そのものを変えるのはNG
 - 【重要】sentence は主語・動詞がそろった、文法的に完全な一文にすること。単語が途中で抜け落ちて意味が通じない文（例: "I ___ any whispers."のように動詞が抜けている）を作らないこと
 - 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
@@ -4817,7 +4860,7 @@ async function loadQuestion(){
   // Route them to the order exercise only, which just scrambles the
   // whole sentence's tokens and doesn't need to find the phrase as a
   // substring.
-  const isTemplateWord = /\bA\b|\bB\b/.test(item.en);
+  const isTemplateWord = /\bA\b|\bB\b|\bme\b|\byou\b|\bhim\b|\bher\b/i.test(item.en);
   const tokenCount = (item.sentence || '').split(' ').length;
   const preferOrder = isTemplateWord || (quizIndex % 2 !== 0 && tokenCount <= 6);
   const mode = preferOrder ? 'order' : 'blank';
@@ -5236,6 +5279,7 @@ sentence を書き終えたら、必ずこのルールに違反していない�
 - 中学生にもわかる、やさしい英文にすること
 - opener・sentence・reaction は、それぞれ8語以内のごく短い一文にすること（長い文にしないこと。特にsentenceは短いほど良い）
 - 文法上必要な場合（主語に合わせて be→is/am/are にする、動詞にsやedを付けるなど）は自然に活用してよい。ただし「turn A into B」のように A・B が記号になっている場合は、A・Bをそのまま使わず、実際の具体的な内容に置きかえて自然な文にすること
+- 「do me a favor」のように me/you などの代名詞を含む熟語は、話の流れに合わせて自然な代名詞（you, him, her など）に置きかえてよい。文脈と合わない代名詞をそのまま使わないこと
 - 【重要】対象の単語の品詞は絶対に変えないこと。名詞を動詞に、動詞を名詞に変えるなど、別の品詞の単語に置きかえてはいけない
 - 【重要】sentence は主語・動詞がそろった、文法的に完全な一文にすること。単語が途中で抜け落ちて意味が通じない文を作らないこと
 - 【重要】主語と動詞の数の一致（三人称単数のs、be動詞の活用など）を必ず正しくすること
