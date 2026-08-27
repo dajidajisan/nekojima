@@ -99,7 +99,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 .reply-label{font-size:11px; font-weight:800; color:var(--mint-deep); align-self:flex-end; margin-top:8px; display:block;}
 .reaction-bubble{
   align-self:flex-start; max-width:92%; background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-radius:14px 14px 14px 4px;
-  padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--plum); margin-top:2px;
+  padding:10px 14px; font-size:13.5px; font-weight:700; color:var(--plum); margin-top:14px;
 }
 .reaction-bubble .en{ font-family:'Fredoka',sans-serif; font-size:15.5px; }
 .reaction-bubble .ja{ display:block; font-size:11.5px; color:var(--plum-soft); font-weight:700; margin-top:4px; }
@@ -2384,6 +2384,7 @@ const NPC_PERSONALITY_POOL = ['げんき','のんびり','クール','やさし�
 const NPC_COLOR_POOL = [
   [0xFF8FA3,0xFFC9D6],[0x6FE0C2,0x3FC7A6],[0xB9A6E8,0x9A82D6],[0xFFD873,0xF5B942],
   [0x8FC7FF,0x5FA3E8],[0xFFB870,0xF2965B],[0xC9A96E,0x9A7C4A],[0xFFFFFF,0xE5DDF5],
+  [0xFFB3D9,0xFF7FB8],
 ];
 const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク' };
 const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
@@ -2893,7 +2894,8 @@ function makeTree(x,z,scale=1){
   g.scale.setScalar(scale);
   return g;
 }
-[[-13,3,1],[-11,8,0.8],[12,-6,1.1],[14,1,0.9],[-3,10,1],[6,10,0.8],[-14,-8,0.9],[10,10,0.9]]
+[[-13,3,1],[-11,8,0.8],[12,-6,1.1],[14,1,0.9],[-3,10,1],[6,10,0.8],[-14,-8,0.9],[10,10,0.9],
+ [-20,12,1],[21,10,0.9],[-22,-4,1.1],[17,-16,0.85],[-8,20,0.95],[4,22,1],[-24,4,0.8],[20,-8,1],[-16,18,0.9]]
   .forEach(([x,z,s]) => natureGroup.add(makeTree(x,z,s)));
 
 /* ---------- flowers dots ---------- */
@@ -2903,8 +2905,8 @@ function makeFlower(x,z,color){
   return m;
 }
 const flowerColors=[0xFF8FA3,0xFFD873,0xB9A6E8];
-for(let i=0;i<26;i++){
-  const a = Math.random()*Math.PI*2, r = 6+Math.random()*24;
+for(let i=0;i<48;i++){
+  const a = Math.random()*Math.PI*2, r = 6+Math.random()*26;
   natureGroup.add(makeFlower(Math.cos(a)*r, Math.sin(a)*r, flowerColors[i%3]));
 }
 
@@ -3063,7 +3065,45 @@ function makeRiverBridge(x,z,rotY){
   return g;
 }
 natureGroup.add(makeRiver());
-natureGroup.add(makeRiverBridge(19,-1, Math.PI*0.06));
+// the bridge crosses near the [18,-9]→[20,-1] river segment; its long
+// axis (the walking direction) needs to run PERPENDICULAR to that
+// segment's direction to actually span across the river, not run
+// alongside it
+const riverSegAngle = Math.atan2(20-18, -1-(-9)); // direction along the river at the crossing point
+natureGroup.add(makeRiverBridge(19,-1, riverSegAngle + Math.PI/2));
+
+/* ---------- small harbor (pier + boat), near the river's south end ---------- */
+function makeHarbor(x, z, rotY){
+  const g = new THREE.Group();
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 5), new THREE.MeshLambertMaterial({color:0xB08B5A}));
+  pier.position.set(0, 0.1, 2.2);
+  g.add(pier);
+  [0.5, 2.9].forEach(dz=>{
+    [-0.7,0.7].forEach(dx=>{
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.4,6), new THREE.MeshLambertMaterial({color:0x8A6D42}));
+      post.position.set(dx, -0.1, dz);
+      g.add(post);
+    });
+  });
+  const moor = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.5,8), new THREE.MeshLambertMaterial({color:0x8A6D42}));
+  moor.position.set(0.85, 0.35, 4.3);
+  g.add(moor);
+  // small rowboat bobbing beside the pier
+  const boat = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.22,1.6,10), new THREE.MeshLambertMaterial({color:0xE8A93C}));
+  hull.rotation.z = Math.PI/2;
+  hull.scale.set(1,0.6,1);
+  hull.position.y = 0.12;
+  boat.add(hull);
+  boat.position.set(-1.5, 0, 3.8);
+  boat.rotation.y = 0.3;
+  g.add(boat);
+  g.add(makeBlobShadow(2.6));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+natureGroup.add(makeHarbor(22,-18, -Math.PI/2));
 
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
@@ -3083,13 +3123,16 @@ function makeButterfly(x,z){
 }
 
 /* ---------- scatter scenery around the island ---------- */
-[[-16,5],[-15,10],[13,-3],[16,4],[-6,13],[7,13],[-17,-6],[11,13],[-2,16],[15,-12]]
+[[-16,5],[-15,10],[13,-3],[16,4],[-6,13],[7,13],[-17,-6],[11,13],[-2,16],[15,-12],
+ [-21,8],[22,6],[-19,-14],[18,16],[-9,22],[8,20],[-25,0],[23,-4],[-4,-18],[12,18]]
   .forEach(([x,z]) => natureGroup.add(makeBush(x,z, 0.8+Math.random()*0.6)));
 
-[[-10,2],[9,-5],[-7,-11],[13,7],[-1,-13],[5,-10]]
+[[-10,2],[9,-5],[-7,-11],[13,7],[-1,-13],[5,-10],
+ [-18,10],[17,12],[-13,-16],[20,2],[-5,17],[3,19],[-22,-8],[15,-18]]
   .forEach(([x,z]) => natureGroup.add(makeRock(x,z, 0.8+Math.random()*0.5)));
 
-[[-5,6],[10,9],[-12,-3],[3,7]]
+[[-5,6],[10,9],[-12,-3],[3,7],
+ [-19,4],[16,8],[-8,15],[6,17],[-16,-10],[12,-13]]
   .forEach(([x,z]) => natureGroup.add(makeMushroomCluster(x,z)));
 
 [[-2,-7],[3,-1],[-6.5,-2.5],[6.5,6]]
@@ -4511,6 +4554,56 @@ document.getElementById('closeNpcProfile').addEventListener('click', ()=>{
   npcProfileOverlay.classList.remove('show');
 });
 
+const SMALL_TALK_FALLBACK = [
+  { opener:"Hi! How are you doing?", openerJa:"やあ！元気にしてる？", reply:"I'm good, thanks!", replyJa:"うん、元気だよ！ありがとう！" },
+  { opener:"Hey! What's up?", openerJa:"やあ！最近どう？", reply:"Not too bad, just relaxing.", replyJa:"特に何も、のんびりしてるよ。" },
+  { opener:"Hi there! How's it going?", openerJa:"こんにちは！調子はどう？", reply:"Excellent! Thanks for asking.", replyJa:"最高だよ！聞いてくれてありがとう！" },
+  { opener:"Hey! How are you today?", openerJa:"やあ！今日の調子はどう？", reply:"Pretty good, how about you?", replyJa:"まあまあかな、そっちはどう？" },
+  { opener:"Hi! Good to see you!", openerJa:"やあ！会えてうれしいよ！", reply:"Good to see you too!", replyJa:"こっちこそ会えてうれしいよ！" },
+];
+
+async function generateSmallTalk(npc){
+  const personality = npc.def.personality || 'げんき';
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、性格が「${personality}」のキャラクターです。
+英検準2級より簡単な、ごく短い挨拶のやりとり（small talk）を1つ作ってください。
+条件：
+- opener は "Hi", "Hey", "Hi there" などで始まる、"How are you doing?" や "What's up?" のような軽い挨拶の一文にすること（4語以内）
+- reply は "Good", "Not too bad", "Excellent", "Pretty good" などで始まる、短い返事の一文にすること（6語以内）
+- 単語や熟語のテストではないので、やさしい単語だけを使うこと
+- 毎回すこし違う組み合わせ・言い回しにすること
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"opener":"英文","openerJa":"その日本語訳","reply":"英文","replyJa":"その日本語訳"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.opener || !parsed.reply) return null;
+    return parsed;
+  } catch(e){
+    return null;
+  }
+}
+
+async function renderSmallTalk(npc, onDone){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">💭</div>
+    <p>ちょっと待ってね<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const generated = await generateSmallTalk(npc);
+  const chat = generated || SMALL_TALK_FALLBACK[Math.floor(Math.random()*SMALL_TALK_FALLBACK.length)];
+
+  quizBody.innerHTML = `
+    <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
+    <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
+  `;
+  speakEnglish(chat.opener + ' ' + chat.reply);
+  nextBtn.textContent = 'つぎへ →';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = onDone;
+}
+
 function openQuiz(npc){
   activeNPC = npc;
   quizOpen = true;
@@ -4538,7 +4631,7 @@ function openQuiz(npc){
   }
   activeQueue = queue;
   quizIndex = 0;
-  loadQuestion();
+  renderSmallTalk(npc, loadQuestion);
 }
 
 /* =========================================================
