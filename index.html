@@ -2709,17 +2709,17 @@ const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
     theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
-    landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4], future:[9,14] },
+    landmarkPos:{ comedy:[-15,3], fortune:[13,-11], praise:[-3,-4], future:[9,14], robot:[-9,16] },
   },
   {
     id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:250, status:'ready',
     theme:{ groundDay:0xC7C9D4, groundNight:0x33364A, path:0x9098A8, wall:0xE4E6EE, roofs:[0x6B7A99,0x8993B0,0x5E6B87], buildingScaleY:2.1, natureVisible:false },
-    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14], future:[-8,-16] },
+    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14], future:[-8,-16], robot:[12,-16] },
   },
   {
     id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
-    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9], future:[6,15] },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9], future:[6,15], robot:[-14,-11] },
   },
   {
     id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
@@ -3186,7 +3186,9 @@ function makeNeonTower(x,z,h,neonColor){
   g.position.set(x,0,z);
   return g;
 }
-[[16,16,7.5,0x6BCBFF],[-17,-16,8.5,0x9B6BFF],[20,-6,6.5,0x6BCBFF],[-6,20,7,0xFF6BC4]]
+[[16,16,7.5,0x6BCBFF],[-17,-16,8.5,0x9B6BFF],[20,-6,6.5,0x6BCBFF],[-6,20,7,0xFF6BC4],
+ [24,14,9,0x9B6BFF],[-22,6,6,0x6BCBFF],[16,-18,7.5,0xFF6BC4],[-10,-22,8,0x6BCBFF],
+ [26,-2,6.5,0xFF6BC4],[-24,-4,7,0x9B6BFF],[2,24,6.5,0x6BCBFF],[-2,-24,7.5,0x9B6BFF]]
   .forEach(([x,z,h,c]) => cityGroup.add(makeNeonTower(x,z,h,c)));
 
 // asymmetric cantilevered platform: a box "growing" sideways off a thin
@@ -3207,7 +3209,8 @@ function makeFloatingPlatform(x,z,rotY){
   g.rotation.y = rotY;
   return g;
 }
-[[10,-14,0.4],[-14,4,1.9]].forEach(([x,z,r]) => cityGroup.add(makeFloatingPlatform(x,z,r)));
+[[10,-14,0.4],[-14,4,1.9],[19,9,-0.6],[-9,-19,1.1],[-20,17,0.7],[13,20,2.3]]
+  .forEach(([x,z,r]) => cityGroup.add(makeFloatingPlatform(x,z,r)));
 
 // glowing neon strips embedded along the ground, scattered near paths
 function makeNeonStrip(x,z,rotY,len,color){
@@ -3217,7 +3220,9 @@ function makeNeonStrip(x,z,rotY,len,color){
   return strip;
 }
 [[-3,-3,0,3,0x6BCBFF],[5,3,0.5,2.4,0x9B6BFF],[-8,8,1.1,2.8,0xFF6BC4],[12,2,0.3,2.2,0x6BCBFF],
- [-4,-13,0.8,2.6,0x9B6BFF],[3,-9,1.4,2,0x6BCBFF]]
+ [-4,-13,0.8,2.6,0x9B6BFF],[3,-9,1.4,2,0x6BCBFF],
+ [17,18,0.9,2.4,0xFF6BC4],[-18,-2,0.2,2.6,0x9B6BFF],[7,-17,1.3,2.2,0x6BCBFF],[-13,13,0.6,2.8,0xFF6BC4],
+ [21,-11,1.7,2,0x9B6BFF],[-6,18,0.4,2.5,0x6BCBFF]]
   .forEach(([x,z,r,l,c]) => cityGroup.add(makeNeonStrip(x,z,r,l,c)));
 
 // simple hovering pod vehicles, gently bobbing in place
@@ -3242,6 +3247,27 @@ function makeHoverVehicle(x,y,z,color){
 makeHoverVehicle(-10,4.2,-9,0xFF8FA3);
 makeHoverVehicle(14,5.5,8,0x6FE0C2);
 makeHoverVehicle(-2,6.2,15,0xFFD873);
+makeHoverVehicle(20,3.8,-16,0x9B6BFF);
+makeHoverVehicle(-19,5.2,10,0x6BCBFF);
+makeHoverVehicle(6,4.6,-20,0xFF6BC4);
+
+// street-level holographic signs — a thin glowing panel on a pole,
+// scattered at ground level for extra visual density up close
+function makeHoloSign(x,z,color){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.6,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  pole.position.y = 0.8;
+  g.add(pole);
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.6), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.75, side:THREE.DoubleSide}));
+  panel.position.y = 1.5;
+  g.add(panel);
+  const frame = new THREE.Mesh(new THREE.TorusGeometry(0.01,0.02,4,4), new THREE.MeshBasicMaterial({color}));
+  g.add(makeBlobShadow(0.5));
+  g.position.set(x,0,z);
+  return g;
+}
+[[4,6,0x6BCBFF],[-7,-4,0x9B6BFF],[9,-8,0xFF6BC4],[-11,10,0x6BCBFF],[15,13,0x9B6BFF],[-4,-16,0xFF6BC4]]
+  .forEach(([x,z,c]) => cityGroup.add(makeHoloSign(x,z,c)));
 
 // monorail: an elevated loop with glowing rail + a moving car
 const monorailPoints = [[-14,-14],[0,-17],[14,-12],[18,4],[8,16],[-10,14],[-18,0],[-14,-14]];
@@ -3489,11 +3515,53 @@ function makeFutureOrb(x,z){
   return { group:g, marker, orb, core };
 }
 
+function makeCatRobot(x,z){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.8,0.5), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:100}));
+  body.position.y = 0.55;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.45,0.45), new THREE.MeshPhongMaterial({color:0xF1F3FA, shininess:110}));
+  head.position.y = 1.15;
+  g.add(head);
+  // cat-ear attachments, keeping the robot recognizably "neko"
+  [-1,1].forEach(side=>{
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.18,4), new THREE.MeshPhongMaterial({color:0xC7CBE0, shininess:100}));
+    ear.position.set(side*0.18, 1.42, 0);
+    ear.rotation.y = Math.PI/4;
+    g.add(ear);
+  });
+  // glowing LED eyes
+  [-1,1].forEach(side=>{
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.06,12), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    eye.position.set(side*0.12, 1.17, 0.23);
+    g.add(eye);
+  });
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.3,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  antenna.position.set(0, 1.55, 0);
+  g.add(antenna);
+  const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshBasicMaterial({color:0xFF6BC4}));
+  antennaTip.position.set(0, 1.72, 0);
+  g.add(antennaTip);
+  // simple arm nubs
+  [-1,1].forEach(side=>{
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.35,8), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:100}));
+    arm.position.set(side*0.42, 0.55, 0);
+    arm.rotation.z = side*0.3;
+    g.add(arm);
+  });
+  const marker = makeFloatingMarker('🤖', 2.3);
+  g.add(marker);
+  g.add(makeBlobShadow(1.0));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
 const landmarks = [
   { ...makeComedyStage(-15,3), id:'comedy', type:'comedy', title:'コメディポイント', sub:'えいごジョークを聞く', emoji:'😂', bg:'FFD873', label:'😂 ジョークを聞く' },
   { ...makeFortuneTent(13,-11), id:'fortune', type:'fortune', title:'占いポイント', sub:'きょうの運勢', emoji:'🔮', bg:'B9A6E8', label:'🔮 占ってもらう' },
   { ...makePraisePedestal(-3,-4), id:'praise', type:'praise', title:'ほめポイント', sub:'とにかくほめてもらう', emoji:'💖', bg:'FF8FA3', label:'💖 ほめてもらう' },
   { ...makeFutureOrb(9,14), id:'future', type:'future', title:'未来予想ポイント', sub:'未来のことを予想する', emoji:'🔭', bg:'6BCBFF', label:'🔭 未来を のぞく' },
+  { ...makeCatRobot(-9,16), id:'robot', type:'robot', title:'ねこロボ', sub:'じゃんけんで勝負！', emoji:'🤖', bg:'9B6BFF', label:'🤖 じゃんけんする' },
 ];
 landmarks.forEach(l => scene.add(l.group));
 
@@ -5048,6 +5116,79 @@ function vocabCallout(keyWord, explain){
   return `<div class="vocab-callout"><span class="vocab-callout-word">📘 ${keyWord}</span><span class="vocab-callout-explain">${explain||''}</span></div>`;
 }
 
+/* ---------- ねこロボ: rock-paper-scissors minigame ---------- */
+const RPS_CHOICES = [
+  { key:'rock', emoji:'✊', en:'Rock', ja:'グー' },
+  { key:'scissors', emoji:'✌️', en:'Scissors', ja:'チョキ' },
+  { key:'paper', emoji:'✋', en:'Paper', ja:'パー' },
+];
+function rpsWinner(playerKey, robotKey){
+  if(playerKey === robotKey) return 'tie';
+  const beats = { rock:'scissors', scissors:'paper', paper:'rock' };
+  return beats[playerKey] === robotKey ? 'player' : 'robot';
+}
+
+function renderCatRobot(landmark){
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#9B6BFF;">🤖 ねこロボと じゃんけん</span>
+    <div class="dialogue-bubble"><span class="en">Let's play rock-paper-scissors!</span><span class="ja">じゃんけんしよう！</span></div>
+    <div class="ja-hint">勝ったらコイン+2、負けたらコイン-2だよ</div>
+    <div class="choices" id="rpsChoices"></div>
+  `;
+  speakEnglish("Let's play rock, paper, scissors!");
+  nextBtn.classList.remove('show');
+  const cw = document.getElementById('rpsChoices');
+  RPS_CHOICES.forEach(c=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.innerHTML = `${c.emoji}<br>${c.en}`;
+    btn.onclick = ()=> playRPS(c.key, landmark);
+    cw.appendChild(btn);
+  });
+}
+
+function playRPS(playerKey, landmark){
+  const robotKey = RPS_CHOICES[Math.floor(Math.random()*3)].key;
+  const result = rpsWinner(playerKey, robotKey);
+  const playerC = RPS_CHOICES.find(c=>c.key===playerKey);
+  const robotC = RPS_CHOICES.find(c=>c.key===robotKey);
+
+  let resultEn, resultJa, banner;
+  if(result === 'tie'){
+    resultEn = "It's a tie! Let's try again.";
+    resultJa = "あいこだね！もう一回！";
+    banner = `<div class="feedback-banner" style="background:linear-gradient(135deg,#FFD873,#F5B942); color:#6b4a00;">🤝 Tie!</div>`;
+  } else if(result === 'player'){
+    coins += 2;
+    updateCoinHUD();
+    saveProgress();
+    playCorrectSound();
+    resultEn = "You win! Here are two coins.";
+    resultJa = "きみの勝ち！コインを2枚どうぞ！";
+    banner = `<div class="feedback-banner correct">✅ You win! +2🪙</div>`;
+  } else {
+    coins = Math.max(0, coins - 2);
+    updateCoinHUD();
+    saveProgress();
+    playWrongSound();
+    resultEn = "I win! You lose two coins.";
+    resultJa = "ぼくの勝ち！コインを2枚失っちゃった！";
+    banner = `<div class="feedback-banner wrong">❌ Robot wins. -2🪙</div>`;
+  }
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#9B6BFF;">🤖 ねこロボと じゃんけん</span>
+    <div class="dialogue-bubble"><span class="en">I chose ${robotC.en}. You chose ${playerC.en}.</span><span class="ja">ぼくは${robotC.ja}、きみは${playerC.ja}を出したね。</span></div>
+    ${banner}
+    <div class="ja-hint">${resultJa}</div>
+  `;
+  speakEnglish(`I chose ${robotC.en}. You chose ${playerC.en}. ${resultEn}`);
+  if(result === 'player') burstSparkles(document.querySelector('.feedback-banner'));
+  nextBtn.textContent = 'もう一回 🤖';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderCatRobot(landmark);
+}
+
 function renderLandmarkContent(landmark){
   quizCard.classList.remove('flash-good','flash-bad');
 
@@ -5090,6 +5231,9 @@ function renderLandmarkContent(landmark){
 
   } else if(landmark.type === 'future'){
     renderFuturePrediction(landmark);
+
+  } else if(landmark.type === 'robot'){
+    renderCatRobot(landmark);
   }
 }
 
