@@ -3073,73 +3073,61 @@ const riverSegAngle = Math.atan2(20-18, -1-(-9)); // direction along the river a
 natureGroup.add(makeRiverBridge(19,-1, riverSegAngle + Math.PI/2));
 
 /* ---------- small harbor (pier + boat), near the river's south end ---------- */
-function makeHarbor(x, z, rotY){
+/* ---------- simple scattered peripheral props (boulders, tall grass, driftwood) ---------- */
+function makeBoulderCluster(x,z,scale=1){
   const g = new THREE.Group();
-  const pier = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 5), new THREE.MeshLambertMaterial({color:0xB08B5A}));
-  pier.position.set(0, 0.1, 2.2);
-  g.add(pier);
-  [0.5, 2.9].forEach(dz=>{
-    [-0.7,0.7].forEach(dx=>{
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.4,6), new THREE.MeshLambertMaterial({color:0x8A6D42}));
-      post.position.set(dx, -0.1, dz);
-      g.add(post);
-    });
+  const mat = new THREE.MeshLambertMaterial({color:0x9B958A});
+  const positions = [[0,0,0.55],[0.35,0,-0.25,0.7],[-0.3,0,-0.3,0.6]];
+  positions.forEach(([dx,dy,dz,s])=>{
+    const r = (s||1) * (0.35+Math.random()*0.15);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r,0), mat);
+    rock.position.set(dx, r*0.6, dz);
+    rock.rotation.set(Math.random(),Math.random(),Math.random());
+    g.add(rock);
   });
-  const moor = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.5,8), new THREE.MeshLambertMaterial({color:0x8A6D42}));
-  moor.position.set(0.85, 0.35, 4.3);
-  g.add(moor);
-
-  // anchor decoration, mounted flat against the mooring post
-  const anchor = new THREE.Group();
-  const anchorMat = new THREE.MeshLambertMaterial({color:0x5A6B7A});
-  const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.4,6), anchorMat);
-  anchor.add(shank);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09,0.02,6,12), anchorMat);
-  ring.position.y = 0.24;
-  anchor.add(ring);
-  const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.26,6), anchorMat);
-  crossbar.rotation.z = Math.PI/2;
-  crossbar.position.y = 0.08;
-  anchor.add(crossbar);
-  const fluke = new THREE.Mesh(new THREE.TorusGeometry(0.16,0.025,6,10,Math.PI), anchorMat);
-  fluke.position.y = -0.2;
-  fluke.rotation.x = Math.PI;
-  anchor.add(fluke);
-  anchor.position.set(1.15, 0.5, 4.3);
-  anchor.rotation.y = Math.PI/2;
-  g.add(anchor);
-
-  // small trawler-style boat: hull + cabin + smokestack, echoing the
-  // classic pictogram silhouette (hull, wheelhouse, funnel)
-  const boat = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.22,1.6,10), new THREE.MeshLambertMaterial({color:0xE8A93C}));
-  hull.rotation.z = Math.PI/2;
-  hull.scale.set(1,0.6,1);
-  hull.position.y = 0.12;
-  boat.add(hull);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.32,0.4), new THREE.MeshLambertMaterial({color:0xF1EDE3}));
-  cabin.position.set(-0.15, 0.38, 0);
-  boat.add(cabin);
-  const cabinRoof = new THREE.Mesh(new THREE.BoxGeometry(0.48,0.05,0.46), new THREE.MeshLambertMaterial({color:0xC94F4F}));
-  cabinRoof.position.set(-0.15, 0.56, 0);
-  boat.add(cabinRoof);
-  const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.32,8), new THREE.MeshLambertMaterial({color:0xC94F4F}));
-  funnel.position.set(0.2, 0.55, 0);
-  boat.add(funnel);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.5,6), new THREE.MeshLambertMaterial({color:0x8A6D42}));
-  mast.position.set(-0.15, 0.75, 0);
-  boat.add(mast);
-  boat.position.set(-1.5, 0, 3.8);
-  boat.rotation.y = 0.3;
-  g.add(boat);
-
-  g.add(makeBlobShadow(2.6));
+  g.add(makeBlobShadow(1.1));
   g.position.set(x,0,z);
-  g.rotation.y = rotY;
+  g.scale.setScalar(scale);
   return g;
 }
-// placed at the river's new southern end, right at the world boundary
-natureGroup.add(makeHarbor(22,-27, -Math.PI/2));
+function makeGrassTuft(x,z,scale=1){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({color:0x6FBE5A});
+  for(let i=0;i<6;i++){
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.04,0.5+Math.random()*0.3,4), mat);
+    const a = (i/6)*Math.PI*2;
+    blade.position.set(Math.cos(a)*0.08, 0.25, Math.sin(a)*0.08);
+    blade.rotation.z = (Math.random()-0.5)*0.4;
+    blade.rotation.x = (Math.random()-0.5)*0.4;
+    g.add(blade);
+  }
+  g.add(makeBlobShadow(0.3));
+  g.position.set(x,0,z);
+  g.scale.setScalar(scale);
+  return g;
+}
+function makeDriftwood(x,z,rotY,scale=1){
+  const g = new THREE.Group();
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.11,1.8,8), new THREE.MeshLambertMaterial({color:0xA98B65}));
+  log.rotation.z = Math.PI/2;
+  log.position.y = 0.14;
+  g.add(log);
+  const knot = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.06,8), new THREE.MeshLambertMaterial({color:0x8A6D42}));
+  knot.rotation.z = Math.PI/2;
+  knot.position.set(0.85,0.14,0);
+  g.add(knot);
+  g.add(makeBlobShadow(1));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  g.scale.setScalar(scale);
+  return g;
+}
+[[-30,10,1.1],[28,-22,0.9],[-27,-20,1],[30,18,0.85],[-20,26,1],[24,24,0.9],[-31,-6,0.8]]
+  .forEach(([x,z,s]) => natureGroup.add(makeBoulderCluster(x,z,s)));
+[[-26,14,1],[25,-14,0.8],[-14,28,0.9],[17,26,1],[-29,-14,0.8],[27,4,0.9],[-24,-24,1],[13,-25,0.85]]
+  .forEach(([x,z,s]) => natureGroup.add(makeGrassTuft(x,z,s)));
+[[-28,2,0.4,1],[26,10,1.2,0.9],[-16,-27,0.8,1],[23,-27,-0.5,0.85]]
+  .forEach(([x,z,r,s]) => natureGroup.add(makeDriftwood(x,z,r,s)));
 
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
@@ -3371,10 +3359,12 @@ function makeCharacter({ bodyColor, earColor, earType }){
   };
   const bellyColor = lighten(bodyColor, 55);
 
-  // small round sitting body
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5,20,16), toon(bodyColor));
-  body.scale.set(1.0, 0.88, 0.95);
-  body.position.y = 0.46;
+  // rounder, more continuous body — overlaps further into the head so
+  // the silhouette reads as one soft round shape rather than two
+  // separate spheres (closer to the 'nekonoke nihonshi' round-mochi look)
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.58,20,16), toon(bodyColor));
+  body.scale.set(1.0, 0.9, 0.95);
+  body.position.y = 0.5;
   g.add(body);
 
   // cream belly patch
@@ -3392,15 +3382,8 @@ function makeCharacter({ bodyColor, earColor, earType }){
 
   // big chibi head (bigger than the body = cuter proportions)
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.72,22,18), toon(bodyColor));
-  head.position.y = 1.3;
+  head.position.y = 1.24;
   g.add(head);
-
-  // faint muzzle tint (kept subtle so the head still reads as one clean
-  // round shape, like a flat kawaii-sticker cat rather than a snout)
-  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.22,16,12), toon(bellyColor));
-  muzzle.scale.set(1,0.55,0.5);
-  muzzle.position.set(0, 1.16, 0.6);
-  g.add(muzzle);
 
   // ears vary by type
   if(earType === 'rabbit'){
@@ -3416,60 +3399,21 @@ function makeCharacter({ bodyColor, earColor, earType }){
       g.add(ear, earInner);
     });
   } else if(earType === 'cat'){
+    // simple solid-color triangle ears, no separate inner-ear patch —
+    // matching the flat, minimal 'nekonoke nihonshi' style
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.34,8), toon(bodyColor));
-      ear.scale.set(1,1,0.5); // flatten front-to-back so it reads as a flat triangle
-      ear.position.set(side*0.44, 2.02, -0.02);
-      // straight up and perky, just the slightest outward angle
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.32,8), toon(bodyColor));
+      ear.scale.set(1,1,0.5);
+      ear.position.set(side*0.42, 1.95, -0.02);
       ear.rotation.z = side*0.08;
-      const earInner = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.2,8), toon(earColor));
-      earInner.scale.set(1,1,0.5);
-      earInner.position.set(side*0.44, 1.99, 0.09);
-      earInner.rotation.z = side*0.08;
-      g.add(ear, earInner);
+      g.add(ear);
     });
-    // nose + mouth, drawn as a small canvas decal so the mouth can be a
-    // proper cute curved "w" smile (matching the reference image) rather
-    // than something built out of 3D primitives
-    const faceCanvas = document.createElement('canvas');
-    faceCanvas.width = 100; faceCanvas.height = 60;
-    const fctx = faceCanvas.getContext('2d');
-    fctx.fillStyle = '#FF8FA3';
-    fctx.beginPath();
-    fctx.ellipse(50, 16, 7, 5, 0, 0, Math.PI*2);
-    fctx.fill();
-    fctx.strokeStyle = '#3A3450';
-    fctx.lineWidth = 4;
-    fctx.lineCap = 'round';
-    fctx.beginPath();
-    fctx.moveTo(50, 22);
-    fctx.quadraticCurveTo(38, 38, 22, 24);
-    fctx.stroke();
-    fctx.beginPath();
-    fctx.moveTo(50, 22);
-    fctx.quadraticCurveTo(62, 38, 78, 24);
-    fctx.stroke();
-    const faceTex = new THREE.CanvasTexture(faceCanvas);
-    const faceDecal = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.55, 0.33),
-      new THREE.MeshBasicMaterial({ map:faceTex, transparent:true })
-    );
-    faceDecal.position.set(0, 1.14, 0.79);
-    g.add(faceDecal);
-    // whiskers — built as explicit line segments from a start point to
-    // an end point (both given directly in local X/Y/Z), instead of
-    // rotating a shape. This sidesteps rotation-sign math entirely, so
-    // there's no way for left/right to accidentally end up identical.
-    [-1,1].forEach(side=>{
-      for(let i=0;i<3;i++){
-        const yOff = (i-1)*0.06;
-        const start = new THREE.Vector3(side*0.3, 1.2 - yOff, 0.62);
-        const end   = new THREE.Vector3(side*0.66, 1.19 - yOff*1.3, 0.66);
-        const whiskerGeo = new THREE.BufferGeometry().setFromPoints([start, end]);
-        const whisker = new THREE.Line(whiskerGeo, new THREE.LineBasicMaterial({color:0xFFFFFF}));
-        g.add(whisker);
-      }
-    });
+    // pink nose only — no drawn mouth or whiskers, keeping the face as
+    // just two simple round eyes on one clean round silhouette
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.045,0.06,6), toon(0xFF8FA3));
+    nose.rotation.x = Math.PI/2;
+    nose.position.set(0, 1.2, 0.78);
+    g.add(nose);
     // tail: a few segments curving up and back
     const tailMat = toon(bodyColor);
     const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.56,8), tailMat);
@@ -3505,7 +3449,7 @@ function makeCharacter({ bodyColor, earColor, earType }){
   // cheeks
   [-1,1].forEach(side=>{
     const cheek = new THREE.Mesh(new THREE.CircleGeometry(0.13,12), new THREE.MeshBasicMaterial({color:0xFFB3C1}));
-    cheek.position.set(side*0.42, 1.17, 0.6);
+    cheek.position.set(side*0.42, 1.11, 0.6);
     cheek.rotation.y = side*-0.5;
     g.add(cheek);
   });
@@ -3515,7 +3459,7 @@ function makeCharacter({ bodyColor, earColor, earType }){
   const eyeMat = new THREE.MeshBasicMaterial({color:0x2E2A3A});
   [-1,1].forEach(side=>{
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(side*0.26, 1.36, 0.665);
+    eye.position.set(side*0.26, 1.3, 0.665);
     eye.rotation.y = side*-0.15;
     g.add(eye);
   });
@@ -4591,32 +4535,65 @@ document.getElementById('closeNpcProfile').addEventListener('click', ()=>{
 });
 
 const SMALL_TALK_FALLBACK = [
-  { opener:"Hi! How are you doing?", openerJa:"やあ！元気にしてる？", reply:"I'm good, thanks!", replyJa:"うん、元気だよ！ありがとう！" },
-  { opener:"Hey! What's up?", openerJa:"やあ！最近どう？", reply:"Not too bad, just relaxing.", replyJa:"特に何も、のんびりしてるよ。" },
-  { opener:"Hi there! How's it going?", openerJa:"こんにちは！調子はどう？", reply:"Excellent! Thanks for asking.", replyJa:"最高だよ！聞いてくれてありがとう！" },
-  { opener:"Hey! How are you today?", openerJa:"やあ！今日の調子はどう？", reply:"Pretty good, how about you?", replyJa:"まあまあかな、そっちはどう？" },
-  { opener:"Hi! Good to see you!", openerJa:"やあ！会えてうれしいよ！", reply:"Good to see you too!", replyJa:"こっちこそ会えてうれしいよ！" },
+  [
+    { opener:"Hi! How are you doing?", openerJa:"やあ！元気にしてる？", reply:"I'm good, thanks!", replyJa:"うん、元気だよ！ありがとう！" },
+    { opener:"What are you up to today?", openerJa:"今日は何してるの？", reply:"Just hanging out here.", replyJa:"ここでのんびりしてるよ。" },
+  ],
+  [
+    { opener:"Hey! What's up?", openerJa:"やあ！最近どう？", reply:"Not too bad, just relaxing.", replyJa:"特に何も、のんびりしてるよ。" },
+    { opener:"That sounds nice! Ready to chat?", openerJa:"いいね！おしゃべりする準備はいい？", reply:"Sure, let's go!", replyJa:"うん、いこう！" },
+  ],
+  [
+    { opener:"Hi there! How's it going?", openerJa:"こんにちは！調子はどう？", reply:"Excellent! Thanks for asking.", replyJa:"最高だよ！聞いてくれてありがとう！" },
+    { opener:"Glad to hear that! Got a minute?", openerJa:"それは良かった！少し時間ある？", reply:"Yep, plenty of time.", replyJa:"うん、たっぷりあるよ。" },
+  ],
+  [
+    { opener:"Hey! How are you today?", openerJa:"やあ！今日の調子はどう？", reply:"Pretty good, how about you?", replyJa:"まあまあかな、そっちはどう？" },
+    { opener:"I'm doing great, thanks!", openerJa:"ぼくも元気だよ、ありがとう！", reply:"That's great to hear!", replyJa:"それは良かった！" },
+  ],
+  [
+    { opener:"Hi! Good to see you!", openerJa:"やあ！会えてうれしいよ！", reply:"Good to see you too!", replyJa:"こっちこそ会えてうれしいよ！" },
+    { opener:"So, what have you been doing?", openerJa:"それで、最近何してたの？", reply:"Not much, just relaxing.", replyJa:"特に何も、のんびりしてたよ。" },
+  ],
 ];
 
 async function generateSmallTalk(npc){
   const personality = npc.def.personality || 'げんき';
   const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、性格が「${personality}」のキャラクターです。
-英検準2級より簡単な、ごく短い挨拶のやりとり（small talk）を1つ作ってください。
+英検準2級より簡単な、ごく短い挨拶のやりとり（small talk）を2ターン分作ってください。1ターン目の返事を受けて、2ターン目が自然に続く内容にすること。
 条件：
-- opener は "Hi", "Hey", "Hi there" などで始まる、"How are you doing?" や "What's up?" のような軽い挨拶の一文にすること（4語以内）
-- reply は "Good", "Not too bad", "Excellent", "Pretty good" などで始まる、短い返事の一文にすること（6語以内）
+- 1ターン目の opener は "Hi", "Hey", "Hi there" などで始まる、"How are you doing?" や "What's up?" のような軽い挨拶の一文にすること（4語以内）
+- 1ターン目の reply は "Good", "Not too bad", "Excellent", "Pretty good" などで始まる、短い返事の一文にすること（6語以内）
+- 2ターン目は、1ターン目の続きとして自然なごく短い一往復にすること（例: 「今日は何してた？」「特に何も」のような軽い話）
 - 単語や熟語のテストではないので、やさしい単語だけを使うこと
 - 毎回すこし違う組み合わせ・言い回しにすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
-{"opener":"英文","openerJa":"その日本語訳","reply":"英文","replyJa":"その日本語訳"}`;
+{"turns":[{"opener":"英文","openerJa":"その日本語訳","reply":"英文","replyJa":"その日本語訳"},{"opener":"英文","openerJa":"その日本語訳","reply":"英文","replyJa":"その日本語訳"}]}`;
   try{
     const data = await callClaudeProxy(prompt);
     const text = (data.content || []).map(b=>b.text||'').join('').trim();
     const parsed = extractJSON(text);
-    if(!parsed || !parsed.opener || !parsed.reply) return null;
-    return parsed;
+    if(!parsed || !Array.isArray(parsed.turns) || parsed.turns.length < 2) return null;
+    if(parsed.turns.some(t => !t.opener || !t.reply)) return null;
+    return parsed.turns;
   } catch(e){
     return null;
+  }
+}
+
+function renderSmallTalkTurn(turns, turnIndex, onDone){
+  const chat = turns[turnIndex];
+  quizBody.innerHTML = `
+    <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
+    <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
+  `;
+  speakEnglish(chat.opener + ' ' + chat.reply);
+  nextBtn.textContent = 'つぎへ →';
+  nextBtn.classList.add('show');
+  if(turnIndex + 1 < turns.length){
+    nextBtn.onclick = () => renderSmallTalkTurn(turns, turnIndex + 1, onDone);
+  } else {
+    nextBtn.onclick = onDone;
   }
 }
 
@@ -4628,16 +4605,8 @@ async function renderSmallTalk(npc, onDone){
   nextBtn.classList.remove('show');
 
   const generated = await generateSmallTalk(npc);
-  const chat = generated || SMALL_TALK_FALLBACK[Math.floor(Math.random()*SMALL_TALK_FALLBACK.length)];
-
-  quizBody.innerHTML = `
-    <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
-    <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
-  `;
-  speakEnglish(chat.opener + ' ' + chat.reply);
-  nextBtn.textContent = 'つぎへ →';
-  nextBtn.classList.add('show');
-  nextBtn.onclick = onDone;
+  const turns = generated || SMALL_TALK_FALLBACK[Math.floor(Math.random()*SMALL_TALK_FALLBACK.length)];
+  renderSmallTalkTurn(turns, 0, onDone);
 }
 
 function openQuiz(npc){
