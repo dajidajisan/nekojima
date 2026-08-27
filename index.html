@@ -610,6 +610,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
     <div id="profileName" style="font-family:'Fredoka',sans-serif; font-weight:700; font-size:19px; color:var(--plum); margin-top:4px;"></div>
     <div id="profilePersonality" class="rarity-pill uncommon" style="margin:6px auto;"></div>
     <p id="profileBio" style="font-size:13px; color:var(--plum-soft); font-weight:700; line-height:1.6; margin:6px 0 10px;"></p>
+    <div id="profileLikes" style="font-size:12.5px; color:var(--plum); font-weight:700; margin-bottom:10px;"></div>
     <div id="profileCats" class="nc-row" style="justify-content:center;"></div>
   </div>
 </div>
@@ -2389,6 +2390,8 @@ const NPC_COLOR_POOL = [
 const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク' };
 const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
 const NPC_BREED_POOL = ['三毛猫','黒猫','白猫','キジトラ','茶トラ','サビ猫','ハチワレ','グレー猫','ポインテッド柄','しま猫'];
+const NPC_LIKES_POOL = ['ひなたぼっこ','魚','マタタビ','段ボール箱','毛糸玉','おひるね','ちゅ〜る','高いところ','くしゃくしゃの紙','あたたかい毛布'];
+const NPC_DISLIKES_POOL = ['お風呂','雷の音','掃除機の音','病院','爪切り','きゅうり','水たまり','花火の音','冬の寒さ','大きな音'];
 
 // each of the 30 NPCs owns an explicit ~50-word slice of VOCAB (instead of
 // filtering by category) — this is what makes "~50 words per NPC" exact
@@ -2414,6 +2417,8 @@ function buildNpcRoster(){
         type,
         emoji: EMOJI_BY_TYPE[type],
         breed: NPC_BREED_POOL[idx % NPC_BREED_POOL.length],
+        likes: NPC_LIKES_POOL[idx % NPC_LIKES_POOL.length],
+        dislikes: NPC_DISLIKES_POOL[(idx + 3) % NPC_DISLIKES_POOL.length],
         color, earColor,
         pos,
         personality: NPC_PERSONALITY_POOL[idx % NPC_PERSONALITY_POOL.length],
@@ -4569,6 +4574,10 @@ document.getElementById('npcProfileBtn').addEventListener('click', ()=>{
   pTag.textContent = def.personality || 'げんき';
   pTag.className = 'rarity-pill ' + (PERSONALITY_COLOR[def.personality] || 'common');
   document.getElementById('profileBio').textContent = def.bio || 'まだ自己紹介はないみたい。';
+  const likesLine = (def.likes || def.dislikes)
+    ? `${def.likes ? `💗 好き: ${def.likes}` : ''}${def.likes && def.dislikes ? '　　' : ''}${def.dislikes ? `💦 苦手: ${def.dislikes}` : ''}`
+    : '';
+  document.getElementById('profileLikes').textContent = likesLine;
   const worldChip = def.world ? `<span class="nc-choice active" style="cursor:default;">🌏 ${WORLD_LABELS[def.world] || def.world}</span>` : '';
   const wordCountTag = `<span class="nc-choice active" style="cursor:default;">📖 ${activeNPC.vocabList.length}語 たんとう</span>`;
   document.getElementById('profileCats').innerHTML = wordCountTag + worldChip;
@@ -4611,12 +4620,18 @@ document.body.appendChild(stDebugEl);
 
 async function generateSmallTalk(npc){
   const personality = npc.def.personality || 'げんき';
-  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、性格が「${personality}」のキャラクターです。
+  const likes = npc.def.likes || '';
+  const dislikes = npc.def.dislikes || '';
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくるキャラクターです。
+あなたのプロフィール：
+- 性格: ${personality}
+- 好きなもの: ${likes}
+- 嫌いなもの: ${dislikes}
 英検準2級より簡単な、ごく短い挨拶のやりとり（small talk）を2ターン分作ってください。1ターン目の返事を受けて、2ターン目が自然に続く内容にすること。
 条件：
 - 1ターン目の opener は "Hi", "Hey", "Hi there" などで始まる、"How are you doing?" や "What's up?" のような軽い挨拶の一文にすること（4語以内）
 - 1ターン目の reply は "Good", "Not too bad", "Excellent", "Pretty good" などで始まる、短い返事の一文にすること（6語以内）
-- 2ターン目は、1ターン目の続きとして自然なごく短い一往復にすること（例: 「今日は何してた？」「特に何も」のような軽い話）
+- 2ターン目は、1ターン目の続きとして自然なごく短い一往復にすること。できるだけ、あなたの「好きなもの」か「嫌いなもの」のどちらかに軽く触れる内容にすること（例: 好きなものが「ひなたぼっこ」なら「Do you want to sit in the sun?」「Sure, I love that!」のような感じ）
 - 単語や熟語のテストではないので、やさしい単語だけを使うこと
 - 毎回すこし違う組み合わせ・言い回しにすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
