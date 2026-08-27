@@ -3272,7 +3272,7 @@ cityGroup.add(makeMonorail());
 
 const monorailCar = new THREE.Group();
 {
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry ? new THREE.CylinderGeometry(0.32,0.32,1.4,10) : new THREE.CylinderGeometry(0.32,0.32,1.4,10),
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.32,1.4,10),
     new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:140}));
   body.rotation.z = Math.PI/2;
   monorailCar.add(body);
