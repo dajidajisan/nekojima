@@ -2751,6 +2751,7 @@ function travelToIsland(id){
   const island = ISLANDS.find(i=>i.id===id);
   if(!island || !canActuallyTravel(island)) return;
   currentIslandId = id;
+  inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
 
   // recolor path
@@ -2768,7 +2769,7 @@ function travelToIsland(id){
   // show/hide trees & co.
   natureGroup.visible = theme.natureVisible;
   cityGroup.visible = (id === 'city');
-  mazeGroup.visible = (id === 'themepark');
+  mazeGateLandmark.group.visible = (id === 'themepark');
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
   // a distinct ~50-word slice), so switching worlds shows/hides the
@@ -3353,20 +3354,23 @@ function makeChromeBridge(x,z,rotY){
 cityGroup.add(makeChromeBridge(-5,-6,Math.PI*0.06));
 
 /* =========================================================
-   THEMEPARK MAZE — a real, walkable hedge maze with genuine wall
-   collision (not just decorative), plus English-language signs the
-   player must read to find the way through, and a goal reward.
-   3x3 grid of 5-unit cells, offset into the world so it stays well
-   inside the play boundary (world radius 34).
+   MAZE (separate space) — the maze itself lives FAR from the normal
+   world (a remote zone at a huge offset), so it takes zero space in
+   the shared themepark and can't overlap anything. Only a small gate
+   building sits in themepark; interacting with it teleports the player
+   to the remote zone, and reaching the exit teleports back.
 ========================================================= */
-const MAZE_OFFSET = { x:8, z:6 };
-const MAZE_CELL = 5;
+const MAZE_ZONE_CENTER = { x: 600, z: 600 }; // far enough that it's never reachable by normal walking
+const MAZE_ZONE_RADIUS = 20; // local boundary radius used for tap-to-move clamping while inside
+const MAZE_OFFSET = { x: MAZE_ZONE_CENTER.x - 7.5, z: MAZE_ZONE_CENTER.z - 7.5 }; // maze's local (0,0) corner
 const MAZE_WALL_THICKNESS = 0.5;
 const MAZE_WALL_HEIGHT = 1.6;
+let inMazeMode = false;
+let returnSpot = null; // where to teleport back to when leaving the maze
 
 // each segment is the CENTERLINE of one wall, in maze-local coordinates
-// (before MAZE_OFFSET is applied). Vertical segments have x1===x2 (wall
-// runs along Z); horizontal segments have z1===z2 (wall runs along X).
+// (0..15 on each axis). Vertical segments have x1===x2 (wall runs along
+// Z); horizontal segments have z1===z2 (wall runs along X).
 const MAZE_WALL_SEGMENTS = [
   // internal walls that close off the wrong turns
   {x1:5,z1:0,x2:5,z2:5},   {x1:10,z1:0,x2:10,z2:5},
@@ -3381,36 +3385,48 @@ const MAZE_WALL_SEGMENTS = [
   {x1:15,z1:0,x2:15,z2:5},  {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15},
 ];
 
-// resolved AABBs in WORLD coordinates, used for both the visual mesh and
-// the collision check
 const mazeGroup = new THREE.Group();
-mazeGroup.visible = false;
+mazeGroup.visible = true; // this group only ever sits far away, so it can just stay visible always
 scene.add(mazeGroup);
 
-const MAZE_COLLIDERS = MAZE_WALL_SEGMENTS.map(seg=>{
+// build both the collision AABBs and the visible hedge meshes from the
+// same segment list, so they can never drift out of sync with each other
+const MAZE_COLLIDERS = [];
+MAZE_WALL_SEGMENTS.forEach(seg=>{
   const x1 = seg.x1 + MAZE_OFFSET.x, z1 = seg.z1 + MAZE_OFFSET.z;
   const x2 = seg.x2 + MAZE_OFFSET.x, z2 = seg.z2 + MAZE_OFFSET.z;
   const half = MAZE_WALL_THICKNESS/2;
-  const box = {
+  MAZE_COLLIDERS.push({
     minX: Math.min(x1,x2) - half, maxX: Math.max(x1,x2) + half,
     minZ: Math.min(z1,z2) - half, maxZ: Math.max(z1,z2) + half,
-  };
-  // visual hedge wall mesh
+  });
+  const isVertical = (seg.x1 === seg.x2);
   const len = Math.hypot(x2-x1, z2-z1) + MAZE_WALL_THICKNESS;
-  const isVertical = seg.x1 === seg.x2;
   const wall = new THREE.Mesh(
     new THREE.BoxGeometry(isVertical ? MAZE_WALL_THICKNESS : len, MAZE_WALL_HEIGHT, isVertical ? len : MAZE_WALL_THICKNESS),
     new THREE.MeshLambertMaterial({color:0x4FA84A})
   );
   wall.position.set((x1+x2)/2, MAZE_WALL_HEIGHT/2, (z1+z2)/2);
   mazeGroup.add(wall);
-  return box;
 });
 
+// a flat ground disc under just the maze zone, so it doesn't float over
+// the void out there
+{
+  const mazeGround = new THREE.Mesh(new THREE.CircleGeometry(MAZE_ZONE_RADIUS+4, 32), new THREE.MeshLambertMaterial({color:0xFFD9EC}));
+  mazeGround.rotation.x = -Math.PI/2;
+  mazeGround.position.set(MAZE_ZONE_CENTER.x, -0.01, MAZE_ZONE_CENTER.z);
+  mazeGroup.add(mazeGround);
+}
+
 function isMazeBlocked(x, z, radius){
-  if(!mazeGroup.visible) return false; // maze only exists in the themepark world
-  for(const b of MAZE_COLLIDERS){
-    if(x + radius > b.minX && x - radius < b.maxX && z + radius > b.minZ && z - radius < b.maxZ) return true;
+  if(!inMazeMode) return false; // walls only apply while actually inside the maze zone
+  for(let i=0;i<MAZE_COLLIDERS.length;i++){
+    const b = MAZE_COLLIDERS[i];
+    const overlapX = (x + radius > b.minX) && (x - radius < b.maxX);
+    if(!overlapX) continue;
+    const overlapZ = (z + radius > b.minZ) && (z - radius < b.maxZ);
+    if(overlapX && overlapZ) return true;
   }
   return false;
 }
@@ -3484,12 +3500,11 @@ mazeGroup.add(makeSignpost(
   "もうすぐゴール！出口はすぐそこ！"
 ));
 
-// goal marker + one-time-per-visit reward
+// entrance point (just south of the maze's south gap), used to place
+// the player right as they teleport in
+const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z - 1 };
+// goal marker + reward, reachable just past the north exit gap
 const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 12.5, z: MAZE_OFFSET.z + 16.5 };
-// TEMPORARY debug indicator — remove once maze visibility is confirmed working
-const mazeDebugEl = document.createElement('div');
-mazeDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
-document.body.appendChild(mazeDebugEl);
 {
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
@@ -3504,17 +3519,67 @@ document.body.appendChild(mazeDebugEl);
 }
 let mazeGoalClaimedToday = false;
 function checkMazeGoal(){
-  if(!mazeGroup.visible || mazeGoalClaimedToday) return;
+  if(!inMazeMode) return;
   const dist = Math.hypot(player.position.x - mazeGoalWorldPos.x, player.position.z - mazeGoalWorldPos.z);
-  if(dist < 1.5){
-    mazeGoalClaimedToday = true;
-    coins += 5;
-    updateCoinHUD();
-    saveProgress();
-    playCorrectSound();
-    showToast('🎉 めいろクリア！ +5🪙');
+  if(dist < 1.8){
+    if(!mazeGoalClaimedToday){
+      mazeGoalClaimedToday = true;
+      coins += 5;
+      updateCoinHUD();
+      saveProgress();
+      playCorrectSound();
+      showToast('🎉 めいろクリア！ +5🪙');
+    }
+    exitMaze();
   }
 }
+
+function enterMaze(){
+  returnSpot = { x: player.position.x, z: player.position.z, island: currentIslandId };
+  inMazeMode = true;
+  player.position.set(mazeEntranceWorldPos.x, 0, mazeEntranceWorldPos.z);
+  playerFacing = 0;
+  player.rotation.y = 0;
+  moveTarget = null;
+  camera.position.set(mazeEntranceWorldPos.x, 2.6, mazeEntranceWorldPos.z - 6.8);
+  camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
+  showToast('🌀 めいろに入った！');
+}
+function exitMaze(){
+  inMazeMode = false;
+  const back = returnSpot || { x:0, z:4 };
+  player.position.set(back.x, 0, back.z);
+  moveTarget = null;
+  camera.position.set(back.x, 2.6, back.z - 6.8);
+  camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
+}
+
+// small entrance-gate building in themepark — this is the ONLY maze
+// footprint inside the normal shared world
+function makeMazeGate(x,z){
+  const g = new THREE.Group();
+  const postMat = new THREE.MeshLambertMaterial({color:0x4FA84A});
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.4,1.8,0.4), postMat);
+    post.position.set(side*0.9, 0.9, 0);
+    g.add(post);
+  });
+  const arch = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.35,0.4), postMat);
+  arch.position.set(0,1.85,0);
+  g.add(arch);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.4,0.4), new THREE.MeshBasicMaterial({color:0xFFFFFF, side:THREE.DoubleSide}));
+  sign.position.set(0,1.85,0.22);
+  g.add(sign);
+  const marker = makeFloatingMarker('🌀', 2.5);
+  g.add(marker);
+  g.add(makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+const mazeGateLandmark = { ...makeMazeGate(-9,16), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
+scene.add(mazeGateLandmark.group);
+landmarks.push(mazeGateLandmark);
+const themeparkOnlyLandmarkIds = new Set(['mazegate']);
 
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
@@ -4114,8 +4179,11 @@ canvas.addEventListener('pointerdown', e=>{
   raycaster.setFromCamera(ndc, camera);
   const hit = new THREE.Vector3();
   if(raycaster.ray.intersectPlane(groundPlane, hit)){
-    const d = Math.hypot(hit.x, hit.z);
-    if(d > 32){ const s = 32/d; hit.x *= s; hit.z *= s; } // stay on the island
+    const cx = inMazeMode ? MAZE_ZONE_CENTER.x : 0;
+    const cz = inMazeMode ? MAZE_ZONE_CENTER.z : 0;
+    const d = Math.hypot(hit.x - cx, hit.z - cz);
+    const boundR = inMazeMode ? MAZE_ZONE_RADIUS : 32;
+    if(d > boundR){ const s = boundR/d; hit.x = cx + (hit.x-cx)*s; hit.z = cz + (hit.z-cz)*s; } // stay within the current zone
     moveTarget = { x:hit.x, z:hit.z };
     tapMarker.position.set(hit.x, 0, hit.z);
     tapMarker.visible = true;
@@ -4335,6 +4403,7 @@ function animate(){
     if(dist < closestDist){ closestDist = dist; closest = n; closestKind = 'npc'; }
   });
   landmarks.forEach(l=>{
+    if(!l.group.visible) return;
     l.marker.position.y = 2.15 + Math.sin(t*2.5 + l.group.position.x)*0.1;
     if(l.ball) l.ball.rotation.y = t*0.6;
     if(l.star) l.star.rotation.y = t*0.8;
@@ -4373,8 +4442,7 @@ function animate(){
     });
   }
 
-  if(mazeGroup.visible) checkMazeGoal();
-  mazeDebugEl.textContent = `迷路: island=${currentIslandId} visible=${mazeGroup.visible} プレイヤー座標=(${player.position.x.toFixed(1)},${player.position.z.toFixed(1)}) 入口まで=${Math.hypot(player.position.x-10.5, player.position.z-4.5).toFixed(1)}`;
+  checkMazeGoal();
 
   // camera follow (third person, behind player)
   const camOffset = new THREE.Vector3(
@@ -5065,6 +5133,7 @@ function lrDraw(){
 
 interactBtn.addEventListener('click', ()=>{
   if(nearNPC) openQuiz(nearNPC);
+  else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
   else if(nearLandmark) openLandmark(nearLandmark);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
