@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AppleCare for Enterprise - TCO Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --font-system: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  --text-large-title: 34px; --text-title1: 28px; --text-title2: 22px; --text-title3: 20px;
+  --text-headline: 17px; --text-body: 17px; --text-callout: 16px; --text-subhead: 15px;
+  --text-footnote: 13px; --text-caption1: 12px; --text-caption2: 11px;
+  --weight-regular: 400; --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700;
+  --lh-tight: 1.2; --lh-normal: 1.47; --lh-relaxed: 1.6;
+  --ls-tight: -0.02em; --ls-normal: 0; --ls-wide: 0.06em;
+  --bg-primary: #FFFFFF; --bg-secondary: #F5F5F7; --bg-tertiary: #E8E8ED; --bg-grouped: #F2F2F7;
+  --text-primary: #1D1D1F; --text-secondary: #6E6E73; --text-muted: #86868B; --text-on-accent: #FFFFFF;
+  --apple-blue: #0071E3; --apple-blue-hover: #0077ED; --apple-blue-active: #006EDB;
+  --apple-blue-light: rgba(0, 113, 227, 0.08); --apple-blue-focus: rgba(0, 113, 227, 0.25);
+  --color-success: #34C759; --color-warning: #FF9F0A; --color-error: #FF3B30; --color-info: #5AC8FA;
+  --color-success-bg: rgba(52, 199, 89, 0.12); --color-warning-bg: rgba(255, 159, 10, 0.12);
+  --color-error-bg: rgba(255, 59, 48, 0.12); --color-info-bg: rgba(90, 200, 250, 0.12);
+  --border-color: #D2D2D7; --border-color-light: #E5E5EA; --divider: #C6C6C8;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px; --space-20: 80px;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-pill: 980px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04); --shadow-md: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.08); --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.12);
+  --transition-fast: 150ms ease; --transition-normal: 200ms ease; --transition-slow: 300ms ease;
+  --content-max-width: 980px; --header-height: auto; --touch-target: 44px;
+  /* HIG system grays */
+  --gray1: #8E8E93; --gray2: #AEAEB2; --gray3: #C7C7CC; --gray4: #D1D1D6; --gray5: #E5E5EA; --gray6: #F2F2F7;
+  /* Chart color sequence (HIG extended palette) */
+  --chart-1: #0071E3; --chart-2: #34C759; --chart-3: #5856D6; --chart-4: #FF9F0A;
+  --chart-5: #FF3B30; --chart-6: #AF52DE; --chart-7: #FF2D55; --chart-8: #5AC8FA;
+  --chart-9: #FFCC00; --chart-10: #AC8E68;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-behavior: smooth; }
+body { font-family: var(--font-system); font-size: var(--text-subhead); line-height: var(--lh-normal); color: var(--text-primary); background: var(--bg-secondary); }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Remove number input spinners globally */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Header ── */
+header {
+  position: sticky; top: 0; z-index: 100;
+  padding: var(--space-3) var(--space-6);
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--border-color-light);
+}
+.header-inner { max-width: var(--content-max-width); margin: 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand svg { height: 20px; width: auto; }
+.brand-subtitle { font-size: var(--text-headline); font-weight: var(--weight-semibold); color: var(--text-primary); letter-spacing: var(--ls-tight); text-align: left; padding: var(--space-4) var(--space-6) 0; max-width: var(--content-max-width); margin: 0 auto; }
+.header-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.header-badges { display: flex; align-items: center; gap: var(--space-2); }
+.version-badge { display: inline-flex; align-items: center; padding: 2px 8px; font-size: var(--text-caption2); font-weight: var(--weight-semibold); letter-spacing: var(--ls-wide); border-radius: var(--radius-sm); font-family: var(--font-mono); }
+.version-badge.version { background: var(--bg-secondary); color: var(--text-secondary); }
+.version-badge.beta { background: var(--apple-blue-light); color: var(--apple-blue); }
+.freshness { font-size: var(--text-caption2); color: var(--text-muted); }
+.freshness.stale { color: var(--color-error); }
+
+/* ── Main ── */
+main { max-width: var(--content-max-width); margin: 0 auto; padding: var(--space-6); }
+.section { background: var(--bg-primary); border-radius: var(--radius-lg); padding: var(--space-6); margin-bottom: var(--space-4); box-shadow: var(--shadow-sm); }
+.section-title { font-size: var(--text-headline); font-weight: var(--weight-semibold); letter-spacing: var(--ls-tight); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); }
+.section-title svg { flex-shrink: 0; }
+.section-desc { font-size: var(--text-footnote); color: var(--text-secondary); margin-top: -8px; margin-bottom: var(--space-4); }
+
+/* ── Instructions ── */
+.instructions { background: var(--bg-primary); border-radius: var(--radius-lg); margin-bottom: var(--space-4); box-shadow: var(--shadow-sm); overflow: hidden; }
+.instructions summary { cursor: pointer; padding: var(--space-4) var(--space-6); font-size: var(--text-subhead); font-weight: var(--weight-semibold); color: var(--apple-blue); display: flex; align-items: center; gap: var(--space-2); list-style: none; user-select: none; }
+.instructions summary::-webkit-details-marker { display: none; }
+.instructions summary::after { content: "\25BE"; margin-left: auto; transition: transform var(--transition-normal); }
+.instructions[open] summary::after { transform: rotate(180deg); }
+.instructions .body { padding: 0 var(--space-6) var(--space-6); }
+.steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.step-card { background: var(--bg-secondary); padding: var(--space-4); border-radius: var(--radius-md); }
+.step-num { display: inline-flex; width: 24px; height: 24px; border-radius: 50%; background: var(--apple-blue); color: white; align-items: center; justify-content: center; font-size: var(--text-caption1); font-weight: var(--weight-semibold); margin-bottom: var(--space-2); }
+.step-title { font-weight: var(--weight-semibold); font-size: var(--text-subhead); margin-bottom: 2px; }
+.step-desc { font-size: var(--text-footnote); color: var(--text-secondary); }
+
+/* ── Form fields ── */
+input[type="text"], input[type="number"], select {
+  font-family: var(--font-system); font-size: var(--text-footnote);
+  height: 34px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  background: var(--bg-primary); color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast); outline: none;
+}
+input:focus, select:focus { border-color: var(--apple-blue); box-shadow: 0 0 0 3px var(--apple-blue-focus); }
+select {
+  appearance: none; cursor: pointer; padding-right: var(--space-8);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3e%3cpath fill='%236E6E73' d='M1.41 0L6 4.59 10.59 0 12 1.41l-6 6-6-6z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.field-label { font-size: var(--text-caption1); font-weight: var(--weight-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-wide); display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-1); }
+
+/* ── Fleet grid ── */
+.fleet-grid { display: grid; grid-template-columns: 75px 1fr 50px 80px 70px 80px 60px 68px 28px; gap: 5px; align-items: center; font-size: var(--text-footnote); }
+.fleet-grid.header { padding-bottom: var(--space-2); border-bottom: 1px solid var(--border-color-light); margin-bottom: var(--space-2); }
+.fleet-grid.header > div { font-size: 10px; color: var(--text-muted); font-weight: var(--weight-medium); text-transform: uppercase; letter-spacing: var(--ls-wide); line-height: 1.3; }
+.fleet-grid input, .fleet-grid select { height: 32px; font-size: var(--text-footnote); width: 100%; }
+.fleet-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); padding: var(--space-4); background: var(--bg-secondary); border-radius: var(--radius-md); }
+.stat-label { font-size: var(--text-caption2); color: var(--text-secondary); font-weight: var(--weight-medium); text-transform: uppercase; letter-spacing: var(--ls-wide); }
+.stat-value { font-size: var(--text-headline); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; color: var(--apple-blue); }
+
+/* ── Buttons ── */
+.btn { font-family: var(--font-system); font-size: var(--text-subhead); font-weight: var(--weight-medium); min-height: 36px; padding: 0 var(--space-5); border: none; border-radius: var(--radius-pill); cursor: pointer; transition: background var(--transition-fast), transform 0.1s; display: inline-flex; align-items: center; gap: var(--space-2); }
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--apple-blue); color: var(--text-on-accent); }
+.btn-primary:hover { background: var(--apple-blue-hover); }
+.btn-secondary { background: var(--bg-secondary); color: var(--text-primary); }
+.btn-secondary:hover { background: var(--bg-tertiary); }
+.btn-sm { min-height: 28px; font-size: var(--text-footnote); padding: 0 var(--space-3); }
+.btn-icon { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px; padding: 4px; border-radius: var(--radius-sm); transition: all var(--transition-fast); display: flex; align-items: center; justify-content: center; }
+.btn-icon:hover { background: var(--color-error-bg); color: var(--color-error); }
+
+/* ── Info tips (transparent bg, grey outline) ── */
+.info-tip { display: inline-flex; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--gray2); background: transparent; color: var(--gray1); align-items: center; justify-content: center; font-size: 9px; font-weight: 700; cursor: help; position: relative; font-style: italic; font-family: Georgia, serif; }
+.info-tip:hover { border-color: var(--apple-blue); color: var(--apple-blue); }
+.info-tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: var(--text-primary); color: white; padding: 8px 12px; border-radius: var(--radius-md); font-size: var(--text-caption1); font-weight: var(--weight-regular); font-style: normal; font-family: var(--font-system); width: max-content; max-width: 280px; line-height: 1.4; white-space: normal; text-align: left; opacity: 0; pointer-events: none; transition: opacity var(--transition-fast); z-index: 1000; box-shadow: var(--shadow-lg); }
+.info-tip::before { content: ""; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); border: 4px solid transparent; border-top-color: var(--text-primary); opacity: 0; pointer-events: none; transition: opacity var(--transition-fast); }
+.info-tip:hover::after, .info-tip:hover::before { opacity: 1; }
+
+/* ── Presets ── */
+.presets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+.preset-card { background: var(--bg-primary); border: 2px solid var(--border-color-light); border-radius: var(--radius-lg); padding: var(--space-4); cursor: pointer; transition: all var(--transition-fast); text-align: left; font-family: var(--font-system); }
+.preset-card:hover { border-color: var(--apple-blue); box-shadow: var(--shadow-md); }
+.preset-card.active { border-color: var(--apple-blue); background: var(--apple-blue-light); }
+.preset-icon { margin-bottom: var(--space-2); color: var(--text-secondary); }
+.preset-card.active .preset-icon { color: var(--apple-blue); }
+.preset-name { font-weight: var(--weight-semibold); font-size: var(--text-subhead); }
+.preset-desc { font-size: var(--text-caption1); color: var(--text-secondary); margin-top: 2px; }
+
+/* ── Assumption cards ── */
+.assumptions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 768px) { .assumptions-grid { grid-template-columns: 1fr; } }
+.assumption-card { background: var(--bg-secondary); border-radius: var(--radius-md); padding: var(--space-4); }
+.assumption-card h3 { font-size: var(--text-subhead); font-weight: var(--weight-semibold); margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); }
+
+/* ── Sliders ── */
+.slider-group { margin-bottom: var(--space-4); }
+.slider-group:last-child { margin-bottom: 0; }
+.slider-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-1); }
+.slider-label { font-size: var(--text-footnote); color: var(--text-primary); display: flex; align-items: center; gap: 4px; }
+.slider-val { font-size: var(--text-subhead); font-weight: var(--weight-semibold); color: var(--apple-blue); font-variant-numeric: tabular-nums; }
+.slider-scale { display: flex; justify-content: space-between; font-size: var(--text-caption2); color: var(--text-muted); margin-top: 2px; }
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: var(--border-color-light); border-radius: 2px; outline: none; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--apple-blue); border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; background: var(--apple-blue); border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
+
+/* ── Spares section ── */
+.spares-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+@media (max-width: 768px) { .spares-grid { grid-template-columns: 1fr; } }
+.spare-card { padding: var(--space-4); border-radius: var(--radius-md); }
+.spare-self { background: var(--bg-secondary); border: 1px solid var(--border-color-light); }
+.spare-self h4 { font-size: var(--text-subhead); font-weight: var(--weight-semibold); margin-bottom: var(--space-3); color: var(--text-primary); }
+.spare-ace { background: var(--bg-secondary); border: 1px solid var(--border-color-light); }
+.spare-ace h4 { font-size: var(--text-subhead); font-weight: var(--weight-semibold); margin-bottom: var(--space-3); color: var(--text-primary); }
+
+/* ── Toggle with expandable detail ── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) 0; }
+.toggle-row + .toggle-row { border-top: 1px solid var(--border-color-light); }
+.toggle-label { font-size: var(--text-footnote); font-weight: var(--weight-medium); display: flex; align-items: center; gap: 4px; }
+.toggle-hint { font-size: var(--text-caption1); color: var(--text-secondary); }
+.switch { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-toggle { position: absolute; cursor: pointer; inset: 0; background: var(--border-color); border-radius: 999px; transition: var(--transition-normal); }
+.slider-toggle::before { position: absolute; content: ""; height: 22px; width: 22px; left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: var(--transition-normal); box-shadow: var(--shadow-sm); }
+input:checked + .slider-toggle { background: var(--color-success); }
+input:checked + .slider-toggle::before { transform: translateX(18px); }
+.ops-detail { display: none; padding: var(--space-3) 0 0; }
+.ops-detail.open { display: block; }
+.ops-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md); }
+@media (max-width: 768px) { .ops-detail-grid { grid-template-columns: 1fr; } }
+.ops-field label { font-size: var(--text-caption2); color: var(--text-muted); font-weight: var(--weight-medium); display: block; margin-bottom: 2px; }
+.ops-field input { width: 100%; }
+
+/* ── Tabs ── */
+.tabs { display: inline-flex; background: var(--bg-tertiary); border-radius: var(--radius-md); padding: 2px; margin-bottom: var(--space-6); }
+.tab-btn { padding: var(--space-2) var(--space-4); font-size: var(--text-subhead); font-weight: var(--weight-medium); font-family: var(--font-system); color: var(--text-secondary); background: transparent; border: none; border-radius: calc(var(--radius-md) - 2px); cursor: pointer; transition: all var(--transition-fast); }
+.tab-btn.active { color: var(--text-primary); background: var(--bg-primary); box-shadow: var(--shadow-sm); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── KPI row ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+@media (max-width: 768px) { .kpi-grid { grid-template-columns: 1fr; } }
+.kpi { padding: var(--space-5); border-radius: var(--radius-lg); border: 1px solid var(--border-color-light); background: var(--bg-primary); }
+.kpi-label { font-size: var(--text-caption1); font-weight: var(--weight-medium); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-wide); margin-bottom: var(--space-2); }
+.kpi-value { font-size: var(--text-title1); font-weight: var(--weight-bold); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums; }
+.kpi-sub { font-size: var(--text-footnote); color: var(--text-secondary); margin-top: 4px; }
+.kpi.self { border-top: 3px solid var(--gray2); }
+.kpi.self .kpi-value { color: var(--text-primary); }
+.kpi.ace { border-top: 3px solid var(--apple-blue); }
+.kpi.ace .kpi-value { color: var(--apple-blue); }
+.kpi.savings-pos { border-top: 3px solid var(--color-success); background: var(--color-success-bg); }
+.kpi.savings-pos .kpi-value { color: var(--color-success); }
+.kpi.savings-warn { border-top: 3px solid var(--color-warning); background: var(--color-warning-bg); }
+.kpi.savings-warn .kpi-value { color: var(--color-warning); }
+.kpi.savings-neg { border-top: 3px solid var(--color-error); background: var(--color-error-bg); }
+.kpi.savings-neg .kpi-value { color: var(--color-error); }
+
+/* ── P&L table ── */
+.pl-wrapper { margin-bottom: var(--space-6); }
+.pl-header { display: grid; grid-template-columns: 1fr 100px 100px 100px; padding: var(--space-2) 0; font-size: var(--text-caption2); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-wide); font-weight: var(--weight-medium); border-bottom: 2px solid var(--text-primary); }
+.pl-header > div:not(:first-child) { text-align: right; }
+.pl-section-label { font-size: var(--text-caption1); font-weight: var(--weight-semibold); color: var(--text-secondary); text-transform: uppercase; letter-spacing: var(--ls-wide); padding: var(--space-3) 0 var(--space-1); }
+.pl-row { display: grid; grid-template-columns: 1fr 100px 100px 100px; padding: 6px 0; font-size: var(--text-footnote); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border-color-light); align-items: center; }
+.pl-row > div:not(:first-child) { text-align: right; }
+.pl-row .nm { color: var(--text-secondary); }
+.pl-row .delta.pos { color: var(--color-success); font-weight: var(--weight-medium); }
+.pl-row .delta.neg { color: var(--color-error); font-weight: var(--weight-medium); }
+.pl-row .delta.neutral { color: var(--text-muted); }
+.pl-total { display: grid; grid-template-columns: 1fr 100px 100px 100px; padding: var(--space-3) 0; font-size: var(--text-subhead); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; border-top: 2px solid var(--text-primary); margin-top: var(--space-2); }
+.pl-total > div:not(:first-child) { text-align: right; }
+
+/* ── Callout ── */
+.callout { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); margin-bottom: var(--space-5); font-size: var(--text-subhead); color: var(--text-secondary); }
+.callout strong { color: var(--text-primary); }
+.callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.callout.success { background: var(--color-success-bg); border-left: 3px solid var(--color-success); }
+.callout.warning { background: var(--color-warning-bg); border-left: 3px solid var(--color-warning); }
+.callout.error { background: var(--color-error-bg); border-left: 3px solid var(--color-error); }
+.callout.info { background: var(--apple-blue-light); border-left: 3px solid var(--apple-blue); }
+
+/* ── Charts ── */
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6); }
+@media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } }
+.chart-box { background: var(--bg-primary); border: 1px solid var(--border-color-light); border-radius: var(--radius-md); padding: var(--space-4); }
+.chart-box h4 { font-size: var(--text-footnote); font-weight: var(--weight-semibold); margin-bottom: var(--space-3); }
+.chart-wrap { min-height: 300px; position: relative; }
+
+/* ── Pros/Cons ── */
+.pc-table { width: 100%; margin-bottom: var(--space-6); border-collapse: separate; border-spacing: 0; }
+.pc-table th { font-size: var(--text-caption1); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: var(--ls-wide); padding: var(--space-2) var(--space-3); border-bottom: 2px solid var(--text-primary); text-align: left; color: var(--text-secondary); }
+.pc-table th:first-child { width: 50%; }
+.pc-group-label { font-size: var(--text-caption2); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: var(--ls-wide); padding: var(--space-4) var(--space-3) var(--space-2); }
+.pc-group-label.pros { color: var(--color-success); border-top: none; }
+.pc-group-label.cons { color: var(--color-error); border-top: 2px solid var(--border-color-light); }
+.pc-table td { padding: 6px var(--space-3); font-size: var(--text-footnote); color: var(--text-secondary); line-height: 1.5; border-bottom: none; vertical-align: top; }
+.pc-table td strong { color: var(--text-primary); font-weight: var(--weight-medium); }
+
+/* ── Beyond the Numbers ── */
+.beyond-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+@media (max-width: 768px) { .beyond-grid { grid-template-columns: repeat(2, 1fr); } }
+.beyond-card { padding: var(--space-4); background: var(--bg-secondary); border-radius: var(--radius-md); text-align: center; }
+.beyond-icon { margin-bottom: var(--space-2); color: var(--text-secondary); }
+.beyond-title { font-size: var(--text-subhead); font-weight: var(--weight-semibold); margin-bottom: var(--space-1); }
+.beyond-desc { font-size: var(--text-caption1); color: var(--text-secondary); line-height: 1.4; }
+
+/* ── Footer ── */
+footer { text-align: center; padding: var(--space-6); font-size: var(--text-caption1); color: var(--text-muted); border-top: 1px solid var(--border-color-light); margin-top: var(--space-8); }
+.not-counting { font-style: italic; max-width: 700px; margin: var(--space-4) auto 0; padding: var(--space-3); background: var(--bg-secondary); border-radius: var(--radius-md); font-size: var(--text-caption1); color: var(--text-secondary); line-height: 1.5; }
+
+/* ── Export bar ── */
+.export-bar { display: flex; gap: var(--space-3); justify-content: flex-end; margin-bottom: var(--space-4); }
+
+/* ── Print styles ── */
+@media print {
+  header, .instructions, .section:has(.presets-grid), .section:has(.assumptions-grid),
+  .section:has(.fleet-grid), .section:has(#customerName), .section:has(.spares-grid),
+  .section:has(.ops-detail), .export-bar, .tabs, footer { display: none !important; }
+  .tab-panel { display: block !important; page-break-inside: avoid; }
+  body { background: white; font-size: 11px; }
+  main { padding: 16px; }
+  .section { box-shadow: none; border: 1px solid #eee; }
+  .kpi-value { font-size: 22px; }
+  .print-header { display: block !important; text-align: center; margin-bottom: 24px; }
+  .print-header h1 { font-size: 18px; margin-bottom: 4px; }
+  .print-header p { font-size: 12px; color: var(--text-secondary); }
+}
+.print-header { display: none; }
+
+/* ── Responsive fleet grid ── */
+@media (max-width: 768px) {
+  .fleet-grid { grid-template-columns: 1fr 1fr; }
+  .fleet-grid.header { display: none; }
+  .btn { min-height: var(--touch-target); }
+  .tab-btn { min-height: var(--touch-target); }
+  select, input[type="number"] { min-height: var(--touch-target); }
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 851.179 96.937" height="20">
+<defs><style>.st0{fill:#ff1736;}</style></defs>
+<g><path class="st0" d="M48.396,19.629c-6.518-.482-12.048,3.641-15.133,3.641-3.13,0-7.956-3.537-13.073-3.44-6.719.098-12.912,3.91-16.377,9.926-6.979,12.114-1.782,30.064,5.016,39.894,3.325,4.803,7.291,10.216,12.5,10.019,5.014-.197,6.911-3.243,12.972-3.243s7.766,3.243,13.068,3.146c5.397-.1,8.816-4.903,12.117-9.733,3.82-5.575,5.389-10.973,5.482-11.259-.119-.045-10.52-4.036-10.624-16.019-.094-10.018,8.177-14.834,8.553-15.066-4.695-6.915-11.947-7.678-14.502-7.867Z"/><path class="st0" d="M44.374,13.14c2.768-3.346,4.631-8.005,4.118-12.64-3.984.158-8.803,2.654-11.661,5.998-2.559,2.962-4.807,7.706-4.196,12.246,4.441.343,8.973-2.256,11.739-5.604Z"/></g>
+<g><path d="M75.766,42.518c0-23.138,13.062-37.719,33.466-37.719,16.556,0,29.061,10.177,30.984,25.416h-11.239c-2.025-9.366-9.822-15.492-19.745-15.492-13.265,0-21.871,10.885-21.871,27.795,0,17.062,8.505,27.846,21.922,27.846,10.176,0,17.416-5.215,19.694-14.024h11.29c-2.784,15.088-14.227,23.947-31.035,23.947-20.505,0-33.466-14.479-33.466-37.769Z"/><path d="M145.505,63.934c0-9.316,7.139-15.037,19.796-15.746l14.581-.86v-4.101c0-5.924-4-9.468-10.683-9.468-6.329,0-10.278,3.037-11.24,7.797h-10.328c.607-9.62,8.81-16.708,21.973-16.708,12.911,0,21.163,6.835,21.163,17.518v36.706h-10.48v-8.759h-.253c-3.088,5.924-9.821,9.67-16.809,9.67-10.43,0-17.72-6.48-17.72-16.049ZM179.882,59.125v-4.202l-13.113.81c-6.531.456-10.227,3.342-10.227,7.898,0,4.657,3.848,7.695,9.721,7.695,7.645,0,13.619-5.266,13.619-12.201Z"/><path d="M201.354,25.81h10.43v9.062h.253c1.772-6.227,6.531-9.923,12.81-9.923,1.569,0,2.937.253,3.746.405v10.176c-.86-.354-2.784-.607-4.911-.607-7.037,0-11.391,4.709-11.391,12.252v31.896h-10.937V25.81Z"/><path d="M278.769,63.427c-1.519,9.721-10.733,16.657-22.935,16.657-15.645,0-25.111-10.581-25.111-27.391,0-16.707,9.619-27.846,24.656-27.846,14.783,0,23.997,10.43,23.997,26.58v3.747h-37.616v.658c0,9.265,5.568,15.391,14.327,15.391,6.228,0,10.835-3.139,12.303-7.797h10.379ZM241.81,47.53h26.631c-.253-8.15-5.417-13.872-13.062-13.872s-13.012,5.822-13.569,13.872Z"/><path d="M303.049,31.583h-7.341v-5.164h7.341v-6.886c0-9.366,4.607-13.619,13.214-13.619,1.772,0,3.646.202,4.709.455v5.063c-1.063-.203-2.48-.354-3.898-.354-5.113,0-7.898,2.582-7.898,8.606v6.734h11.442v5.164h-11.392v47.489h-6.177V31.583Z"/><path d="M323.503,52.745c0-16.758,9.62-27.188,23.847-27.188s23.896,10.43,23.896,27.188-9.619,27.188-23.896,27.188-23.847-10.479-23.847-27.188ZM365.019,52.745c0-13.619-7.037-21.72-17.669-21.72s-17.619,8.101-17.619,21.72,7.037,21.72,17.619,21.72,17.669-8.101,17.669-21.72Z"/><path d="M381.428,26.419h5.771v9.568h.151c1.975-6.582,6.886-10.43,13.519-10.43,1.771,0,3.392.405,4.252.658v6.025c-.911-.405-2.784-.811-5.113-.811-7.594,0-12.454,6.075-12.454,14.834v32.808h-6.126V26.419Z"/><path d="M472.455,79.072h-43.794V6.014h43.794v5.722h-37.465v27.086h35.592v5.671h-35.592v28.858h37.465v5.721Z"/><path d="M484.106,26.419h5.771v10.074h.151c2.633-6.53,8.962-10.936,17.518-10.936,11.594,0,18.783,7.493,18.783,19.391v34.124h-6.126v-33.162c0-9.417-5.315-14.885-14.328-14.885-9.366,0-15.644,6.784-15.644,16.809v31.238h-6.126V26.419Z"/><path d="M547.396,13.103v13.315h10.43v5.164h-10.43v34.478c0,5.569,2.228,7.898,7.139,7.898.607,0,3.24-.051,3.646-.152v5.266c-.658.152-3.544.253-4.81.253-8.607,0-12.101-3.646-12.101-13.012V31.583h-7.848v-5.164h7.848v-13.315h6.126Z"/><path d="M608.86,64.187c-1.62,9.062-10.074,15.745-21.669,15.745-14.732,0-23.896-10.277-23.896-27.086,0-16.354,9.266-27.289,23.492-27.289,13.872,0,22.731,10.277,22.731,25.871v2.785h-39.895v.304c0,12.403,6.936,20.049,17.669,20.049,8.303,0,13.974-4.405,15.441-10.379h6.126ZM569.673,49.252h33.517c-.152-10.784-6.683-18.327-16.505-18.327-9.721,0-16.454,7.492-17.012,18.327Z"/><path d="M619.8,26.419h5.771v9.568h.151c1.975-6.582,6.886-10.43,13.519-10.43,1.771,0,3.392.405,4.252.658v6.025c-.911-.405-2.784-.811-5.113-.811-7.594,0-12.454,6.075-12.454,14.834v32.808h-6.126V26.419Z"/><path d="M698.732,52.745c0,16.354-9.062,27.188-22.276,27.188-8.708,0-15.543-5.215-18.227-12.303h-.151v28.808h-6.177V26.419h5.822v11.745h.151c2.785-7.29,9.67-12.606,18.479-12.606,13.265,0,22.378,10.886,22.378,27.188ZM692.454,52.745c0-13.062-6.784-21.72-17.163-21.72-10.228,0-17.265,8.81-17.265,21.72s7.037,21.72,17.265,21.72c10.379,0,17.163-8.606,17.163-21.72Z"/><path d="M708.862,26.419h5.771v9.568h.151c1.975-6.582,6.886-10.43,13.519-10.43,1.771,0,3.392.405,4.252.658v6.025c-.911-.405-2.784-.811-5.113-.811-7.594,0-12.454,6.075-12.454,14.834v32.808h-6.126V26.419Z"/><path d="M739.747,11.128c0-2.329,1.874-4.151,4.203-4.151s4.202,1.822,4.202,4.151-1.874,4.202-4.202,4.202-4.203-1.873-4.203-4.202ZM740.862,26.419h6.177v52.653h-6.177V26.419Z"/><path d="M776.859,25.557c11.139,0,18.53,6.48,19.239,16.1h-5.924c-.86-6.834-5.771-10.986-13.315-10.986-7.392,0-12.505,3.949-12.505,9.417,0,4.405,3.088,7.189,10.379,8.86l7.797,1.873c10.581,2.531,14.53,6.582,14.53,13.974,0,8.86-8.303,15.138-19.745,15.138-11.746,0-19.694-6.328-20.606-15.947h6.127c1.012,6.834,6.379,10.834,14.479,10.834,8.151,0,13.568-3.848,13.568-9.568,0-4.811-2.734-7.393-10.126-9.164l-7.797-1.822c-9.974-2.329-14.682-6.684-14.682-13.873,0-8.657,7.695-14.834,18.58-14.834Z"/><path d="M850.021,64.187c-1.62,9.062-10.074,15.745-21.669,15.745-14.732,0-23.896-10.277-23.896-27.086,0-16.354,9.265-27.289,23.492-27.289,13.872,0,22.731,10.277,22.731,25.871v2.785h-39.895v.304c0,12.403,6.936,20.049,17.669,20.049,8.303,0,13.974-4.405,15.441-10.379h6.126ZM810.834,49.252h33.517c-.152-10.784-6.683-18.327-16.505-18.327-9.721,0-16.454,7.492-17.012,18.327Z"/></g>
+</svg>
+    </div>
+    <div class="header-meta">
+      <div class="header-badges">
+        <span class="version-badge version">v0.9</span>
+        <span class="version-badge beta">BETA</span>
+      </div>
+      <span class="freshness" id="freshness"></span>
+    </div>
+  </div>
+</header>
+
+<div class="brand-subtitle">Total Cost of Ownership Calculator</div>
+
+<div class="print-header">
+  <h1>AppleCare for Enterprise - TCO Analysis</h1>
+  <p id="printCustomer"></p>
+  <p id="printDate"></p>
+</div>
+
+<main>
+
+<details class="instructions">
+  <summary>How to use this tool</summary>
+  <div class="body">
+    <p style="font-size:var(--text-subhead);color:var(--text-secondary);margin-bottom:var(--space-3);">This tool models the total cost of ownership difference between self-insuring against device incidents and purchasing AppleCare for Enterprise (ACE). The numbers are estimates based on public industry benchmarks. The goal is to surface costs that customers don't always track and frame the conversation around real value.</p>
+    <div class="steps-grid">
+      <div class="step-card"><div class="step-num">1</div><div class="step-title">Build the fleet</div><div class="step-desc">Add a line for each device model in the deployment. Set quantity and desired ACE attributes (term, tier, service pool). One model per line. Add lines for additional lines of business and models. Pricing auto-populates from the current SKU list.</div></div>
+      <div class="step-card"><div class="step-num">2</div><div class="step-title">Set the environment</div><div class="step-desc">Pick a deployment preset (Office, Healthcare, Field, etc.) to load industry-standard defaults, or go straight to the assumption sliders below to customize breakage rates, costs, and lifecycle inputs manually.</div></div>
+      <div class="step-card"><div class="step-num">3</div><div class="step-title">Read the results</div><div class="step-desc">Results update live as you adjust inputs. Use the Executive Summary for the CFO conversation. Use the Mac and iOS tabs for deeper dives with IT directors.</div></div>
+    </div>
+  </div>
+</details>
+
+<section class="section">
+  <div class="section-title">Customer</div>
+  <input type="text" id="customerName" style="width:100%;height:36px;font-size:var(--text-subhead)" placeholder="Enter customer name (appears on exports)" oninput="updateCustomer()">
+</section>
+
+<section class="section">
+  <div class="section-title">Fleet Configuration</div>
+  <div class="section-desc">Add a line for each device model. ACE pricing auto-populates from the current US Channel SKU list (Apple List Price). Click any number to override.</div>
+  <div class="fleet-grid header">
+    <div>LOB</div><div>Model</div><div>Qty</div><div>Device Cost</div><div>ACE Term</div><div>ACE Cost Tier</div><div>ACE Pool</div><div>ACE $</div><div></div>
+  </div>
+  <div id="fleetRows"></div>
+  <button class="btn btn-primary btn-sm" style="margin-top:var(--space-3)" onclick="addFleetRow()" aria-label="Add a new device line to fleet configuration">+ Add Device Line</button>
+  <div class="fleet-summary">
+    <div><div class="stat-label">Total Devices</div><div class="stat-value" id="sumDevices">0</div></div>
+    <div><div class="stat-label">Hardware Investment</div><div class="stat-value" id="sumHardware">$0</div></div>
+    <div><div class="stat-label">ACE Investment</div><div class="stat-value" id="sumAce">$0</div></div>
+    <div><div class="stat-label">Service Pool Credits</div><div class="stat-value" id="sumCredits">0</div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">Deployment Environment</div>
+  <div class="section-desc">Select the environment that best matches the customer's deployment. Each preset loads industry-benchmark defaults into the assumption sliders below. You can override any individual value after making a selection.</div>
+  <div class="presets-grid" id="presetsGrid"></div>
+</section>
+
+<section class="section">
+  <div class="section-title" id="macAssumpTitle"></div>
+  <div class="assumptions-grid" style="grid-template-columns:1fr">
+    <div class="assumption-card">
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Annual Breakage Rate <span class="info-tip" data-tip="Percentage of fleet requiring repair or replacement annually. Office Mac: 5-8%, Field: 10-15%. Sources: SquareTrade Enterprise Device Study, IDC Mobility Index.">i</span></span><span class="slider-val" id="macBreakageVal">8%</span></div><input type="range" id="macBreakage" min="0" max="20" value="8" oninput="setA('macBreakage',this.value)" aria-label="Mac annual breakage rate"><div class="slider-scale"><span>0%</span><span>20%</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Accidental Damage Share <span class="info-tip" data-tip="Percentage of incidents caused by accidental damage vs. mechanical/in-warranty failures. Source: Asurion field service data.">i</span></span><span class="slider-val" id="macADVal">40%</span></div><input type="range" id="macAD" min="20" max="80" value="40" step="5" oninput="setA('macAD',this.value)" aria-label="Mac accidental damage share"><div class="slider-scale"><span>Mostly in-warranty</span><span>Mostly accidental</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Average Repair Cost <span class="info-tip" data-tip="Out-of-warranty repair cost per incident. Source: apple.com/support published pricing. MacBook Air ~$400-600, MacBook Pro ~$700-1100.">i</span></span><span class="slider-val" id="macRepairVal">$850</span></div><input type="range" id="macRepair" min="300" max="1500" value="850" step="50" oninput="setA('macRepair',this.value)" aria-label="Mac average repair cost"></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Lifecycle (Years) <span class="info-tip" data-tip="Enterprise Mac refresh cycle. Knowledge workers: 4-5 yrs, field/shared: 3-4 yrs. Source: IDC Enterprise Endpoint Refresh Study.">i</span></span><span class="slider-val" id="macLifeVal">4</span></div><input type="range" id="macLife" min="2" max="6" value="4" oninput="setA('macLife',this.value)" aria-label="Mac lifecycle years"><div class="slider-scale"><span>2 yr</span><span>6 yr</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Residual Value <span class="info-tip" data-tip="Percentage of original purchase price recoverable at end of lifecycle via resale or trade-in. ACE-maintained devices receive a 5% premium (applied automatically) due to Apple-certified repair history and better device condition.">i</span></span><span class="slider-val" id="macResidualVal">27%</span></div><input type="range" id="macResidual" min="0" max="50" value="27" oninput="setA('macResidual',this.value)" aria-label="Mac residual value percentage"><div class="slider-scale"><span>0%</span><span>50%</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title" id="iosAssumpTitle"></div>
+  <div class="assumptions-grid" style="grid-template-columns:1fr">
+    <div class="assumption-card">
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Annual Breakage Rate <span class="info-tip" data-tip="iPhone office: 6-10%, retail/field: 15-25%. iPad in education/healthcare can exceed 20%. Sources: SquareTrade smartphone studies, CoSN K-12 device data.">i</span></span><span class="slider-val" id="iosBreakageVal">12%</span></div><input type="range" id="iosBreakage" min="0" max="30" value="12" oninput="setA('iosBreakage',this.value)" aria-label="iOS annual breakage rate"><div class="slider-scale"><span>0%</span><span>30%</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Accidental Damage Share <span class="info-tip" data-tip="iPhone/iPad incidents skew heavily to accidental damage (screen breaks most common). Source: Asurion mobile claims data.">i</span></span><span class="slider-val" id="iosADVal">50%</span></div><input type="range" id="iosAD" min="30" max="90" value="50" step="5" oninput="setA('iosAD',this.value)" aria-label="iOS accidental damage share"><div class="slider-scale"><span>Mostly in-warranty</span><span>Mostly accidental</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Average Repair Cost <span class="info-tip" data-tip="Source: apple.com/support published iPhone/iPad repair pricing. Screen: $200-400, full replacement: $400-800 depending on model.">i</span></span><span class="slider-val" id="iosRepairVal">$400</span></div><input type="range" id="iosRepair" min="150" max="900" value="400" step="25" oninput="setA('iosRepair',this.value)" aria-label="iOS average repair cost"></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Lifecycle (Years) <span class="info-tip" data-tip="iPhone enterprise refresh: 2-3 years. iPad: 3-4 years. Source: IDC Enterprise Mobility Study.">i</span></span><span class="slider-val" id="iosLifeVal">3</span></div><input type="range" id="iosLife" min="2" max="5" value="3" oninput="setA('iosLife',this.value)" aria-label="iOS lifecycle years"><div class="slider-scale"><span>2 yr</span><span>5 yr</span></div></div>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Residual Value <span class="info-tip" data-tip="Percentage of original purchase price recoverable at end of lifecycle. ACE-maintained devices receive a 5% premium (applied automatically).">i</span></span><span class="slider-val" id="iosResidualVal">18%</span></div><input type="range" id="iosResidual" min="0" max="50" value="18" oninput="setA('iosResidual',this.value)" aria-label="iOS residual value percentage"><div class="slider-scale"><span>0%</span><span>50%</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">Onsite Spares</div>
+  <div class="section-desc">Percentage of fleet held as ready-to-swap replacement units. ACE's faster service reduces the spare pool needed.</div>
+  <div class="spares-grid">
+    <div class="spare-card spare-self">
+      <h4>Spare Pool without ACE</h4>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Fleet % <span class="info-tip" data-tip="Spare devices held to swap out broken units. Industry norm: 3-7% for self-managed fleets. Source: Gartner endpoint management research.">i</span></span><span class="slider-val" id="sparesSelfVal">5%</span></div><input type="range" id="sparesSelf" min="0" max="15" value="5" oninput="setA('sparesSelf',this.value)" aria-label="Self-insure spare pool percentage"></div>
+    </div>
+    <div class="spare-card spare-ace">
+      <h4>Spare Pool with ACE</h4>
+      <div class="slider-group"><div class="slider-top"><span class="slider-label">Fleet % <span class="info-tip" data-tip="ACE includes onsite or next-day service, dramatically reducing spare pool needs. Typical: 0-2%.">i</span></span><span class="slider-val" id="sparesAceVal">1%</span></div><input type="range" id="sparesAce" min="0" max="10" value="1" oninput="setA('sparesAce',this.value)" aria-label="ACE spare pool percentage"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">Logistics &amp; Warehousing</div>
+  <div class="section-desc">Self-insured fleets bear shipping and storage costs for depot repairs. ACE includes all shipping at no additional cost.</div>
+  <div class="assumptions-grid">
+    <div class="slider-group"><div class="slider-top"><span class="slider-label">Shipping Cost per Incident (Self-Insure) <span class="info-tip" data-tip="Total round-trip shipping for self-insure depot repair (outbound, repair facility, return, redeploy). ACE: $0 - Apple covers all shipping. Industry: $40-100/incident.">i</span></span><span class="slider-val" id="shipVal">$80</span></div><input type="range" id="ship" min="0" max="100" value="80" step="5" oninput="setA('ship',this.value)" aria-label="Shipping cost per incident"><div class="slider-scale"><span>$0</span><span>$100</span></div></div>
+    <div class="slider-group"><div class="slider-top"><span class="slider-label">Warehousing Cost <span class="info-tip" data-tip="Monthly cost per spare device stored at a third-party facility. Some resellers charge $5-20/device/month to warehouse spare inventory. Default $0 if spares are stored on-premises at no incremental cost.">i</span></span><span class="slider-val" id="warehouseVal">$0</span></div><input type="range" id="warehouse" min="0" max="100" value="0" step="5" oninput="setA('warehouse',this.value)" aria-label="Warehousing cost per device per month"><div class="slider-scale"><span>$0/device/mo</span><span>$100/device/mo</span></div></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">Operational &amp; Productivity Costs</div>
+  <div class="section-desc">Soft costs per incident. Each device is tied to one user. Total projected incidents drive both IT overhead and end-user productivity impact. Toggle on to include; expand to customize assumptions.</div>
+
+  <div class="toggle-row">
+    <div>
+      <div class="toggle-label">IT Staff Overhead <span class="info-tip" data-tip="IT staff time per incident: triage, shipping coordination, tracking, reissue, data restore. Self-insure: ~2 hrs/incident. ACE: ~0.75 hrs (log ticket, Apple handles rest). Sources: Robert Half Salary Guide, Gartner IT service desk benchmarks.">i</span></div>
+      <div class="toggle-hint">Loaded labor cost for IT staff time per device incident</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="includeFTE" checked onchange="toggleOps('includeFTE','fteDetail')"><span class="slider-toggle"></span></label>
+  </div>
+  <div class="ops-detail open" id="fteDetail">
+    <div class="ops-detail-grid">
+      <div class="ops-field"><label>Loaded Hourly Rate ($)</label><input type="number" id="opsFteRate" value="75" min="0" onchange="updOps()"></div>
+      <div class="ops-field"><label>Hours/Incident (Self-Insure)</label><input type="number" id="opsFteSelf" value="2.0" min="0" step="0.25" onchange="updOps()"></div>
+      <div class="ops-field"><label>Hours/Incident (ACE)</label><input type="number" id="opsFteAce" value="0.75" min="0" step="0.25" onchange="updOps()"></div>
+    </div>
+  </div>
+
+  <div class="toggle-row">
+    <div>
+      <div class="toggle-label">End-User Productivity Loss <span class="info-tip" data-tip="Time each user is without a working device per incident. Self-insure depot: ~2.5 days. ACE onsite: ~0.75 day. Uses a conservative productivity floor. Source: Gartner.">i</span></div>
+      <div class="toggle-hint">Cost of employee downtime while waiting for device repair or replacement</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="includeProductivity" checked onchange="toggleOps('includeProductivity','prodDetail')"><span class="slider-toggle"></span></label>
+  </div>
+  <div class="ops-detail open" id="prodDetail">
+    <div class="ops-detail-grid">
+      <div class="ops-field"><label>Hourly Productivity Cost ($)</label><input type="number" id="opsProdRate" value="15" min="0" onchange="updOps()"></div>
+      <div class="ops-field"><label>Downtime Days (Self-Insure)</label><input type="number" id="opsProdDownSelf" value="2.5" min="0" step="0.25" onchange="updOps()"></div>
+      <div class="ops-field"><label>Downtime Days (ACE)</label><input type="number" id="opsProdDownAce" value="0.75" min="0" step="0.25" onchange="updOps()"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-title">TCO Analysis</div>
+  <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:calc(-1 * var(--space-4));margin-bottom:var(--space-4)">
+    <button class="btn btn-secondary btn-sm" onclick="window.print()" aria-label="Export calculator results as PDF">Export PDF</button>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="exec" onclick="switchTab('exec')" aria-label="View Executive Summary">Executive Summary</button>
+    <button class="tab-btn" data-tab="mac" onclick="switchTab('mac')" aria-label="View Mac and Display breakdown">Mac + Display</button>
+    <button class="tab-btn" data-tab="ios" onclick="switchTab('ios')" aria-label="View iPhone and iPad breakdown">iPhone + iPad</button>
+  </div>
+  <div id="execPanel" class="tab-panel active"></div>
+  <div id="macPanel" class="tab-panel"></div>
+  <div id="iosPanel" class="tab-panel"></div>
+</section>
+</main>
+
+<footer>
+  <p>Industry benchmarks: SquareTrade, Asurion, IDC, Gartner, Forrester, Robert Half, BLS, apple.com/support</p>
+  <p style="margin-top:4px">ACE SKU pricing: US Apple List Price (ALP)</p>
+  <div class="not-counting">This analysis excludes compliance documentation labor, executive escalation handling, security incident risk from devices in transit, and cost of capital on the spare pool. These typically add 10-20% to total self-insurance cost. The savings shown are conservative.</div>
+  <p style="margin-top:12px;color:var(--text-muted)">Apple Confidential - Internal Use Only</p>
+</footer>
+
+<script>
+
+/* ============================================================
+   ACE TCO Calculator v0.9 BETA
+   DATA ARCHITECTURE NOTE FOR STEFAN:
+   The TCO_DATA object below contains all reference data.
+   When ready to split, extract TCO_DATA into tco-data.js.
+   ============================================================ */
+
+/* ── SF Symbol-style SVG Icons ── */
+const ICN = {
+  office: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h1m4 0h1M9 11h1m4 0h1M9 21v-4h6v4"/></svg>',
+  mixed: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-4h6v4m-6-8h.01M15 13h.01m-6.01 -4h.01M15 9h.01"/></svg>',
+  field: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5a2 2 0 012-2h8a2 2 0 012 2v2m-6 4v2"/></svg>',
+  health: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8m-4-4h8"/></svg>',
+  edu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 9l10 6 10-6-10-6z"/><path d="M20 9v6M6 11.5v5s2 3.5 6 3.5 6-3.5 6-3.5v-5"/></svg>',
+  retail: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 7v13a1 1 0 001 1h16a1 1 0 001-1V7l-3-5H6zM3 7h18"/><path d="M16 11a4 4 0 01-8 0"/></svg>',
+  laptop: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>',
+  phone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>',
+  chart: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>',
+  shield: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  clock: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  user: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+};
+
+const TCO_DATA = {
+  meta: { version: 'v0.9', status: 'BETA', lastUpdated: '2026-04-21', skuSource: 'US Apple List Price (ALP)', freshnessWarningDays: 90 },
+  devices: {
+    Mac: [
+      { name: 'MacBook Air 15" (M3/M4/M5)', price: 1299, aceCat: 'MacBook Air 15-in' },
+      { name: 'MacBook Neo 13" (A18 Pro)', price: 1099, aceCat: 'MacBook Neo' },
+      { name: 'MacBook Pro 14" (M4)', price: 1599, aceCat: 'MacBook Pro 14-inch' },
+      { name: 'MacBook Pro 16" (M4)', price: 2499, aceCat: 'MacBook Pro 16-inch' },
+      { name: 'iMac 24" (M4)', price: 1299, aceCat: 'iMac' },
+      { name: 'Mac mini (M4)', price: 599, aceCat: 'Mac mini' },
+      { name: 'Mac Studio (M4 Max)', price: 1999, aceCat: 'Mac Studio' },
+      { name: 'Mac Pro', price: 6999, aceCat: 'Mac Pro' }
+    ],
+    iPad: [
+      { name: 'iPad (A16)', price: 349, aceCat: 'iPad' },
+      { name: 'iPad mini 7 (A17)', price: 499, aceCat: 'iPad mini' },
+      { name: 'iPad Air 11" (M2/M3/M4)', price: 599, aceCat: 'iPad Air 11-in' },
+      { name: 'iPad Air 13" (M2/M3/M4)', price: 799, aceCat: 'iPad Air 13-in' },
+      { name: 'iPad Pro 11" (M4/M5)', price: 999, aceCat: 'iPad Pro 11-inch' },
+      { name: 'iPad Pro 13" (M4/M5)', price: 1299, aceCat: 'iPad Pro 13-inch' }
+    ],
+    iPhone: [
+      { name: 'iPhone SE', price: 429, aceCat: 'iPhone SE' },
+      { name: 'iPhone 16e/17e', price: 599, aceCat: 'iPhone e' },
+      { name: 'iPhone 16/17', price: 799, aceCat: 'iPhone' },
+      { name: 'iPhone 16/17 Plus', price: 899, aceCat: 'iPhone Plus' },
+      { name: 'iPhone Air/Pro/Pro Max', price: 999, aceCat: 'iPhone Air, Pro, Pro Max' }
+    ],
+    Display: [
+      { name: 'Studio Display', price: 1599, aceCat: 'Studio Display' },
+      { name: 'Studio Display XDR', price: 3999, aceCat: 'Studio Display XDR' }
+    ]
+  },
+  termsByCategory: { Mac: [36, 48], iPad: [24, 36, 48], iPhone: [24, 36], Display: [36, 48] },
+  acePricing: {
+    'iPhone':                  {SP:{1:{24:99,36:139},2:{24:89,36:125},3:{24:79,36:111}},'SP+':{1:{24:129,36:169},2:{24:116,36:152},3:{24:103,36:135}}},
+    'iPhone Plus':             {SP:{1:{24:119,36:179},2:{24:107,36:161},3:{24:95,36:143}},'SP+':{1:{24:169,36:229},2:{24:152,36:206},3:{24:135,36:183}}},
+    'iPhone mini':             {SP:{1:{24:99,36:139},2:{24:89,36:125},3:{24:79,36:111}},'SP+':{1:{24:129,36:169},2:{24:116,36:152},3:{24:103,36:135}}},
+    'iPhone Air, Pro, Pro Max':{SP:{1:{24:129,36:199},2:{24:116,36:179},3:{24:103,36:159}},'SP+':{1:{24:189,36:279},2:{24:170,36:251},3:{24:151,36:223}}},
+    'iPhone SE':               {SP:{1:{24:59,36:79},2:{24:53,36:71},3:{24:47,36:63}},'SP+':{1:{24:69,36:99},2:{24:62,36:89},3:{24:55,36:79}}},
+    'iPhone e':                {SP:{1:{24:69,36:99},2:{24:62,36:89},3:{24:55,36:79}},'SP+':{1:{24:99,36:129},2:{24:89,36:116},3:{24:79,36:103}}},
+    'iPad':                    {SP:{1:{24:49,36:59,48:79},2:{24:44,36:53,48:71},3:{24:39,36:47,48:63}},'SP+':{1:{24:69,36:89,48:119},2:{24:62,36:80,48:107},3:{24:55,36:71,48:95}}},
+    'iPad mini':               {SP:{1:{24:59,36:79,48:99},2:{24:53,36:71,48:89},3:{24:47,36:63,48:79}},'SP+':{1:{24:79,36:109,48:129},2:{24:71,36:98,48:116},3:{24:63,36:87,48:103}}},
+    'iPad Air 11-in':          {SP:{1:{24:59,36:79,48:99},2:{24:53,36:71,48:89},3:{24:47,36:63,48:79}},'SP+':{1:{24:99,36:109,48:129},2:{24:71,36:98,48:116},3:{24:63,36:87,48:103}}},
+    'iPad Air 13-in':          {SP:{1:{24:79,36:99,48:119},2:{24:71,36:89,48:107},3:{24:63,36:79,48:95}},'SP+':{1:{24:99,36:129,48:149},2:{24:89,36:116,48:134},3:{24:79,36:103,48:119}}},
+    'iPad Pro 11-inch':        {SP:{1:{24:119,36:139,48:159},2:{24:107,36:125,48:143},3:{24:95,36:111,48:127}},'SP+':{1:{24:149,36:179,48:199},2:{24:134,36:161,48:179},3:{24:119,36:143,48:159}}},
+    'iPad Pro 13-inch':        {SP:{1:{24:139,36:159,48:179},2:{24:125,36:143,48:161},3:{24:111,36:127,48:143}},'SP+':{1:{24:169,36:199,48:219},2:{24:152,36:179,48:197},3:{24:135,36:159,48:175}}},
+    'MacBook Air 15-in':       {SP:{1:{36:139,48:159},2:{36:125,48:143},3:{36:111,48:127}},'SP+':{1:{36:159,48:179},2:{36:143,48:161},3:{36:127,48:143}}},
+    'MacBook Neo':             {SP:{1:{36:89,48:109},2:{36:80,48:98},3:{36:71,48:87}},'SP+':{1:{36:109,48:129},2:{36:98,48:116},3:{36:87,48:103}}},
+    'MacBook Pro 14-inch':     {SP:{1:{36:249,48:339},2:{36:224,48:305},3:{36:199,48:271}},'SP+':{1:{36:289,48:379},2:{36:260,48:341},3:{36:231,48:303}}},
+    'MacBook Pro 16-inch':     {SP:{1:{36:279,48:379},2:{36:251,48:341},3:{36:223,48:303}},'SP+':{1:{36:319,48:419},2:{36:287,48:377},3:{36:255,48:335}}},
+    'iMac':                    {SP:{1:{36:119,48:139},2:{36:107,48:125},3:{36:95,48:111}},'SP+':{1:{36:139,48:159},2:{36:125,48:143},3:{36:111,48:127}}},
+    'Mac mini':                {SP:{1:{36:69,48:89},2:{36:62,48:80},3:{36:55,48:71}},'SP+':{1:{36:89,48:109},2:{36:80,48:98},3:{36:71,48:87}}},
+    'Mac Studio':              {SP:{1:{36:119,48:139},2:{36:107,48:125},3:{36:95,48:111}},'SP+':{1:{36:139,48:159},2:{36:125,48:143},3:{36:111,48:127}}},
+    'Mac Pro':                 {SP:{1:{36:249,48:339},2:{36:224,48:305},3:{36:199,48:271}},'SP+':{1:{36:289,48:379},2:{36:260,48:341},3:{36:231,48:303}}},
+    'Studio Display':          {SP:{1:{36:99,48:119},2:{36:89,48:107},3:{36:79,48:95}},'SP+':{1:{36:119,48:139},2:{36:107,48:125},3:{36:95,48:111}}},
+    'Studio Display XDR':      {SP:{1:{36:199,48:219},2:{36:179,48:197},3:{36:159,48:175}},'SP+':{1:{36:219,48:239},2:{36:197,48:215},3:{36:175,48:191}}}
+  },
+  servicePoolOptions: [
+    { id: 'SP', label: 'SP', rate: 0.05 },
+    { id: 'SP+', label: 'SP+', rate: 0.10 }
+  ],
+  presets: [
+    { id:'office', icon:'office', name:'Office', desc:'Knowledge worker, desk-based',
+      tip:'Based on SquareTrade enterprise data for indoor/desk deployments. Lower breakage, mostly mechanical failures.',
+      v:{macBreakage:6,macAD:35,macRepair:750,macLife:4,macResidual:30,iosBreakage:8,iosAD:45,iosRepair:350,iosLife:3,iosResidual:20}},
+    { id:'mixed', icon:'mixed', name:'Mixed Corporate', desc:'Hybrid workforce, balanced',
+      tip:'Blended rates for organizations with both office and mobile workers. IDC enterprise fleet averages.',
+      v:{macBreakage:8,macAD:40,macRepair:850,macLife:4,macResidual:27,iosBreakage:12,iosAD:50,iosRepair:400,iosLife:3,iosResidual:18}},
+    { id:'field', icon:'field', name:'Field / Mobile', desc:'Sales, technicians, remote',
+      tip:'Field devices see 50-80% more damage than office. Source: Asurion field service data.',
+      v:{macBreakage:12,macAD:55,macRepair:900,macLife:3,macResidual:22,iosBreakage:18,iosAD:65,iosRepair:450,iosLife:3,iosResidual:15}},
+    { id:'health', icon:'health', name:'Healthcare', desc:'Clinical, shared, sanitization',
+      tip:'High iOS breakage from shared use and cleaning chemicals. CoSN and HIMSS device lifecycle data.',
+      v:{macBreakage:10,macAD:50,macRepair:850,macLife:4,macResidual:25,iosBreakage:20,iosAD:70,iosRepair:400,iosLife:3,iosResidual:15}},
+    { id:'edu', icon:'edu', name:'Education', desc:'Student-issued, 1:1 programs',
+      tip:'Student-issued iPads see highest breakage rates (20%+). Source: CoSN K-12 device data, IDC education.',
+      v:{macBreakage:8,macAD:45,macRepair:700,macLife:4,macResidual:25,iosBreakage:22,iosAD:75,iosRepair:350,iosLife:3,iosResidual:12}},
+    { id:'retail', icon:'retail', name:'Retail / Frontline', desc:'POS, store-floor, customer-facing',
+      tip:'Customer-facing iOS devices see extreme accidental damage rates. Source: SquareTrade retail deployment studies.',
+      v:{macBreakage:10,macAD:45,macRepair:800,macLife:4,macResidual:25,iosBreakage:25,iosAD:80,iosRepair:400,iosLife:3,iosResidual:12}}
+  ],
+  pros: {
+    ace: [
+      { t:'Predictable spend', d:'Fixed per-device cost. Budget-friendly for finance.' },
+      { t:'Same-day or next-day resolution', d:'Onsite service vs. 3-5 day depot turnaround.' },
+      { t:'24/7 Apple expert support', d:'Direct access to Apple engineers, not call center triage.' },
+      { t:'Reduced IT burden', d:'Apple handles logistics. IT focuses on strategy.' }
+    ],
+    self: [
+      { t:'No upfront plan cost', d:'Pay only when incidents occur.' },
+      { t:'Full repair control', d:'Decide repair vs. replace per incident.' },
+      { t:'Uses existing IT capacity', d:'Viable if IT has bandwidth and expertise.' }
+    ]
+  },
+  cons: {
+    ace: [
+      { t:'Upfront investment', d:'ACE plan paid in Year 1. ROI builds over the term.' },
+      { t:'Credits can exhaust', d:'High breakage may exceed pool. Consider SP+.' }
+    ],
+    self: [
+      { t:'Unpredictable costs', d:'Repair bills spike without warning. Hard to forecast.' },
+      { t:'Slower resolution', d:'3-5 day depot cycle keeps employees offline.' },
+      { t:'IT labor doesn\'t scale', d:'Repair logistics grow expensive past a few hundred devices.' },
+      { t:'Capital tied up in spares', d:'5%+ of fleet sitting idle as buffer stock.' }
+    ]
+  },
+  beyond: [
+    { icon:'chart', t:'Predictability', d:'Variance reduction on annual spend matters more to finance than the headline number.' },
+    { icon:'clock', t:'Speed', d:'Same-day or next-day resolution vs. 3-5 day depot. Less downtime, fewer escalations.' },
+    { icon:'shield', t:'Security', d:'Fewer broken devices in transit means less corporate data exposure.' },
+    { icon:'user', t:'Experience', d:'Employees with working devices stay productive and engaged.' }
+  ]
+};
+
+
+/* ===== STATE ===== */
+const S = {
+  customer: '',
+  preset: 'mixed',
+  fleet: [],
+  a: {
+    macBreakage:8, macAD:40, macRepair:850, macLife:4, macResidual:27,
+    iosBreakage:12, iosAD:50, iosRepair:400, iosLife:3, iosResidual:18,
+    sparesSelf:5, sparesAce:1, ship:80, warehouse:0
+  },
+  ops: {
+    fteRate: 75, fteSelf: 2.0, fteAce: 0.75,
+    prodRate: 15, prodHrs: 5,
+    downSelf: 2.5, downAce: 0.75
+  }
+};
+
+const fmt = n => '$' + Math.round(n).toLocaleString();
+const fmtS = n => (n >= 0 ? '+' : '\u2212') + '$' + Math.abs(Math.round(n)).toLocaleString();
+const pct = n => Math.round(n * 10) / 10 + '%';
+let charts = {};
+
+/* ===== INIT ===== */
+function init() {
+  // Section titles with icons
+  document.getElementById('macAssumpTitle').innerHTML = ICN.laptop + ' Mac Assumptions';
+  document.getElementById('iosAssumpTitle').innerHTML = ICN.phone + ' iPhone and iPad Assumptions';
+
+  // Freshness
+  const d = new Date(TCO_DATA.meta.lastUpdated);
+  const daysSince = Math.floor((Date.now() - d) / 86400000);
+  const el = document.getElementById('freshness');
+  el.textContent = 'Updated ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (daysSince > TCO_DATA.meta.freshnessWarningDays) {
+    el.classList.add('stale');
+    el.title = 'Last updated ' + daysSince + ' days ago. Pricing may be outdated.';
+  } else {
+    el.title = 'Pricing current as of ' + d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) + '.';
+  }
+
+  renderPresets();
+  S.fleet = [
+    { cat:'Mac', dev:0, qty:500, price:1299, term:36, tier:2, sp:'SP', acePrice:null },
+    { cat:'iPad', dev:2, qty:500, price:599, term:36, tier:2, sp:'SP+', acePrice:null },
+    { cat:'iPhone', dev:2, qty:500, price:799, term:36, tier:2, sp:'SP', acePrice:null }
+  ];
+  renderFleet();
+  applyPreset('mixed');
+}
+
+function updateCustomer() { S.customer = document.getElementById('customerName').value; }
+
+/* ===== PRESETS ===== */
+function renderPresets() {
+  document.getElementById('presetsGrid').innerHTML = TCO_DATA.presets.map(p =>
+    '<button class="preset-card" data-id="'+p.id+'" onclick="applyPreset(\''+p.id+'\')" title="'+p.tip+'">' +
+    '<div class="preset-icon">'+(ICN[p.icon]||'')+'</div><div class="preset-name">'+p.name+'</div><div class="preset-desc">'+p.desc+'</div></button>'
+  ).join('');
+}
+
+function applyPreset(id) {
+  const p = TCO_DATA.presets.find(x => x.id === id);
+  if (!p) return;
+  S.preset = id;
+  Object.assign(S.a, p.v);
+  document.querySelectorAll('.preset-card').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  syncSliders();
+  recalc();
+}
+
+function syncSliders() {
+  Object.keys(S.a).forEach(k => { const el = document.getElementById(k); if (el) el.value = S.a[k]; });
+  updateLabels();
+}
+
+function updateLabels() {
+  const a = S.a;
+  document.getElementById('macBreakageVal').textContent = a.macBreakage + '%';
+  document.getElementById('macADVal').textContent = a.macAD + '%';
+  document.getElementById('macRepairVal').textContent = '$' + a.macRepair;
+  document.getElementById('macLifeVal').textContent = a.macLife;
+  document.getElementById('macResidualVal').textContent = a.macResidual + '%';
+  document.getElementById('iosBreakageVal').textContent = a.iosBreakage + '%';
+  document.getElementById('iosADVal').textContent = a.iosAD + '%';
+  document.getElementById('iosRepairVal').textContent = '$' + a.iosRepair;
+  document.getElementById('iosLifeVal').textContent = a.iosLife;
+  document.getElementById('iosResidualVal').textContent = a.iosResidual + '%';
+  document.getElementById('sparesSelfVal').textContent = a.sparesSelf + '%';
+  document.getElementById('sparesAceVal').textContent = a.sparesAce + '%';
+  document.getElementById('shipVal').textContent = '$' + a.ship;
+  document.getElementById('warehouseVal').textContent = '$' + a.warehouse;
+}
+
+function setA(k, v) { S.a[k] = parseFloat(v); updateLabels(); recalc(); }
+
+/* ===== OPS TOGGLES ===== */
+function toggleOps(cbId, detailId) {
+  const cb = document.getElementById(cbId);
+  document.getElementById(detailId).classList.toggle('open', cb.checked);
+  recalc();
+}
+function updOps() {
+  S.ops.fteRate = parseFloat(document.getElementById('opsFteRate').value) || 0;
+  S.ops.fteSelf = parseFloat(document.getElementById('opsFteSelf').value) || 0;
+  S.ops.fteAce = parseFloat(document.getElementById('opsFteAce').value) || 0;
+  S.ops.prodRate = parseFloat(document.getElementById('opsProdRate').value) || 0;
+  S.ops.downSelf = parseFloat(document.getElementById('opsProdDownSelf').value) || 0;
+  S.ops.downAce = parseFloat(document.getElementById('opsProdDownAce').value) || 0;
+  recalc();
+}
+
+/* ===== FLEET ===== */
+function lookupAcePrice(row) {
+  const dev = TCO_DATA.devices[row.cat]?.[row.dev];
+  if (!dev) return 0;
+  const m = TCO_DATA.acePricing[dev.aceCat];
+  if (!m) return 0;
+  return m[row.sp]?.[row.tier]?.[row.term] || 0;
+}
+
+function renderFleet() {
+  const c = document.getElementById('fleetRows');
+  c.innerHTML = S.fleet.map((r, i) => {
+    const devs = TCO_DATA.devices[r.cat];
+    const terms = TCO_DATA.termsByCategory[r.cat] || [36];
+    const ap = r.acePrice !== null ? r.acePrice : lookupAcePrice(r);
+    return '<div class="fleet-grid">' +
+      '<select onchange="updFleet('+i+',\'cat\',this.value)">' + Object.keys(TCO_DATA.devices).map(c => '<option value="'+c+'"'+(c===r.cat?' selected':'')+'>'+c+'</option>').join('') + '</select>' +
+      '<select onchange="updFleet('+i+',\'dev\',this.value)">' + devs.map((d,j) => '<option value="'+j+'"'+(j==r.dev?' selected':'')+'>'+d.name+'</option>').join('') + '</select>' +
+      '<input type="number" value="'+r.qty+'" min="0" onchange="updFleet('+i+',\'qty\',this.value)">' +
+      '<input type="number" value="'+r.price+'" min="0" onchange="updFleet('+i+',\'price\',this.value)">' +
+      '<select onchange="updFleet('+i+',\'term\',this.value)">' + terms.map(t => '<option value="'+t+'"'+(t==r.term?' selected':'')+'>'+t+' mo</option>').join('') + '</select>' +
+      '<select onchange="updFleet('+i+',\'tier\',this.value)">' + [1,2,3].map(t => '<option value="'+t+'"'+(t==r.tier?' selected':'')+'>Tier '+t+'</option>').join('') + '</select>' +
+      '<select onchange="updFleet('+i+',\'sp\',this.value)">' + TCO_DATA.servicePoolOptions.map(o => '<option value="'+o.id+'"'+(o.id===r.sp?' selected':'')+'>'+o.label+'</option>').join('') + '</select>' +
+      '<input type="number" value="'+ap+'" min="0" onchange="updFleet('+i+',\'acePrice\',this.value)">' +
+      '<button class="btn-icon" onclick="rmFleet('+i+')" title="Remove">&times;</button>' +
+      '</div>';
+  }).join('');
+}
+
+function updFleet(i, k, v) {
+  const r = S.fleet[i];
+  if (k === 'cat') {
+    r.cat = v; r.dev = 0;
+    r.price = TCO_DATA.devices[v][0].price;
+    r.term = TCO_DATA.termsByCategory[v]?.[0] || 36;
+    r.acePrice = null;
+  } else if (k === 'dev') {
+    r.dev = parseInt(v);
+    r.price = TCO_DATA.devices[r.cat][r.dev].price;
+    r.acePrice = null;
+  } else if (k === 'acePrice') {
+    r.acePrice = parseFloat(v);
+  } else if (k === 'sp') {
+    r.sp = v; r.acePrice = null;
+  } else {
+    r[k] = parseFloat(v);
+    if (k === 'term' || k === 'tier') r.acePrice = null;
+  }
+  renderFleet(); recalc();
+}
+
+function addFleetRow() {
+  S.fleet.push({ cat:'Mac', dev:0, qty:100, price:1299, term:36, tier:2, sp:'SP', acePrice:null });
+  renderFleet(); recalc();
+}
+function rmFleet(i) { S.fleet.splice(i, 1); renderFleet(); recalc(); }
+
+/* ===== TABS ===== */
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(t + 'Panel').classList.add('active');
+  setTimeout(renderCharts, 50);
+}
+
+/* ===== CALC ENGINE ===== */
+function calcCat(cat) {
+  const a = S.a, ops = S.ops;
+  const isMac = cat === 'Mac';
+  const lines = S.fleet.filter(r => isMac ? (r.cat === 'Mac' || r.cat === 'Display') : (r.cat === 'iPhone' || r.cat === 'iPad'));
+  if (!lines.length) return null;
+
+  const brk = (isMac ? a.macBreakage : a.iosBreakage) / 100;
+  const adPct = (isMac ? a.macAD : a.iosAD) / 100;
+  const repCost = isMac ? a.macRepair : a.iosRepair;
+  const life = isMac ? a.macLife : a.iosLife;
+  const resRate = (isMac ? a.macResidual : a.iosResidual) / 100;
+  const aceResPremium = 0.05; // 5% premium for ACE-maintained devices
+
+  const qty = lines.reduce((s,r) => s + r.qty, 0);
+  const hw = lines.reduce((s,r) => s + r.qty * r.price, 0);
+  const aceP = lines.reduce((s,r) => s + r.qty * (r.acePrice ?? lookupAcePrice(r)), 0);
+
+  const credits = Math.round(lines.reduce((s,r) => {
+    const sp = TCO_DATA.servicePoolOptions.find(x => x.id === r.sp);
+    return s + r.qty * (sp ? sp.rate : 0.05);
+  }, 0));
+
+  const incPerYr = qty * brk;
+  const adPerYr = incPerYr * adPct;
+  const iwPerYr = incPerYr * (1 - adPct);
+
+  let repSelf = 0;
+  for (let y = 1; y <= life; y++) {
+    const billable = adPerYr + (y === 1 ? 0 : iwPerYr);
+    repSelf += billable * repCost;
+  }
+
+  let credRem = credits;
+  const adCov = [], adUncov = [];
+  let repAce = 0;
+  for (let y = 1; y <= life; y++) {
+    const cov = Math.min(credRem, adPerYr);
+    const unc = adPerYr - cov;
+    credRem -= cov;
+    adCov.push(cov); adUncov.push(unc);
+    repAce += unc * repCost;
+  }
+
+  const spSelf = (a.sparesSelf / 100) * hw;
+  const spAce = (a.sparesAce / 100) * hw;
+
+  // Shipping: self-insure pays per incident; ACE = $0
+  const shipSelf = incPerYr * life * a.ship;
+  const shipAce = 0;
+
+  // Warehousing: spare devices * monthly rate * lifecycle
+  const whSelf = (a.sparesSelf / 100) * qty * a.warehouse * 12 * life;
+  const whAce = (a.sparesAce / 100) * qty * a.warehouse * 12 * life;
+
+  const inclFTE = document.getElementById('includeFTE').checked;
+  const inclProd = document.getElementById('includeProductivity').checked;
+  const fteSelf = inclFTE ? incPerYr * life * ops.fteSelf * ops.fteRate : 0;
+  const fteAce = inclFTE ? incPerYr * life * ops.fteAce * ops.fteRate : 0;
+  const prodSelf = inclProd ? incPerYr * life * ops.downSelf * ops.prodHrs * ops.prodRate : 0;
+  const prodAce = inclProd ? incPerYr * life * ops.downAce * ops.prodHrs * ops.prodRate : 0;
+
+  const resSelf = -hw * resRate;
+  const resAce = -hw * (resRate * (1 + aceResPremium));
+
+  const selfTot = hw + repSelf + spSelf + shipSelf + whSelf + fteSelf + prodSelf + resSelf;
+  const aceTot = hw + aceP + repAce + spAce + shipAce + whAce + fteAce + prodAce + resAce;
+
+  // Breakeven
+  let beYear = null;
+  const annS = (repSelf + fteSelf + prodSelf + shipSelf + whSelf) / life;
+  const annA = (repAce + fteAce + prodAce + shipAce + whAce) / life;
+  let cumS = 0, cumA = 0;
+  for (let y = 1; y <= life; y++) {
+    cumS += (y === 1 ? annS + spSelf : annS);
+    cumA += (y === 1 ? aceP + annA + spAce : annA);
+    if (cumA < cumS && !beYear) beYear = y;
+  }
+
+  return {
+    cat, life, qty, hw, aceP, credits, brk, adPct, repCost, incPerYr, adPerYr, iwPerYr, resRate, aceResPremium,
+    secs: {
+      hard: { t:'Hard Costs', lines:[
+        {n:'Hardware acquisition',self:hw,ace:hw},
+        {n:'ACE Investment',self:0,ace:aceP},
+        {n:'Repairs (out-of-warranty)',self:repSelf,ace:repAce},
+        {n:'Residual recovery',self:resSelf,ace:resAce}
+      ]},
+      spares: { t:'Onsite Spares', lines:[
+        {n:'Spare pool capital',self:spSelf,ace:spAce}
+      ]},
+      log: { t:'Logistics & Warehousing', lines:[
+        {n:'Shipping',self:shipSelf,ace:shipAce},
+        {n:'Warehousing',self:whSelf,ace:whAce}
+      ]},
+      ops: { t:'Operational & Productivity', lines:[
+        {n:'IT staff overhead',self:fteSelf,ace:fteAce},
+        {n:'End-user productivity loss',self:prodSelf,ace:prodAce}
+      ]}
+    },
+    selfTot, aceTot, savings: selfTot - aceTot,
+    adCov, adUncov,
+    credExYear: adUncov.findIndex(u => u > 0) + 1 || null,
+    beYear
+  };
+}
+
+/* ===== RENDER ===== */
+function recalc() {
+  const mac = calcCat('Mac'), ios = calcCat('iOS');
+  renderSummary();
+  renderExec(mac, ios);
+  renderCatPanel('mac', mac);
+  renderCatPanel('ios', ios);
+  setTimeout(renderCharts, 50);
+  document.getElementById('printCustomer').textContent = S.customer || '';
+  document.getElementById('printDate').textContent = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function renderSummary() {
+  const tQ = S.fleet.reduce((s,r) => s + r.qty, 0);
+  const tH = S.fleet.reduce((s,r) => s + r.qty * r.price, 0);
+  const tA = S.fleet.reduce((s,r) => s + r.qty * (r.acePrice ?? lookupAcePrice(r)), 0);
+  const tC = Math.round(S.fleet.reduce((s,r) => {
+    const sp = TCO_DATA.servicePoolOptions.find(x => x.id === r.sp);
+    return s + r.qty * (sp ? sp.rate : 0.05);
+  }, 0));
+  document.getElementById('sumDevices').textContent = tQ.toLocaleString();
+  document.getElementById('sumHardware').textContent = fmt(tH);
+  document.getElementById('sumAce').textContent = fmt(tA);
+  document.getElementById('sumCredits').textContent = tC.toLocaleString();
+}
+
+function savingsClass(sav, selfTot) {
+  if (sav > 0) return 'savings-pos';
+  const pct = selfTot > 0 ? sav / selfTot * 100 : 0;
+  return pct > -5 ? 'savings-warn' : 'savings-neg';
+}
+
+function renderExec(mac, ios) {
+  const p = document.getElementById('execPanel');
+  const tS = (mac?.selfTot||0)+(ios?.selfTot||0);
+  const tA = (mac?.aceTot||0)+(ios?.aceTot||0);
+  const sav = tS - tA;
+  const pS = tS > 0 ? sav/tS*100 : 0;
+  const be = mac?.beYear || ios?.beYear;
+  const tQ = (mac?.qty||0)+(ios?.qty||0);
+
+  p.innerHTML =
+    '<div class="kpi-grid">' +
+      '<div class="kpi self"><div class="kpi-label">Total Self-Insurance</div><div class="kpi-value">'+fmt(tS)+'</div><div class="kpi-sub">Lifecycle TCO across '+tQ.toLocaleString()+' devices</div></div>' +
+      '<div class="kpi ace"><div class="kpi-label">Total with ACE</div><div class="kpi-value">'+fmt(tA)+'</div><div class="kpi-sub">Includes ACE plan investment</div></div>' +
+      '<div class="kpi '+savingsClass(sav,tS)+'"><div class="kpi-label">Net Savings with ACE</div><div class="kpi-value">'+fmt(sav)+'</div><div class="kpi-sub">'+pct(pS)+' TCO reduction</div></div>' +
+    '</div>' +
+    (be ? '<div class="callout info"><span class="callout-icon">'+ICN.clock+'</span><span><strong>ACE pays back in Year '+be+'.</strong> The plan is paid upfront, so Year 1 is higher. Cumulative advantage is positive by Year '+be+' and grows from there.</span></div>' :
+          '<div class="callout warning"><span class="callout-icon">'+ICN.chart+'</span><span>ACE does not reach payback within the modeled lifecycle at current assumptions. Consider a longer term, different tier, or adjusting the fleet mix.</span></div>') +
+    '<h3 style="font-size:var(--text-subhead);font-weight:var(--weight-semibold);margin-bottom:var(--space-3)">Cost Breakdown</h3>' +
+    renderPL([mac,ios].filter(Boolean)) +
+    '<h3 style="font-size:var(--text-subhead);font-weight:var(--weight-semibold);margin:var(--space-6) 0 var(--space-3)">Pros and Tradeoffs</h3>' +
+    '<table class="pc-table">' +
+      '<thead><tr><th>AppleCare for Enterprise</th><th>Self-Insurance</th></tr></thead><tbody>' +
+      '<tr><td colspan="2" class="pc-group-label pros">Advantages</td></tr>' +
+      (function(){ const a=TCO_DATA.pros.ace, s=TCO_DATA.pros.self, mx=Math.max(a.length,s.length); let h=''; for(let i=0;i<mx;i++){ h+='<tr><td>'+(a[i]?'<strong>'+a[i].t+'.</strong> '+a[i].d:'')+'</td><td>'+(s[i]?'<strong>'+s[i].t+'.</strong> '+s[i].d:'')+'</td></tr>'; } return h; })() +
+      '<tr><td colspan="2" class="pc-group-label cons">Tradeoffs</td></tr>' +
+      (function(){ const a=TCO_DATA.cons.ace, s=TCO_DATA.cons.self, mx=Math.max(a.length,s.length); let h=''; for(let i=0;i<mx;i++){ h+='<tr><td>'+(a[i]?'<strong>'+a[i].t+'.</strong> '+a[i].d:'')+'</td><td>'+(s[i]?'<strong>'+s[i].t+'.</strong> '+s[i].d:'')+'</td></tr>'; } return h; })() +
+    '</tbody></table>' +
+    '<h3 style="font-size:var(--text-subhead);font-weight:var(--weight-semibold);margin-bottom:var(--space-3)">Beyond the Numbers</h3>' +
+    '<div class="beyond-grid">' + TCO_DATA.beyond.map(b =>
+      '<div class="beyond-card"><div class="beyond-icon">'+(ICN[b.icon]||'')+'</div><div class="beyond-title">'+b.t+'</div><div class="beyond-desc">'+b.d+'</div></div>'
+    ).join('') + '</div>';
+}
+
+function renderCatPanel(id, res) {
+  const p = document.getElementById(id + 'Panel');
+  if (!res) { p.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text-muted)">No '+(id==='mac'?'Mac or Display':'iPhone or iPad')+' devices in fleet. Add a device line above.</div>'; return; }
+  const pS = res.selfTot > 0 ? res.savings/res.selfTot*100 : 0;
+  const resNote = 'Residual: ' + Math.round(res.resRate*100) + '% self-insure, ' + Math.round(res.resRate*(1+res.aceResPremium)*100) + '% ACE (+5% premium)';
+
+  p.innerHTML =
+    '<div style="font-size:var(--text-footnote);color:var(--text-secondary);margin-bottom:var(--space-4)">' +
+      res.qty.toLocaleString()+' devices &middot; '+res.life+'-year lifecycle &middot; '+pct(res.brk*100)+' annual breakage ('+Math.round(res.adPct*100)+'% accidental damage) &middot; '+res.credits.toLocaleString()+' SP credits &middot; ' + resNote +
+    '</div>' +
+    '<div class="kpi-grid">' +
+      '<div class="kpi self"><div class="kpi-label">Self-Insurance</div><div class="kpi-value">'+fmt(res.selfTot)+'</div><div class="kpi-sub">'+fmt(res.selfTot/res.qty/res.life)+' per device/yr</div></div>' +
+      '<div class="kpi ace"><div class="kpi-label">With ACE</div><div class="kpi-value">'+fmt(res.aceTot)+'</div><div class="kpi-sub">'+fmt(res.aceTot/res.qty/res.life)+' per device/yr</div></div>' +
+      '<div class="kpi '+savingsClass(res.savings,res.selfTot)+'"><div class="kpi-label">Net Savings</div><div class="kpi-value">'+fmt(res.savings)+'</div><div class="kpi-sub">'+pct(pS)+' reduction</div></div>' +
+    '</div>' +
+    (res.credExYear ?
+      '<div class="callout warning"><span class="callout-icon">'+ICN.chart+'</span><span><strong>Service Pool credits exhaust in Year '+res.credExYear+'.</strong> At this breakage rate, the customer pays out of pocket for accidental damage beyond that point. Consider modeling SP+ (10% accrual) for higher coverage.</span></div>' :
+      '<div class="callout info"><span class="callout-icon">'+ICN.shield+'</span><span><strong>Service Pool credits cover all expected accidental damage incidents</strong> across the modeled lifecycle.</span></div>') +
+    renderPL([res]) +
+    '<div class="charts-row">' +
+      '<div class="chart-box"><h4>Cumulative Cost Over Lifecycle</h4><div class="chart-wrap"><canvas id="'+id+'CumChart"></canvas></div></div>' +
+      '<div class="chart-box"><h4>Service Pool Credit Usage</h4><div class="chart-wrap"><canvas id="'+id+'DepChart"></canvas></div></div>' +
+    '</div>';
+}
+
+function renderPL(results) {
+  const secKeys = ['hard','spares','log','ops'];
+  const agg = {};
+  secKeys.forEach(sk => { agg[sk] = {t:'', l:{}}; });
+  results.forEach(r => { if(!r) return; secKeys.forEach(sk => {
+    if (r.secs[sk]) {
+      agg[sk].t = r.secs[sk].t;
+      r.secs[sk].lines.forEach(ln => {
+        if (!agg[sk].l[ln.n]) agg[sk].l[ln.n] = {self:0,ace:0};
+        agg[sk].l[ln.n].self += ln.self;
+        agg[sk].l[ln.n].ace += ln.ace;
+      });
+    }
+  });});
+
+  let totalSelf = 0, totalAce = 0;
+  let html = '<div class="pl-wrapper">';
+  html += '<div class="pl-header"><div>Line Item</div><div>Self-Insure</div><div>With ACE</div><div>Advantage</div></div>';
+
+  secKeys.forEach(sk => {
+    const sec = agg[sk];
+    if (!sec.t) return;
+    html += '<div class="pl-section-label">' + sec.t + '</div>';
+    Object.entries(sec.l).forEach(([n, v]) => {
+      totalSelf += v.self;
+      totalAce += v.ace;
+      const d = v.self - v.ace;
+      const cls = d > 0 ? 'pos' : d < 0 ? 'neg' : 'neutral';
+      html += '<div class="pl-row"><div class="nm">' + n + '</div><div>' + fmt(v.self) + '</div><div>' + fmt(v.ace) + '</div><div class="delta ' + cls + '">' + fmtS(d) + '</div></div>';
+    });
+  });
+
+  const totalD = totalSelf - totalAce;
+  const totalCls = totalD > 0 ? 'pos' : totalD < 0 ? 'neg' : 'neutral';
+  html += '<div class="pl-total"><div>Total TCO</div><div>' + fmt(totalSelf) + '</div><div>' + fmt(totalAce) + '</div><div class="delta ' + totalCls + '">' + fmtS(totalD) + '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+/* ===== CHARTS ===== */
+const CHART_COLORS = {
+  self: { bg: 'rgba(142,142,147,0.6)', border: 'rgba(142,142,147,1)' },
+  ace: { bg: 'rgba(0,113,227,0.6)', border: '#0071E3' },
+  selfFill: 'rgba(142,142,147,0.15)',
+  aceFill: 'rgba(0,113,227,0.15)',
+  covered: { bg: 'rgba(52,199,89,0.6)', border: '#34C759' },
+  uncovered: { bg: 'rgba(142,142,147,0.5)', border: 'rgba(142,142,147,1)' }
+};
+
+function renderCharts() {
+  const active = document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (active === 'mac') renderCatCharts('mac');
+  if (active === 'ios') renderCatCharts('ios');
+}
+
+function renderCatCharts(id) {
+  const res = calcCat(id==='mac'?'Mac':'iOS');
+  if (!res) return;
+  const yrs = Array.from({length:res.life},(_,i)=>'Year '+(i+1));
+
+  const ctxC = document.getElementById(id+'CumChart');
+  if (ctxC) {
+    if (charts[id+'C']) charts[id+'C'].destroy();
+    const annS = res.selfTot/res.life, annA = (res.aceTot-res.aceP)/res.life;
+    charts[id+'C'] = new Chart(ctxC, {type:'line', data:{labels:yrs,datasets:[
+      {label:'Self-Insurance',data:yrs.map((_,i)=>annS*(i+1)),borderColor:CHART_COLORS.self.border,backgroundColor:CHART_COLORS.selfFill,fill:true,tension:.3,borderWidth:2},
+      {label:'With ACE',data:yrs.map((_,i)=>res.aceP+annA*(i+1)),borderColor:CHART_COLORS.ace.border,backgroundColor:CHART_COLORS.aceFill,fill:true,tension:.3,borderWidth:2}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:800,easing:'easeOutQuart'},scales:{y:{ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k',color:'#6E6E73',font:{size:12}},grid:{color:'rgba(210,210,215,0.5)',drawBorder:false}},x:{ticks:{color:'#6E6E73',font:{size:12}},grid:{display:false}}},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:16,color:'#6E6E73',font:{size:13}}},tooltip:{backgroundColor:'#FFFFFF',titleColor:'#6E6E73',bodyColor:'#1D1D1F',bodyFont:{weight:'600'},borderColor:'#E5E5EA',borderWidth:1,cornerRadius:12,padding:12,boxShadow:'0 4px 12px rgba(0,0,0,0.08)'}}}});
+  }
+
+  const ctxD = document.getElementById(id+'DepChart');
+  if (ctxD) {
+    if (charts[id+'D']) charts[id+'D'].destroy();
+    charts[id+'D'] = new Chart(ctxD, {type:'bar', data:{labels:yrs,datasets:[
+      {label:'Covered by Credits',data:res.adCov.map(Math.round),backgroundColor:CHART_COLORS.covered.bg,borderRadius:{topLeft:4,topRight:4,bottomLeft:0,bottomRight:0}},
+      {label:'Out of Pocket',data:res.adUncov.map(Math.round),backgroundColor:CHART_COLORS.uncovered.bg,borderRadius:{topLeft:4,topRight:4,bottomLeft:0,bottomRight:0}}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:800,easing:'easeOutQuart'},scales:{x:{stacked:true,ticks:{color:'#6E6E73',font:{size:12}},grid:{display:false}},y:{stacked:true,ticks:{color:'#6E6E73',font:{size:12}},grid:{color:'rgba(210,210,215,0.5)',drawBorder:false}}},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:16,color:'#6E6E73',font:{size:13}}},tooltip:{backgroundColor:'#FFFFFF',titleColor:'#6E6E73',bodyColor:'#1D1D1F',bodyFont:{weight:'600'},borderColor:'#E5E5EA',borderWidth:1,cornerRadius:12,padding:12}}}});
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>
