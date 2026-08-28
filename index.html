@@ -3486,6 +3486,10 @@ mazeGroup.add(makeSignpost(
 
 // goal marker + one-time-per-visit reward
 const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 12.5, z: MAZE_OFFSET.z + 16.5 };
+// TEMPORARY debug indicator — remove once maze visibility is confirmed working
+const mazeDebugEl = document.createElement('div');
+mazeDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
+document.body.appendChild(mazeDebugEl);
 {
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
@@ -4370,6 +4374,7 @@ function animate(){
   }
 
   if(mazeGroup.visible) checkMazeGoal();
+  mazeDebugEl.textContent = `迷路: island=${currentIslandId} visible=${mazeGroup.visible} プレイヤー座標=(${player.position.x.toFixed(1)},${player.position.z.toFixed(1)}) 入口まで=${Math.hypot(player.position.x-10.5, player.position.z-4.5).toFixed(1)}`;
 
   // camera follow (third person, behind player)
   const camOffset = new THREE.Vector3(
