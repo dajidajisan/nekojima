@@ -3470,28 +3470,28 @@ function makeGuideRobot(x,z,rotY){
    to the remote zone, and reaching the exit teleports back.
 ========================================================= */
 const MAZE_ZONE_CENTER = { x: 600, z: 600 }; // far enough that it's never reachable by normal walking
-const MAZE_ZONE_RADIUS = 20; // local boundary radius used for tap-to-move clamping while inside
-const MAZE_OFFSET = { x: MAZE_ZONE_CENTER.x - 7.5, z: MAZE_ZONE_CENTER.z - 7.5 }; // maze's local (0,0) corner
+const MAZE_ZONE_RADIUS = 26; // local boundary radius used for tap-to-move clamping while inside
+const MAZE_COLS = 5, MAZE_ROWS = 4; // 20 cells — a long winding corridor, much bigger than before
+const MAZE_OFFSET = { x: MAZE_ZONE_CENTER.x - (MAZE_COLS*5)/2, z: MAZE_ZONE_CENTER.z - (MAZE_ROWS*5)/2 };
 const MAZE_WALL_THICKNESS = 0.5;
 const MAZE_WALL_HEIGHT = 1.6;
 let inMazeMode = false;
 let returnSpot = null; // where to teleport back to when leaving the maze
 
+// a long serpentine path winding through all 20 cells of a 5x4 grid —
+// verified end-to-end walkable by simulation before shipping. Entrance
+// at the south of (row0,col0); exit at the north of (row3,col0).
 // each segment is the CENTERLINE of one wall, in maze-local coordinates
-// (0..15 on each axis). Vertical segments have x1===x2 (wall runs along
-// Z); horizontal segments have z1===z2 (wall runs along X).
+// (0..25 on X, 0..20 on Z). Vertical segments have x1===x2 (wall runs
+// along Z); horizontal segments have z1===z2 (wall runs along X).
 const MAZE_WALL_SEGMENTS = [
-  // internal walls that close off the wrong turns
-  {x1:5,z1:0,x2:5,z2:5},   {x1:10,z1:0,x2:10,z2:5},
-  {x1:5,z1:5,x2:5,z2:10},  {x1:10,z1:5,x2:10,z2:10},
-  {x1:5,z1:5,x2:10,z2:5},  {x1:10,z1:5,x2:15,z2:5},
-  {x1:10,z1:10,x2:15,z2:10},
-  // outer boundary, with a gap at the south for the entrance
-  // (x:0-5, z=0) and a gap at the north for the exit (x:10-15, z=15)
-  {x1:5,z1:0,x2:10,z2:0},   {x1:10,z1:0,x2:15,z2:0},
-  {x1:0,z1:15,x2:5,z2:15},  {x1:5,z1:15,x2:10,z2:15},
-  {x1:0,z1:0,x2:0,z2:5},    {x1:0,z1:5,x2:0,z2:10},   {x1:0,z1:10,x2:0,z2:15},
-  {x1:15,z1:0,x2:15,z2:5},  {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15},
+  {x1:0,z1:0,x2:0,z2:5}, {x1:5,z1:0,x2:10,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0},
+  {x1:20,z1:0,x2:25,z2:0}, {x1:25,z1:0,x2:25,z2:5}, {x1:0,z1:5,x2:5,z2:5}, {x1:0,z1:5,x2:0,z2:10},
+  {x1:5,z1:5,x2:10,z2:5}, {x1:10,z1:5,x2:15,z2:5}, {x1:15,z1:5,x2:20,z2:5}, {x1:25,z1:5,x2:25,z2:10},
+  {x1:0,z1:10,x2:0,z2:15}, {x1:5,z1:10,x2:10,z2:10}, {x1:10,z1:10,x2:15,z2:10}, {x1:15,z1:10,x2:20,z2:10},
+  {x1:20,z1:10,x2:25,z2:10}, {x1:25,z1:10,x2:25,z2:15}, {x1:0,z1:15,x2:5,z2:15}, {x1:0,z1:15,x2:0,z2:20},
+  {x1:5,z1:15,x2:10,z2:15}, {x1:5,z1:20,x2:10,z2:20}, {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20},
+  {x1:15,z1:15,x2:20,z2:15}, {x1:15,z1:20,x2:20,z2:20}, {x1:20,z1:20,x2:25,z2:20}, {x1:25,z1:15,x2:25,z2:20},
 ];
 
 const mazeGroup = new THREE.Group();
@@ -3555,10 +3555,6 @@ function wrapSignText(ctx, text, cx, y, maxWidth, lineHeight){
   lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
 }
 function makeSignpost(x,z,rotY,textEn,textJa){
-  const g = new THREE.Group();
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.2,8), new THREE.MeshLambertMaterial({color:0x8A6D42}));
-  post.position.y = 0.6;
-  g.add(post);
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 140;
   const ctx = canvas.getContext('2d');
@@ -3575,45 +3571,54 @@ function makeSignpost(x,z,rotY,textEn,textJa){
   ctx.fillStyle = '#8878A0';
   ctx.fillText(textJa, 160, 112);
   const tex = new THREE.CanvasTexture(canvas);
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.66), new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide}));
-  plane.position.set(0,1.4,0);
-  g.add(plane);
-  g.add(makeBlobShadow(0.4));
-  g.position.set(x,0,z);
-  g.rotation.y = rotY;
-  return g;
+  // a single front-facing plane, mounted flush on/near the hedge wall —
+  // simpler and more reliable than a double-sided post: it's only ever
+  // meant to be read from one direction (the way the player naturally
+  // approaches in that stretch of corridor), so there's no risk of the
+  // mirrored-text problem a two-sided sign has
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.3,0.58),
+    new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.FrontSide})
+  );
+  plane.position.set(x, 1.15, z);
+  plane.rotation.y = rotY;
+  return plane;
 }
 
-// entrance / mid-maze hint / dead-end warning signs, placed at the
-// actual decision points in the path: straight corridor from the
-// entrance up through (0,0)->(0,1)->(0,2), turn east at (0,2), dead-end
-// branch south at (1,2), then straight on to the exit at (2,2)
+// signs placed at each U-turn of the serpentine path — this maze has
+// no dead ends (it's one long winding corridor), so the signs are all
+// encouragement + turn-direction guidance rather than warnings
 mazeGroup.add(makeSignpost(
   MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, 0,
-  "Welcome! Go straight ahead to start.",
-  "ようこそ！まっすぐ進んでスタート！"
+  "Welcome! Follow the path to the right.",
+  "ようこそ！右に道なりに進もう！"
 ));
 mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 12.5, Math.PI/2,
-  "Turn right here to find the exit.",
-  "ここを右に曲がると出口だよ。"
+  MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 2.5, Math.PI/2,
+  "Turn left and go up here.",
+  "ここを左に曲がって進もう。"
 ));
 mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z + 12.5, Math.PI,
-  "The path to the south is a dead end.",
-  "南への道は行き止まりだよ。"
+  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 7.5, -Math.PI/2,
+  "Turn right and keep going.",
+  "ここを右に曲がって進もう。"
 ));
 mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 12.5, MAZE_OFFSET.z + 13.5, 0,
-  "Almost there! The exit is just ahead.",
-  "もうすぐゴール！出口はすぐそこ！"
+  MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 12.5, Math.PI/2,
+  "Almost there! Turn left again.",
+  "もうすぐゴール！またここを左に！"
+));
+mazeGroup.add(makeSignpost(
+  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 17.5, 0,
+  "The exit is just ahead!",
+  "出口はすぐそこだよ！"
 ));
 
 // entrance point (just south of the maze's south gap), used to place
 // the player right as they teleport in
 const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z - 1 };
 // goal marker + reward, reachable just past the north exit gap
-const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 12.5, z: MAZE_OFFSET.z + 16.5 };
+const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z + MAZE_ROWS*5 + 1.5 };
 {
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
@@ -4530,8 +4535,24 @@ function animate(){
       const stepX = Math.sin(playerFacing) * step;
       const stepZ = Math.cos(playerFacing) * step;
       const PLAYER_RADIUS = 0.35;
-      if(!isMazeBlocked(player.position.x + stepX, player.position.z, PLAYER_RADIUS)) player.position.x += stepX;
-      if(!isMazeBlocked(player.position.x, player.position.z + stepZ, PLAYER_RADIUS)) player.position.z += stepZ;
+      const x0 = player.position.x, z0 = player.position.z;
+      if(!isMazeBlocked(x0 + stepX, z0 + stepZ, PLAYER_RADIUS)){
+        // diagonal move is fully clear — most common case, no wall nearby
+        player.position.x = x0 + stepX;
+        player.position.z = z0 + stepZ;
+      } else {
+        // the diagonal destination hits something. Check each axis alone
+        // (both from the ORIGINAL x0,z0, not chained). If exactly one
+        // axis is clear on its own, slide along it. If BOTH are
+        // individually clear, applying both together would silently
+        // reconstruct the exact diagonal position we just found blocked
+        // (a classic "corner-cutting" bug) — so in that ambiguous case,
+        // and when both are blocked, don't move at all this frame.
+        const xClear = !isMazeBlocked(x0 + stepX, z0, PLAYER_RADIUS);
+        const zClear = !isMazeBlocked(x0, z0 + stepZ, PLAYER_RADIUS);
+        if(xClear && !zClear) player.position.x = x0 + stepX;
+        else if(zClear && !xClear) player.position.z = z0 + stepZ;
+      }
       player.rotation.y = playerFacing;
       player.position.y = Math.abs(Math.sin(t*9))*0.06;
 
