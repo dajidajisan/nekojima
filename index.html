@@ -3577,9 +3577,7 @@ function makeMazeGate(x,z){
   return { group:g, marker };
 }
 const mazeGateLandmark = { ...makeMazeGate(-9,16), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
-scene.add(mazeGateLandmark.group);
-landmarks.push(mazeGateLandmark);
-const themeparkOnlyLandmarkIds = new Set(['mazegate']);
+// (registered into `landmarks` further down, once that array actually exists — see near its declaration)
 
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
@@ -3792,6 +3790,7 @@ const landmarks = [
   { ...makePraisePedestal(-3,-4), id:'praise', type:'praise', title:'ほめポイント', sub:'とにかくほめてもらう', emoji:'💖', bg:'FF8FA3', label:'💖 ほめてもらう' },
   { ...makeFutureOrb(9,14), id:'future', type:'future', title:'未来予想ポイント', sub:'未来のことを予想する', emoji:'🔭', bg:'6BCBFF', label:'🔭 未来を のぞく' },
   { ...makeCatRobot(-9,16), id:'robot', type:'robot', title:'ねこロボ', sub:'じゃんけんで勝負！', emoji:'🤖', bg:'9B6BFF', label:'🤖 じゃんけんする' },
+  mazeGateLandmark,
 ];
 landmarks.forEach(l => scene.add(l.group));
 
