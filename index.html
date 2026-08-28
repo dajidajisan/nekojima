@@ -2770,6 +2770,9 @@ function travelToIsland(id){
   natureGroup.visible = theme.natureVisible;
   cityGroup.visible = (id === 'city');
   mazeGateLandmark.group.visible = (id === 'themepark');
+  landmarks.forEach(l=>{
+    if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'city');
+  });
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
   // a distinct ~50-word slice), so switching worlds shows/hides the
@@ -3353,6 +3356,112 @@ function makeChromeBridge(x,z,rotY){
 }
 cityGroup.add(makeChromeBridge(-5,-6,Math.PI*0.06));
 
+// large digital vision billboard — a big glowing screen with scrolling
+// English words, mounted at height on a slim pole
+const digitalVisionScreens = [];
+function makeDigitalVision(x,z,rotY){
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0A1A3A';
+  ctx.fillRect(0,0,512,128);
+  ctx.font = '700 46px sans-serif';
+  ctx.fillStyle = '#6BCBFF';
+  ctx.textBaseline = 'middle';
+  const words = ['FUTURE','TECHNOLOGY','DREAM BIG','ADVENTURE','DISCOVER','EXPLORE'];
+  ctx.fillText(words.join('   ✦   ') + '   ✦   ', 0, 64);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(3.6,0.9), new THREE.MeshBasicMaterial({map:tex}));
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(3.8,1.1,0.08), new THREE.MeshLambertMaterial({color:0x2A2F45}));
+  frame.position.z = -0.05;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,3.2,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  pole.position.y = -2.05;
+  const g = new THREE.Group();
+  g.add(frame, screen, pole);
+  g.position.set(x, 3.5, z);
+  g.rotation.y = rotY;
+  cityGroup.add(g);
+  digitalVisionScreens.push(tex);
+}
+makeDigitalVision(4,-11,0);
+makeDigitalVision(-16,9,Math.PI*0.6);
+
+// glowing vending-machine robot
+function makeVendingBot(x,z){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7,1.3,0.5), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:110}));
+  body.position.y = 0.65;
+  g.add(body);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.7), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  screen.position.set(0,0.75,0.26);
+  g.add(screen);
+  [0.2,0.5,0.8].forEach(fy=>{
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.02,8), new THREE.MeshBasicMaterial({color:0xFF6BC4}));
+    dot.position.set(0.25, 0.35+fy*0.5, 0.26);
+    g.add(dot);
+  });
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.3,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  antenna.position.set(0,1.45,0);
+  g.add(antenna);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshBasicMaterial({color:0xFF6BC4}));
+  tip.position.set(0,1.62,0);
+  g.add(tip);
+  g.add(makeBlobShadow(0.6));
+  g.position.set(x,0,z);
+  return g;
+}
+[[6,-4],[-11,-6],[15,7],[-4,13]].forEach(([x,z]) => cityGroup.add(makeVendingBot(x,z)));
+
+// transparent skywalk connecting two towers, purely decorative (not walkable)
+function makeSkywalk(x1,z1,x2,z2,h){
+  const midX=(x1+x2)/2, midZ=(z1+z2)/2;
+  const len = Math.hypot(x2-x1,z2-z1);
+  const angle = Math.atan2(x2-x1,z2-z1);
+  const tube = new THREE.Mesh(
+    new THREE.BoxGeometry(1.1,0.85,len),
+    new THREE.MeshPhongMaterial({color:0xBFE6FF, transparent:true, opacity:0.32, shininess:150})
+  );
+  tube.position.set(midX,h,midZ);
+  tube.rotation.y = -angle;
+  cityGroup.add(tube);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(1.15,0.06,len), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  trim.position.set(midX,h-0.4,midZ);
+  trim.rotation.y = -angle;
+  cityGroup.add(trim);
+}
+makeSkywalk(16,16,20,-6,5.5);
+makeSkywalk(-17,-16,-14,4,6);
+
+// smart guide robot, standing at an intersection in a directing pose
+function makeGuideRobot(x,z,rotY){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.3,0.9,10), new THREE.MeshPhongMaterial({color:0xF1F3FA, shininess:110}));
+  body.position.y = 0.55;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,14,12), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:110}));
+  head.position.y = 1.15;
+  g.add(head);
+  [-1,1].forEach(side=>{
+    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    eye.position.set(side*0.08,1.17,0.19);
+    g.add(eye);
+  });
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.5,8), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:110}));
+  arm.position.set(0.3,0.75,0);
+  arm.rotation.z = -0.9; // pointing/directing pose
+  g.add(arm);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28,0.02,6,16), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = 0.05;
+  g.add(ring);
+  g.add(makeBlobShadow(0.5));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+[[2,2,0.5],[-6,-13,2.2],[13,-9,4.7]].forEach(([x,z,r]) => cityGroup.add(makeGuideRobot(x,z,r)));
+
 /* =========================================================
    MAZE (separate space) — the maze itself lives FAR from the normal
    world (a remote zone at a huge offset), so it takes zero space in
@@ -3784,6 +3893,68 @@ function makeCatRobot(x,z){
   return { group:g, marker };
 }
 
+// robot cafe: a small kiosk with a counter + awning
+function makeRobotCafe(x,z){
+  const g = new THREE.Group();
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.4,0.7,0.7), new THREE.MeshPhongMaterial({color:0xF1F3FA, shininess:90}));
+  counter.position.y = 0.35;
+  g.add(counter);
+  const awning = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.1,0.9), new THREE.MeshBasicMaterial({color:0xFF6BC4}));
+  awning.position.set(0,1.15,-0.1);
+  g.add(awning);
+  [-0.6,0.6].forEach(dx=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.8,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+    post.position.set(dx,0.75,-0.45);
+    g.add(post);
+  });
+  const sign = new THREE.Mesh(new THREE.CircleGeometry(0.22,16), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  sign.position.set(0,0.55,0.36);
+  g.add(sign);
+  const marker = makeFloatingMarker('☕', 2.0);
+  g.add(marker);
+  g.add(makeBlobShadow(1.1));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// breaking news: a small screen-on-a-stand, like a street news kiosk
+function makeNewsKiosk(x,z){
+  const g = new THREE.Group();
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.14,1.1,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  stand.position.y = 0.55;
+  g.add(stand);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.6), new THREE.MeshBasicMaterial({color:0x0A1A3A}));
+  screen.position.set(0,1.25,0.05);
+  g.add(screen);
+  const screenGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.94,0.64), new THREE.MeshBasicMaterial({color:0xFF6BC4}));
+  screenGlow.position.set(0,1.25,0.03);
+  g.add(screenGlow);
+  const marker = makeFloatingMarker('📰', 2.1);
+  g.add(marker);
+  g.add(makeBlobShadow(0.6));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// smart home: a little house-shaped pod with a glowing window
+function makeSmartHomePod(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.6,0.9,12), new THREE.MeshPhongMaterial({color:0xF1F3FA, shininess:90}));
+  base.position.y = 0.45;
+  g.add(base);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(0.65,0.5,12), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:100}));
+  roof.position.y = 1.15;
+  g.add(roof);
+  const window = new THREE.Mesh(new THREE.CircleGeometry(0.16,16), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  window.position.set(0,0.5,0.56);
+  g.add(window);
+  const marker = makeFloatingMarker('🏠', 2.2);
+  g.add(marker);
+  g.add(makeBlobShadow(0.9));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
 const landmarks = [
   { ...makeComedyStage(-15,3), id:'comedy', type:'comedy', title:'コメディポイント', sub:'えいごジョークを聞く', emoji:'😂', bg:'FFD873', label:'😂 ジョークを聞く' },
   { ...makeFortuneTent(13,-11), id:'fortune', type:'fortune', title:'占いポイント', sub:'きょうの運勢', emoji:'🔮', bg:'B9A6E8', label:'🔮 占ってもらう' },
@@ -3791,7 +3962,12 @@ const landmarks = [
   { ...makeFutureOrb(9,14), id:'future', type:'future', title:'未来予想ポイント', sub:'未来のことを予想する', emoji:'🔭', bg:'6BCBFF', label:'🔭 未来を のぞく' },
   { ...makeCatRobot(-9,16), id:'robot', type:'robot', title:'ねこロボ', sub:'じゃんけんで勝負！', emoji:'🤖', bg:'9B6BFF', label:'🤖 じゃんけんする' },
   mazeGateLandmark,
+  { ...makeRobotCafe(-16,-2), id:'robotcafe', type:'robotcafe', title:'ロボットカフェ', sub:'えいごで注文してみよう', emoji:'☕', bg:'6BCBFF', label:'☕ 注文する' },
+  { ...makeNewsKiosk(18,-2), id:'news', type:'news', title:'速報ニュース', sub:'みらいの街のニュースを見る', emoji:'📰', bg:'FF6BC4', label:'📰 ニュースを見る' },
+  { ...makeSmartHomePod(-19,-8), id:'smarthome', type:'smarthome', title:'スマートホーム', sub:'おうちロボに指示してみよう', emoji:'🏠', bg:'6BCBFF', label:'🏠 指示する' },
 ];
+// these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
+const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome']);
 landmarks.forEach(l => scene.add(l.group));
 
 /* =========================================================
@@ -4439,6 +4615,7 @@ function animate(){
       v.mesh.position.y = v.baseY + Math.sin(t*1.2 + v.phase)*0.25;
       v.mesh.rotation.y = t*0.3 + v.phase;
     });
+    digitalVisionScreens.forEach(tex=>{ tex.offset.x = (tex.offset.x + dt*0.08) % 1; });
   }
 
   checkMazeGoal();
@@ -5355,6 +5532,130 @@ function vocabCallout(keyWord, explain){
   return `<div class="vocab-callout"><span class="vocab-callout-word">📘 ${keyWord}</span><span class="vocab-callout-explain">${explain||''}</span></div>`;
 }
 
+/* ---------- ロボットカフェ: ordering practice ---------- */
+const CAFE_MENU = [
+  { en:'a coffee', ja:'コーヒー' },
+  { en:'a sandwich', ja:'サンドイッチ' },
+  { en:'a slice of cake', ja:'ケーキ' },
+  { en:'a glass of juice', ja:'ジュース' },
+];
+function renderRobotCafe(landmark){
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#6BCBFF;">☕ ロボットカフェ</span>
+    <div class="dialogue-bubble"><span class="en">Hi! What would you like to order?</span><span class="ja">いらっしゃいませ！何を注文しますか？</span></div>
+    <div class="choices" id="cafeChoices"></div>
+  `;
+  speakEnglish("Hi! What would you like to order?");
+  nextBtn.classList.remove('show');
+  const cw = document.getElementById('cafeChoices');
+  CAFE_MENU.forEach(item=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = item.en;
+    btn.onclick = ()=> orderFromCafe(item, landmark);
+    cw.appendChild(btn);
+  });
+}
+function orderFromCafe(item, landmark){
+  coins += 1;
+  updateCoinHUD();
+  saveProgress();
+  playCorrectSound();
+  const orderEn = `Can I have ${item.en}, please?`;
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#6BCBFF;">☕ ロボットカフェ</span>
+    <div class="dialogue-bubble"><span class="en">${orderEn}</span><span class="ja">${item.ja}をください。</span></div>
+    <div class="feedback-banner correct">✅ Order placed! +1🪙</div>
+    <div class="reaction-bubble"><span class="en">Sure! Here you go.</span><span class="ja">はい、どうぞ！</span></div>
+  `;
+  speakEnglish(`${orderEn} Sure! Here you go.`);
+  burstSparkles(document.querySelector('.feedback-banner'));
+  nextBtn.textContent = 'もう一回 ☕';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderRobotCafe(landmark);
+}
+
+/* ---------- 速報ニュース: AI-generated future-city news ---------- */
+const NEWS_FALLBACK = [
+  { en:"A new park opened in the city today.", ja:"今日、街に新しい公園がオープンしました。", keyWord:"opened", explain:"「open」の過去形。『（施設などが）開く、オープンする』という意味だよ。" },
+  { en:"Robots helped clean the streets this morning.", ja:"今朝、ロボットたちが道路のそうじを手伝いました。", keyWord:"helped clean", explain:"「help + 動詞の原形」で『〜するのを手伝う』という意味だよ。" },
+  { en:"A flying car was seen over the city.", ja:"空飛ぶ車が街の上空で目撃されました。", keyWord:"was seen", explain:"「be動詞 + 過去分詞」の受け身で『見られた』という意味だよ。" },
+];
+async function generateBreakingNews(){
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、未来の都市のニュースキャスターです。
+「みらいシティ」という未来の街で今日起きた、ちょっと楽しいニュースを英語で1文作ってください。
+条件：
+- 英検準2級レベルの、10語以内のやさしい英文にすること
+- ニュースらしく、過去形を使うこと
+- 現実離れしすぎない、子どもが楽しく想像できる内容にすること
+- 文中で使われている単語・熟語のうち、学習にちょうどいいものを1つ選び、keyWord としてそのまま書き出し、その意味・使い方を日本語でやさしく説明すること
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"en":"英文","ja":"その日本語訳","keyWord":"文中の単語・熟語","explain":"その単語の意味・使い方の説明（日本語）"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.en || !parsed.ja) return null;
+    return parsed;
+  } catch(e){
+    return null;
+  }
+}
+async function renderBreakingNews(landmark){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">📰</div>
+    <p>ニュースをさがし中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const generated = await generateBreakingNews();
+  const pick = generated || NEWS_FALLBACK[Math.floor(Math.random()*NEWS_FALLBACK.length)];
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#FF6BC4;">📰 みらいシティ速報</span>
+    <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
+    <button class="speak-btn" id="lmSpeak" style="align-self:center;">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    </button>
+    <div class="ja-hint">${pick.ja}</div>
+    ${vocabCallout(pick.keyWord, pick.explain)}
+  `;
+  document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+  speakEnglish(pick.en);
+  nextBtn.textContent = 'つぎのニュース 📰';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderBreakingNews(landmark);
+}
+
+/* ---------- スマートホーム: imperative-command practice ---------- */
+const SMART_HOME_COMMANDS = [
+  { en:"Turn on the lights.", ja:"電気をつけて。", keyWord:"turn on", explain:"「turn on」で『（電源を）つける』という意味の熟語だよ。" },
+  { en:"Turn off the TV.", ja:"テレビを消して。", keyWord:"turn off", explain:"「turn off」で『（電源を）消す』という意味の熟語だよ。" },
+  { en:"Close the curtains, please.", ja:"カーテンを閉めてください。", keyWord:"close", explain:"「close」は『閉める』という意味の動詞だよ。" },
+  { en:"Open the window.", ja:"窓を開けて。", keyWord:"open", explain:"「open」は『開ける』という意味の動詞だよ。" },
+  { en:"Play some music, please.", ja:"音楽をかけてください。", keyWord:"play", explain:"「play」には『（音楽などを）流す』という意味もあるよ。" },
+  { en:"Set an alarm for seven.", ja:"7時にアラームをセットして。", keyWord:"set an alarm", explain:"「set an alarm」で『アラームをセットする』という意味だよ。" },
+  { en:"Lock the front door.", ja:"玄関のドアに鍵をかけて。", keyWord:"lock", explain:"「lock」は『鍵をかける』という意味の動詞だよ。" },
+  { en:"Turn down the volume.", ja:"音量を下げて。", keyWord:"turn down", explain:"「turn down」で『（音量などを）下げる』という意味の熟語だよ。" },
+];
+function renderSmartHome(landmark){
+  const pick = SMART_HOME_COMMANDS[Math.floor(Math.random()*SMART_HOME_COMMANDS.length)];
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#6BCBFF;">🏠 スマートホーム</span>
+    <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
+    <button class="speak-btn" id="lmSpeak" style="align-self:center;">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    </button>
+    <div class="ja-hint">${pick.ja}</div>
+    ${vocabCallout(pick.keyWord, pick.explain)}
+  `;
+  document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+  speakEnglish(pick.en);
+  nextBtn.textContent = 'つぎの指示 🏠';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderSmartHome(landmark);
+}
+
 /* ---------- ねこロボ: rock-paper-scissors minigame ---------- */
 const RPS_CHOICES = [
   { key:'rock', emoji:'✊', en:'Rock', ja:'グー' },
@@ -5473,6 +5774,15 @@ function renderLandmarkContent(landmark){
 
   } else if(landmark.type === 'robot'){
     renderCatRobot(landmark);
+
+  } else if(landmark.type === 'robotcafe'){
+    renderRobotCafe(landmark);
+
+  } else if(landmark.type === 'news'){
+    renderBreakingNews(landmark);
+
+  } else if(landmark.type === 'smarthome'){
+    renderSmartHome(landmark);
   }
 }
 
@@ -6499,6 +6809,10 @@ applyDayNight();
 updateIslandUI();
 updateWordPercent();
 npcs.forEach(n=>{ n.mesh.visible = (n.def.world === currentIslandId); });
+mazeGateLandmark.group.visible = (currentIslandId === 'themepark');
+landmarks.forEach(l=>{
+  if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'city');
+});
 
 </script>
 </body>
