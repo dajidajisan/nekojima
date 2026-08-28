@@ -2768,6 +2768,7 @@ function travelToIsland(id){
   // show/hide trees & co.
   natureGroup.visible = theme.natureVisible;
   cityGroup.visible = (id === 'city');
+  mazeGroup.visible = (id === 'themepark');
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
   // a distinct ~50-word slice), so switching worlds shows/hides the
@@ -3350,6 +3351,166 @@ function makeChromeBridge(x,z,rotY){
   return g;
 }
 cityGroup.add(makeChromeBridge(-5,-6,Math.PI*0.06));
+
+/* =========================================================
+   THEMEPARK MAZE — a real, walkable hedge maze with genuine wall
+   collision (not just decorative), plus English-language signs the
+   player must read to find the way through, and a goal reward.
+   3x3 grid of 5-unit cells, offset into the world so it stays well
+   inside the play boundary (world radius 34).
+========================================================= */
+const MAZE_OFFSET = { x:8, z:6 };
+const MAZE_CELL = 5;
+const MAZE_WALL_THICKNESS = 0.5;
+const MAZE_WALL_HEIGHT = 1.6;
+
+// each segment is the CENTERLINE of one wall, in maze-local coordinates
+// (before MAZE_OFFSET is applied). Vertical segments have x1===x2 (wall
+// runs along Z); horizontal segments have z1===z2 (wall runs along X).
+const MAZE_WALL_SEGMENTS = [
+  // internal walls that close off the wrong turns
+  {x1:5,z1:0,x2:5,z2:5},   {x1:10,z1:0,x2:10,z2:5},
+  {x1:5,z1:5,x2:5,z2:10},  {x1:10,z1:5,x2:10,z2:10},
+  {x1:5,z1:5,x2:10,z2:5},  {x1:10,z1:5,x2:15,z2:5},
+  {x1:10,z1:10,x2:15,z2:10},
+  // outer boundary, with a gap at the south for the entrance
+  // (x:0-5, z=0) and a gap at the north for the exit (x:10-15, z=15)
+  {x1:5,z1:0,x2:10,z2:0},   {x1:10,z1:0,x2:15,z2:0},
+  {x1:0,z1:15,x2:5,z2:15},  {x1:5,z1:15,x2:10,z2:15},
+  {x1:0,z1:0,x2:0,z2:5},    {x1:0,z1:5,x2:0,z2:10},   {x1:0,z1:10,x2:0,z2:15},
+  {x1:15,z1:0,x2:15,z2:5},  {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15},
+];
+
+// resolved AABBs in WORLD coordinates, used for both the visual mesh and
+// the collision check
+const mazeGroup = new THREE.Group();
+mazeGroup.visible = false;
+scene.add(mazeGroup);
+
+const MAZE_COLLIDERS = MAZE_WALL_SEGMENTS.map(seg=>{
+  const x1 = seg.x1 + MAZE_OFFSET.x, z1 = seg.z1 + MAZE_OFFSET.z;
+  const x2 = seg.x2 + MAZE_OFFSET.x, z2 = seg.z2 + MAZE_OFFSET.z;
+  const half = MAZE_WALL_THICKNESS/2;
+  const box = {
+    minX: Math.min(x1,x2) - half, maxX: Math.max(x1,x2) + half,
+    minZ: Math.min(z1,z2) - half, maxZ: Math.max(z1,z2) + half,
+  };
+  // visual hedge wall mesh
+  const len = Math.hypot(x2-x1, z2-z1) + MAZE_WALL_THICKNESS;
+  const isVertical = seg.x1 === seg.x2;
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(isVertical ? MAZE_WALL_THICKNESS : len, MAZE_WALL_HEIGHT, isVertical ? len : MAZE_WALL_THICKNESS),
+    new THREE.MeshLambertMaterial({color:0x4FA84A})
+  );
+  wall.position.set((x1+x2)/2, MAZE_WALL_HEIGHT/2, (z1+z2)/2);
+  mazeGroup.add(wall);
+  return box;
+});
+
+function isMazeBlocked(x, z, radius){
+  if(!mazeGroup.visible) return false; // maze only exists in the themepark world
+  for(const b of MAZE_COLLIDERS){
+    if(x + radius > b.minX && x - radius < b.maxX && z + radius > b.minZ && z - radius < b.maxZ) return true;
+  }
+  return false;
+}
+
+// simple wrapped-text sign on a post, readable just by walking past —
+// no interaction needed, matching how a real signpost works
+function wrapSignText(ctx, text, cx, y, maxWidth, lineHeight){
+  const words = text.split(' ');
+  let line = '';
+  const lines = [];
+  words.forEach(w=>{
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
+    else line = test;
+  });
+  if(line) lines.push(line);
+  lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
+}
+function makeSignpost(x,z,rotY,textEn,textJa){
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.2,8), new THREE.MeshLambertMaterial({color:0x8A6D42}));
+  post.position.y = 0.6;
+  g.add(post);
+  const canvas = document.createElement('canvas');
+  canvas.width = 320; canvas.height = 140;
+  const ctx = canvas.getContext('2d');
+  const rr=(px,py,pw,ph,r)=>{ ctx.beginPath(); ctx.moveTo(px+r,py); ctx.arcTo(px+pw,py,px+pw,py+ph,r); ctx.arcTo(px+pw,py+ph,px,py+ph,r); ctx.arcTo(px,py+ph,px,py,r); ctx.arcTo(px,py,px+pw,py,r); ctx.closePath(); };
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  rr(4,4,312,132,14); ctx.fill();
+  ctx.strokeStyle = '#8A6D42'; ctx.lineWidth = 4;
+  rr(6,6,308,128,12); ctx.stroke();
+  ctx.fillStyle = '#4A3B5C';
+  ctx.font = '700 22px sans-serif';
+  ctx.textAlign = 'center';
+  wrapSignText(ctx, textEn, 160, 42, 280, 27);
+  ctx.font = '600 15px sans-serif';
+  ctx.fillStyle = '#8878A0';
+  ctx.fillText(textJa, 160, 112);
+  const tex = new THREE.CanvasTexture(canvas);
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.66), new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide}));
+  plane.position.set(0,1.4,0);
+  g.add(plane);
+  g.add(makeBlobShadow(0.4));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+
+// entrance / mid-maze hint / dead-end warning signs, placed at the
+// actual decision points in the path: straight corridor from the
+// entrance up through (0,0)->(0,1)->(0,2), turn east at (0,2), dead-end
+// branch south at (1,2), then straight on to the exit at (2,2)
+mazeGroup.add(makeSignpost(
+  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, 0,
+  "Welcome! Go straight ahead to start.",
+  "ようこそ！まっすぐ進んでスタート！"
+));
+mazeGroup.add(makeSignpost(
+  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 12.5, Math.PI/2,
+  "Turn right here to find the exit.",
+  "ここを右に曲がると出口だよ。"
+));
+mazeGroup.add(makeSignpost(
+  MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z + 12.5, Math.PI,
+  "The path to the south is a dead end.",
+  "南への道は行き止まりだよ。"
+));
+mazeGroup.add(makeSignpost(
+  MAZE_OFFSET.x + 12.5, MAZE_OFFSET.z + 13.5, 0,
+  "Almost there! The exit is just ahead.",
+  "もうすぐゴール！出口はすぐそこ！"
+));
+
+// goal marker + one-time-per-visit reward
+const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 12.5, z: MAZE_OFFSET.z + 16.5 };
+{
+  const flag = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  pole.position.y = 0.9;
+  flag.add(pole);
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.4), new THREE.MeshBasicMaterial({color:0xFFD873, side:THREE.DoubleSide}));
+  banner.position.set(0.3,1.55,0);
+  flag.add(banner);
+  flag.add(makeBlobShadow(0.5));
+  flag.position.set(mazeGoalWorldPos.x, 0, mazeGoalWorldPos.z);
+  mazeGroup.add(flag);
+}
+let mazeGoalClaimedToday = false;
+function checkMazeGoal(){
+  if(!mazeGroup.visible || mazeGoalClaimedToday) return;
+  const dist = Math.hypot(player.position.x - mazeGoalWorldPos.x, player.position.z - mazeGoalWorldPos.z);
+  if(dist < 1.5){
+    mazeGoalClaimedToday = true;
+    coins += 5;
+    updateCoinHUD();
+    saveProgress();
+    playCorrectSound();
+    showToast('🎉 めいろクリア！ +5🪙');
+  }
+}
 
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
@@ -4119,8 +4280,11 @@ function animate(){
       playerFacing += diff * Math.min(1, dt*6);
       const speed = Math.min(2.8, dist*4); // ease in as it arrives, no overshoot-jitter
       const step = Math.min(speed*dt, dist);
-      player.position.x += Math.sin(playerFacing) * step;
-      player.position.z += Math.cos(playerFacing) * step;
+      const stepX = Math.sin(playerFacing) * step;
+      const stepZ = Math.cos(playerFacing) * step;
+      const PLAYER_RADIUS = 0.35;
+      if(!isMazeBlocked(player.position.x + stepX, player.position.z, PLAYER_RADIUS)) player.position.x += stepX;
+      if(!isMazeBlocked(player.position.x, player.position.z + stepZ, PLAYER_RADIUS)) player.position.z += stepZ;
       player.rotation.y = playerFacing;
       player.position.y = Math.abs(Math.sin(t*9))*0.06;
 
@@ -4204,6 +4368,8 @@ function animate(){
       v.mesh.rotation.y = t*0.3 + v.phase;
     });
   }
+
+  if(mazeGroup.visible) checkMazeGoal();
 
   // camera follow (third person, behind player)
   const camOffset = new THREE.Vector3(
