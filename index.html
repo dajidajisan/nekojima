@@ -135,6 +135,8 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .vocab-callout-word{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; color:var(--lavender-deep); }
 .vocab-callout-explain{ font-size:12px; color:var(--plum-soft); font-weight:700; line-height:1.5; }
+.coaster-timerbar{ width:100%; height:8px; background:#F1E9EF; border-radius:999px; overflow:hidden; margin-top:6px; }
+.coaster-timerfill{ height:100%; width:100%; background:linear-gradient(90deg, var(--coral), var(--coral-deep)); }
 .exercise-tag{font-size:10.5px; font-weight:800; color:#fff; padding:3px 10px; border-radius:999px; align-self:flex-start;}
 .exercise-tag.blank{background:var(--lavender-deep);}
 .exercise-tag.order{background:var(--sunshine-deep); color:#6b4a00;}
@@ -2770,8 +2772,10 @@ function travelToIsland(id){
   natureGroup.visible = theme.natureVisible;
   cityGroup.visible = (id === 'city');
   mazeGateLandmark.group.visible = (id === 'themepark');
+  themeparkDecorGroup.visible = (id === 'themepark');
   landmarks.forEach(l=>{
     if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'city');
+    if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'themepark');
   });
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
@@ -3693,6 +3697,347 @@ function makeMazeGate(x,z){
 const mazeGateLandmark = { ...makeMazeGate(-9,16), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
 // (registered into `landmarks` further down, once that array actually exists — see near its declaration)
 
+// roller coaster entrance: a colorful looping track + a parked cart,
+// purely decorative — the actual "ride" is a 2D reaction minigame
+// shown in the overlay, no 3D physics involved
+function makeCoasterGate(x,z){
+  const g = new THREE.Group();
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(1.1,0.09,10,28), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:90}));
+  loop.position.y = 1.3;
+  g.add(loop);
+  [-0.9,0.9].forEach(dx=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.3,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+    post.position.set(dx,0.65,0);
+    g.add(post);
+  });
+  const cart = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.4), new THREE.MeshPhongMaterial({color:0xFFD873, shininess:100}));
+  cart.position.set(0,0.35,0.6);
+  g.add(cart);
+  const marker = makeFloatingMarker('🎢', 2.5);
+  g.add(marker);
+  g.add(makeBlobShadow(1.3));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// house of horror: a small dark spooky cottage, playful not scary
+function makeHorrorHouse(x,z){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.1,1.2), new THREE.MeshLambertMaterial({color:0x3A2F55}));
+  body.position.y = 0.55;
+  g.add(body);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.1,0.7,4), new THREE.MeshLambertMaterial({color:0x241B3D}));
+  roof.rotation.y = Math.PI/4;
+  roof.position.y = 1.45;
+  g.add(roof);
+  const window = new THREE.Mesh(new THREE.CircleGeometry(0.18,16), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  window.position.set(0,0.6,0.61);
+  g.add(window);
+  // small bat decoration
+  const bat = new THREE.Mesh(new THREE.CircleGeometry(0.12,3), new THREE.MeshBasicMaterial({color:0x1A1428}));
+  bat.position.set(0.7,1.4,0.3);
+  bat.rotation.z = Math.PI;
+  g.add(bat);
+  const marker = makeFloatingMarker('👻', 2.4);
+  g.add(marker);
+  g.add(makeBlobShadow(1.1));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// panda mascot — an interactive character you can walk up to and greet,
+// not just a decoration
+function makePandaMascot(x,z){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.42,16,14), new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+  body.position.y = 0.55;
+  body.scale.set(1,1.1,0.95);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34,16,14), new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+  head.position.y = 1.15;
+  g.add(head);
+  [-1,1].forEach(side=>{
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+    ear.position.set(side*0.28,1.42,0);
+    g.add(ear);
+    const eyePatch = new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+    eyePatch.scale.set(0.8,1,0.6);
+    eyePatch.position.set(side*0.16,1.13,0.27);
+    g.add(eyePatch);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.4,8), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+    arm.position.set(side*0.42,0.55,0);
+    arm.rotation.z = side*0.4;
+    g.add(arm);
+  });
+  const nose = new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+  nose.position.set(0,1.02,0.36);
+  g.add(nose);
+  const marker = makeFloatingMarker('🐼', 2.1);
+  g.add(marker);
+  g.add(makeBlobShadow(0.7));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+/* =========================================================
+   THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
+   noted, all shown only in ゆめのくにテーマパーク
+========================================================= */
+const themeparkDecorGroup = new THREE.Group();
+themeparkDecorGroup.visible = false;
+scene.add(themeparkDecorGroup);
+
+// 観覧車 — a big slowly-rotating Ferris wheel, the park's landmark
+let ferrisWheel = null;
+function makeFerrisWheel(x,z){
+  const g = new THREE.Group();
+  const towerMat = new THREE.MeshLambertMaterial({color:0xE4E6EE});
+  [-1,1].forEach(side=>{
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.16,5.5,8), towerMat);
+    leg.position.set(side*1.2, 2.75, 0);
+    leg.rotation.z = side*0.15;
+    g.add(leg);
+  });
+  const wheel = new THREE.Group();
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(3.2,0.14,10,32), new THREE.MeshPhongMaterial({color:0xFF6BC4, shininess:90}));
+  wheel.add(rim);
+  for(let i=0;i<8;i++){
+    const a = (i/8)*Math.PI*2;
+    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,3.2,6), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    spoke.rotation.z = Math.PI/2;
+    spoke.rotation.y = a;
+    wheel.add(spoke);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshPhongMaterial({color:[0xFFD873,0x6BCBFF,0xFF6BC4,0x9B6BFF][i%4], shininess:100}));
+    cabin.position.set(Math.cos(a)*3.2, Math.sin(a)*3.2, 0);
+    wheel.add(cabin);
+  }
+  wheel.position.set(0,5.6,0);
+  g.add(wheel);
+  g.add(makeBlobShadow(2.4));
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+  ferrisWheel = wheel;
+}
+makeFerrisWheel(0,24);
+
+// メリーゴーランド — a rotating carousel with cat/horse mounts that
+// gently bob up and down
+let carouselGroup = null;
+const carouselMounts = [];
+function makeCarousel(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.9,0.25,20), new THREE.MeshPhongMaterial({color:0xF1EDE3, shininess:80}));
+  base.position.y = 0.12;
+  g.add(base);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,2.6,8), new THREE.MeshLambertMaterial({color:0xE8A93C}));
+  pole.position.y = 1.4;
+  g.add(pole);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.1,0.9,16), new THREE.MeshPhongMaterial({color:0xFF8FA3, shininess:90}));
+  roof.position.y = 2.9;
+  g.add(roof);
+  const spinner = new THREE.Group();
+  for(let i=0;i<5;i++){
+    const a = (i/5)*Math.PI*2;
+    const pr = 1.2;
+    const mountPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1,6), new THREE.MeshLambertMaterial({color:0xC7CBE0}));
+    mountPole.position.set(Math.cos(a)*pr, 1.1, Math.sin(a)*pr);
+    spinner.add(mountPole);
+    const mount = new THREE.Mesh(new THREE.SphereGeometry(0.28,12,10), new THREE.MeshLambertMaterial({color:[0xFF8FA3,0xFFD873,0x6FE0C2,0x8FC7FF,0xB9A6E8][i%5]}));
+    mount.scale.set(1,0.8,1.6);
+    mount.position.set(Math.cos(a)*pr, 0.85, Math.sin(a)*pr);
+    spinner.add(mount);
+    [-1,1].forEach(side=>{
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.14,6), mount.material);
+      ear.position.set(Math.cos(a)*pr+side*0.12, 1.08, Math.sin(a)*pr);
+      spinner.add(ear);
+    });
+    carouselMounts.push({ mesh:mount, baseY:0.85, phase:i });
+  }
+  g.add(spinner);
+  g.add(makeBlobShadow(2.0));
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+  carouselGroup = spinner;
+}
+makeCarousel(-6,-2);
+
+// ミニジェットコースターのレール — a decorative curved track snaking
+// through the air, no functional ride (matches the "mini/decorative"
+// scope, keeps zero collision risk)
+function makeMiniCoasterRail(){
+  const points = [[-22,-24],[-15,-22],[-10,-26],[-4,-22],[-2,-16],[-8,-12],[-14,-15],[-20,-18]];
+  const railMat = new THREE.MeshPhongMaterial({color:0xFFD93D, shininess:100});
+  for(let i=0;i<points.length;i++){
+    const [x1,z1] = points[i], [x2,z2] = points[(i+1)%points.length];
+    const midX=(x1+x2)/2, midZ=(z1+z2)/2;
+    const len = Math.hypot(x2-x1,z2-z1);
+    const angle = Math.atan2(x2-x1,z2-z1);
+    const h = 2.5 + Math.sin(i*1.3)*1.2;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,len+0.3,6), railMat);
+    seg.rotation.z = Math.PI/2;
+    seg.rotation.y = -angle;
+    seg.position.set(midX, h, midZ);
+    themeparkDecorGroup.add(seg);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,h,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+    pillar.position.set(x1, h/2, z1);
+    themeparkDecorGroup.add(pillar);
+  }
+}
+makeMiniCoasterRail();
+
+// ティーカップ — colorful cups that slowly spin in place
+const teacups = [];
+function makeTeacups(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.7,0.2,20), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:70}));
+  base.position.y = 0.1;
+  g.add(base);
+  const colors = [0xFF8FA3,0x6BCBFF,0xFFD873];
+  for(let i=0;i<3;i++){
+    const a = (i/3)*Math.PI*2;
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.35,0.5,16), new THREE.MeshPhongMaterial({color:colors[i], shininess:100}));
+    cup.position.set(Math.cos(a)*0.9, 0.45, Math.sin(a)*0.9);
+    g.add(cup);
+    teacups.push({ mesh:cup, phase:i });
+  }
+  g.add(makeBlobShadow(1.8));
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+}
+makeTeacups(20,-16);
+
+// 風船アーチ — a colorful balloon arch
+function makeBalloonArch(x,z,rotY){
+  const g = new THREE.Group();
+  const colors = [0xFF8FA3,0xFFD873,0x6FE0C2,0x8FC7FF,0xB9A6E8];
+  const archRadius = 1.6, count = 9;
+  for(let i=0;i<count;i++){
+    const a = (i/(count-1)) * Math.PI;
+    const balloon = new THREE.Mesh(new THREE.SphereGeometry(0.24,12,10), new THREE.MeshLambertMaterial({color:colors[i%colors.length]}));
+    balloon.position.set(Math.cos(a)*archRadius, 0.6 + Math.sin(a)*archRadius, 0);
+    g.add(balloon);
+  }
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  themeparkDecorGroup.add(g);
+}
+makeBalloonArch(0,10,0);
+makeBalloonArch(10,-14,Math.PI/2);
+
+// のぼり旗 — small flag banners dotted along the paths
+function makeFlagBanner(x,z,color){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,1.6,6), new THREE.MeshLambertMaterial({color:0xE4E6EE}));
+  pole.position.y = 0.8;
+  g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.35,0.9), new THREE.MeshBasicMaterial({color, side:THREE.DoubleSide}));
+  flag.position.set(0.19,1.15,0);
+  g.add(flag);
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+}
+[[5,5,0xFF6BC4],[-5,-5,0x6BCBFF],[19,3,0xFFD93D],[-15,5,0x9B6BFF],[3,-8,0xFF6BC4],[-8,8,0x6BCBFF]]
+  .forEach(([x,z,c]) => makeFlagBanner(x,z,c));
+
+// キャンディー・ロリポップの巨大オブジェ — twisted candy sculptures
+function makeGiantCandy(x,z,color){
+  const g = new THREE.Group();
+  const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.2,8), new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+  stick.position.y = 0.6;
+  g.add(stick);
+  const swirl = new THREE.Mesh(new THREE.TorusGeometry(0.42,0.13,10,20), new THREE.MeshPhongMaterial({color, shininess:100}));
+  swirl.rotation.x = Math.PI/2.3;
+  swirl.position.y = 1.5;
+  g.add(swirl);
+  const swirl2 = new THREE.Mesh(new THREE.TorusGeometry(0.3,0.1,10,20), new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:100}));
+  swirl2.rotation.x = Math.PI/2.3;
+  swirl2.position.y = 1.6;
+  g.add(swirl2);
+  g.add(makeBlobShadow(0.5));
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+}
+makeGiantCandy(-2,20,0xFF8FA3);
+makeGiantCandy(3,20,0x6BCBFF);
+makeGiantCandy(-16,-20,0xFFD873);
+
+// 光る噴水 — a fountain that slowly cycles through colors, reusing the
+// pond-style base with an added upward water jet
+let fountainWaterMat = null;
+function makeGlowFountain(x,z){
+  const g = new THREE.Group();
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.7,0.3,24), new THREE.MeshLambertMaterial({color:0xE4E6EE}));
+  basin.position.y = 0.15;
+  g.add(basin);
+  const waterMat = new THREE.MeshBasicMaterial({color:0x6BCBFF, transparent:true, opacity:0.75});
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,0.15,24), waterMat);
+  water.position.y = 0.32;
+  g.add(water);
+  const jet = new THREE.Mesh(new THREE.ConeGeometry(0.12,1.2,8), waterMat);
+  jet.position.y = 1.0;
+  g.add(jet);
+  const jetTip = new THREE.Mesh(new THREE.SphereGeometry(0.18,10,10), waterMat);
+  jetTip.position.y = 1.6;
+  g.add(jetTip);
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+  fountainWaterMat = waterMat;
+}
+makeGlowFountain(0,-2);
+
+// 入口ゲートアーチ — a big arch with the park's name
+function makeThemeparkGateArch(x,z){
+  const g = new THREE.Group();
+  const postMat = new THREE.MeshPhongMaterial({color:0xFF6BC4, shininess:90});
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.28,3.4,10), postMat);
+    post.position.set(side*2.4, 1.7, 0);
+    g.add(post);
+  });
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(2.4,0.22,10,24,Math.PI), postMat);
+  arch.position.set(0,3.4,0);
+  g.add(arch);
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(4,4,504,88,20) : ctx.rect(4,4,504,88);
+  ctx.fill();
+  ctx.font = '700 42px sans-serif';
+  ctx.fillStyle = '#FF6BC4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ゆめのくにテーマパーク', 256, 50);
+  const tex = new THREE.CanvasTexture(canvas);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.4,0.85), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
+  sign.position.set(0,3.9,0.3);
+  g.add(sign);
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+}
+makeThemeparkGateArch(0,26);
+
+// ポップコーン・わたあめの屋台
+function makeSnackStand(x,z,roofColor,topColor){
+  const g = new THREE.Group();
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.65,0.65), new THREE.MeshPhongMaterial({color:0xFFF3EC, shininess:70}));
+  counter.position.y = 0.32;
+  g.add(counter);
+  const awning = new THREE.Mesh(new THREE.ConeGeometry(1.1,0.7,4), new THREE.MeshLambertMaterial({color:roofColor}));
+  awning.rotation.y = Math.PI/4;
+  awning.position.y = 1.15;
+  g.add(awning);
+  const jar = new THREE.Mesh(new THREE.SphereGeometry(0.24,12,10), new THREE.MeshBasicMaterial({color:topColor, transparent:true, opacity:0.85}));
+  jar.position.set(0,0.75,0.15);
+  g.add(jar);
+  g.add(makeBlobShadow(1.0));
+  g.position.set(x,0,z);
+  themeparkDecorGroup.add(g);
+}
+makeSnackStand(-20,4, 0xFFD873, 0xFFFFFF);   // popcorn
+makeSnackStand(20,4, 0xFF8FA3, 0xFFB3D9);    // cotton candy
+
 /* ---------- butterflies (simple animated sprites) ---------- */
 const butterflies = [];
 function makeButterfly(x,z){
@@ -3970,9 +4315,14 @@ const landmarks = [
   { ...makeRobotCafe(-16,-2), id:'robotcafe', type:'robotcafe', title:'ロボットカフェ', sub:'えいごで注文してみよう', emoji:'☕', bg:'6BCBFF', label:'☕ 注文する' },
   { ...makeNewsKiosk(18,-2), id:'news', type:'news', title:'速報ニュース', sub:'みらいの街のニュースを見る', emoji:'📰', bg:'FF6BC4', label:'📰 ニュースを見る' },
   { ...makeSmartHomePod(-19,-8), id:'smarthome', type:'smarthome', title:'スマートホーム', sub:'おうちロボに指示してみよう', emoji:'🏠', bg:'6BCBFF', label:'🏠 指示する' },
+  { ...makeCoasterGate(18,10), id:'coaster', type:'coaster', title:'ローラーコースター', sub:'指示についていこう！', emoji:'🎢', bg:'FF6B9D', label:'🎢 のる' },
+  { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
+  { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome']);
+// these are themepark-only, alongside the maze gate
+const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda']);
 landmarks.forEach(l => scene.add(l.group));
 
 /* =========================================================
@@ -4640,6 +4990,15 @@ function animate(){
   }
 
   checkMazeGoal();
+  if(themeparkDecorGroup.visible){
+    if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
+    if(carouselGroup){
+      carouselGroup.rotation.y = t*0.5;
+      carouselMounts.forEach(m=>{ m.mesh.position.y = m.baseY + Math.sin(t*2 + m.phase)*0.12; });
+    }
+    teacups.forEach(c=>{ c.mesh.rotation.y = t*1.2 + c.phase; });
+    if(fountainWaterMat) fountainWaterMat.color.setHSL((t*0.08)%1, 0.65, 0.62);
+  }
 
   // camera follow (third person, behind player)
   const camOffset = new THREE.Vector3(
@@ -5677,6 +6036,201 @@ function renderSmartHome(landmark){
   nextBtn.onclick = ()=> renderSmartHome(landmark);
 }
 
+/* ---------- ローラーコースター: timed command-matching reaction game ---------- */
+const COASTER_COMMANDS = [
+  { en:"Duck down!", ja:"頭を下げて！", emoji:"🙆" },
+  { en:"Raise your hands!", ja:"両手を上げて！", emoji:"🙌" },
+  { en:"Hold on tight!", ja:"しっかりつかまって！", emoji:"💪" },
+  { en:"Wave your arms!", ja:"腕を振って！", emoji:"👋" },
+  { en:"Look up!", ja:"上を見て！", emoji:"👀" },
+  { en:"Scream!", ja:"叫んで！", emoji:"😱" },
+];
+const COASTER_ROUNDS = 6;
+const COASTER_TIME_MS = 2800;
+let coasterRound = 0;
+let coasterScore = 0;
+let coasterTimer = null;
+
+function renderCoasterIntro(landmark){
+  coasterRound = 0;
+  coasterScore = 0;
+  if(coasterTimer) clearTimeout(coasterTimer);
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#FF6B9D;">🎢 ローラーコースター</span>
+    <div class="dialogue-bubble"><span class="en">Ready for the ride? Follow my commands!</span><span class="ja">準備はいい？指示についてきてね！</span></div>
+  `;
+  speakEnglish("Ready for the ride? Follow my commands!");
+  nextBtn.textContent = 'スタート！ 🎢';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderCoasterRound(landmark);
+}
+
+function renderCoasterRound(landmark){
+  if(coasterTimer) clearTimeout(coasterTimer);
+  if(coasterRound >= COASTER_ROUNDS){ renderCoasterResult(landmark); return; }
+  coasterRound++;
+  nextBtn.classList.remove('show');
+
+  const correct = COASTER_COMMANDS[Math.floor(Math.random()*COASTER_COMMANDS.length)];
+  const distractors = shuffle(COASTER_COMMANDS.filter(c=>c!==correct)).slice(0,3);
+  const options = shuffle([correct, ...distractors]);
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#FF6B9D;">🎢 ${coasterRound}/${COASTER_ROUNDS}</span>
+    <div class="dialogue-bubble"><span class="en">${correct.en}</span><span class="ja">${correct.ja}</span></div>
+    <div class="coaster-timerbar"><div class="coaster-timerfill" id="coasterFill"></div></div>
+    <div class="choices" id="coasterChoices"></div>
+  `;
+  speakEnglish(correct.en);
+
+  const fill = document.getElementById('coasterFill');
+  requestAnimationFrame(()=>{
+    fill.style.transition = `width ${COASTER_TIME_MS}ms linear`;
+    fill.style.width = '0%';
+  });
+
+  let answered = false;
+  const cw = document.getElementById('coasterChoices');
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.innerHTML = `${opt.emoji}<br>${opt.en}`;
+    btn.onclick = ()=>{
+      if(answered) return;
+      answered = true;
+      clearTimeout(coasterTimer);
+      handleCoasterAnswer(opt === correct, landmark);
+    };
+    cw.appendChild(btn);
+  });
+
+  coasterTimer = setTimeout(()=>{
+    if(answered) return;
+    answered = true;
+    handleCoasterAnswer(false, landmark);
+  }, COASTER_TIME_MS);
+}
+
+function handleCoasterAnswer(correct, landmark){
+  if(correct){
+    coasterScore++;
+    coins += 1;
+    updateCoinHUD();
+    saveProgress();
+    playCorrectSound();
+  } else {
+    playWrongSound();
+  }
+  setTimeout(()=> renderCoasterRound(landmark), 450);
+}
+
+function renderCoasterResult(landmark){
+  if(coasterTimer) clearTimeout(coasterTimer);
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#FF6B9D;">🎢 ライド終了！</span>
+    <div class="dialogue-bubble"><span class="en">You got ${coasterScore} out of ${COASTER_ROUNDS} right!</span><span class="ja">${COASTER_ROUNDS}問中${coasterScore}問正解！</span></div>
+    <div class="feedback-banner correct">🎉 +${coasterScore}🪙</div>
+  `;
+  speakEnglish(`You got ${coasterScore} out of ${COASTER_ROUNDS} right! Great job!`);
+  burstSparkles(document.querySelector('.feedback-banner'));
+  nextBtn.textContent = 'もう一回 🎢';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderCoasterIntro(landmark);
+}
+
+/* ---------- ハウス・オブ・ホラー: AI-generated spooky-but-fun story ---------- */
+const HORROR_FALLBACK = [
+  { en:"A friendly ghost cat lives in the old tower.", ja:"古い塔には、人なつっこい幽霊猫が住んでいます。", keyWord:"ghost", explain:"「ghost」は『幽霊』という意味の名詞だよ。" },
+  { en:"Something whispered in the dark hallway.", ja:"暗い廊下で、何かがささやきました。", keyWord:"whispered", explain:"「whisper」は『ささやく』という意味の動詞だよ。" },
+  { en:"A spooky spider wove a web by the window.", ja:"不気味なクモが窓のそばに巣を張りました。", keyWord:"spooky", explain:"「spooky」は『不気味な、ちょっと怖い』という意味の形容詞だよ。" },
+];
+async function generateHorrorStory(){
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、ちょっと不気味だけど楽しい「ハウス・オブ・ホラー」の語り手です。
+子どもが楽しめる、怖すぎない「ちょっと不気味で面白い」お話を英語で1文作ってください。
+条件：
+- 英検準2級レベルの、10語以内のやさしい英文にすること
+- 本当に怖い・グロテスクな内容は絶対に避け、幽霊やお化けを「ちょっと変な・面白い」トーンで描くこと
+- 文中で使われている単語・熟語のうち、学習にちょうどいいものを1つ選び、keyWord としてそのまま書き出し、その意味・使い方を日本語でやさしく説明すること
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"en":"英文","ja":"その日本語訳","keyWord":"文中の単語・熟語","explain":"その単語の意味・使い方の説明（日本語）"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.en || !parsed.ja) return null;
+    return parsed;
+  } catch(e){
+    return null;
+  }
+}
+async function renderHouseOfHorror(landmark){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">👻</div>
+    <p>お話を考え中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const generated = await generateHorrorStory();
+  const pick = generated || HORROR_FALLBACK[Math.floor(Math.random()*HORROR_FALLBACK.length)];
+
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#3A2F55;">👻 ハウス・オブ・ホラー</span>
+    <div class="dialogue-bubble"><span class="en">${pick.en}</span></div>
+    <button class="speak-btn" id="lmSpeak" style="align-self:center;">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    </button>
+    <div class="ja-hint">${pick.ja}</div>
+    ${vocabCallout(pick.keyWord, pick.explain)}
+  `;
+  document.getElementById('lmSpeak').onclick = ()=> speakEnglish(pick.en);
+  speakEnglish(pick.en);
+  nextBtn.textContent = 'つぎのお話 👻';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderHouseOfHorror(landmark);
+}
+
+/* ---------- パンダのプーちゃん: mascot greeting ---------- */
+const PANDA_REACTIONS = [
+  { en:"Give me a high five!", ja:"ハイタッチしよう！", reply:"Yay! That was fun!", replyJa:"やった！楽しかった！" },
+  { en:"Let's take a photo together!", ja:"一緒に写真を撮ろう！", reply:"Say cheese! 📸", replyJa:"はい、チーズ！📸" },
+  { en:"Come here for a big hug!", ja:"こっちに来てハグしよう！", reply:"Aww, thank you!", replyJa:"わぁ、ありがとう！" },
+  { en:"Let's wave to everyone!", ja:"みんなに手を振ろう！", reply:"They waved back!", replyJa:"みんなも手を振り返してくれたよ！" },
+];
+function renderPandaMascot(landmark){
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
+    <div class="dialogue-bubble"><span class="en">Hi there! Nice to meet you!</span><span class="ja">やあ！会えてうれしいな！</span></div>
+    <div class="choices" id="pandaChoices"></div>
+  `;
+  speakEnglish("Hi there! Nice to meet you!");
+  nextBtn.classList.remove('show');
+  const cw = document.getElementById('pandaChoices');
+  PANDA_REACTIONS.forEach(r=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = r.en;
+    btn.onclick = ()=> reactWithPanda(r, landmark);
+    cw.appendChild(btn);
+  });
+}
+function reactWithPanda(r, landmark){
+  coins += 1;
+  updateCoinHUD();
+  saveProgress();
+  playCorrectSound();
+  quizBody.innerHTML = `
+    <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
+    <div class="dialogue-bubble"><span class="en">${r.en}</span><span class="ja">${r.ja}</span></div>
+    <div class="feedback-banner correct">✅ +1🪙</div>
+    <div class="reaction-bubble"><span class="en">${r.reply}</span><span class="ja">${r.replyJa}</span></div>
+  `;
+  speakEnglish(`${r.en} ${r.reply}`);
+  burstSparkles(document.querySelector('.feedback-banner'));
+  nextBtn.textContent = 'また あいさつする 🐼';
+  nextBtn.classList.add('show');
+  nextBtn.onclick = ()=> renderPandaMascot(landmark);
+}
+
 /* ---------- ねこロボ: rock-paper-scissors minigame ---------- */
 const RPS_CHOICES = [
   { key:'rock', emoji:'✊', en:'Rock', ja:'グー' },
@@ -5804,6 +6358,15 @@ function renderLandmarkContent(landmark){
 
   } else if(landmark.type === 'smarthome'){
     renderSmartHome(landmark);
+
+  } else if(landmark.type === 'coaster'){
+    renderCoasterIntro(landmark);
+
+  } else if(landmark.type === 'horror'){
+    renderHouseOfHorror(landmark);
+
+  } else if(landmark.type === 'panda'){
+    renderPandaMascot(landmark);
   }
 }
 
@@ -5910,6 +6473,7 @@ function npcGreeting(){
 function closeQuiz(){
   quizOpen = false;
   quizOverlay.classList.remove('show');
+  if(coasterTimer){ clearTimeout(coasterTimer); coasterTimer = null; }
 }
 
 function showAllDone(){
@@ -6831,8 +7395,10 @@ updateIslandUI();
 updateWordPercent();
 npcs.forEach(n=>{ n.mesh.visible = (n.def.world === currentIslandId); });
 mazeGateLandmark.group.visible = (currentIslandId === 'themepark');
+themeparkDecorGroup.visible = (currentIslandId === 'themepark');
 landmarks.forEach(l=>{
   if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'city');
+  if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'themepark');
 });
 
 </script>
