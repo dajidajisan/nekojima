@@ -3363,19 +3363,34 @@ cityGroup.add(makeChromeBridge(-5,-6,Math.PI*0.06));
 // large digital vision billboard — a big glowing screen with scrolling
 // English words, mounted at height on a slim pole
 const digitalVisionScreens = [];
-function makeDigitalVision(x,z,rotY){
+function makeDigitalVision(x,z,rotY,words){
+  const tickerText = words.join('   ✦   ') + '   ✦   ';
+
+  // measure the full text first, then size the canvas to fit it exactly —
+  // this was the bug: a fixed 512px canvas was narrower than the actual
+  // text, so it got cut off mid-word and the loop seam read as garbage
+  // (e.g. "...TECHNOL" immediately followed by "FUTURE..." = "technolfuture")
+  const measureCanvas = document.createElement('canvas');
+  const mctx = measureCanvas.getContext('2d');
+  mctx.font = '700 46px sans-serif';
+  const textWidth = Math.ceil(mctx.measureText(tickerText).width);
+
   const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 128;
+  canvas.width = textWidth;
+  canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#0A1A3A';
-  ctx.fillRect(0,0,512,128);
+  ctx.fillRect(0,0,canvas.width,128);
   ctx.font = '700 46px sans-serif';
   ctx.fillStyle = '#6BCBFF';
   ctx.textBaseline = 'middle';
-  const words = ['FUTURE','TECHNOLOGY','DREAM BIG','ADVENTURE','DISCOVER','EXPLORE'];
-  ctx.fillText(words.join('   ✦   ') + '   ✦   ', 0, 64);
+  ctx.fillText(tickerText, 0, 64);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
+  // show only a natural-size window of the (now wider) canvas at once,
+  // matching the original visible width, so the text doesn't shrink to
+  // fit the whole phrase into the screen's fixed physical size
+  tex.repeat.x = 512 / canvas.width;
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(3.6,0.9), new THREE.MeshBasicMaterial({map:tex}));
   const frame = new THREE.Mesh(new THREE.BoxGeometry(3.8,1.1,0.08), new THREE.MeshLambertMaterial({color:0x2A2F45}));
   frame.position.z = -0.05;
@@ -3388,8 +3403,12 @@ function makeDigitalVision(x,z,rotY){
   cityGroup.add(g);
   digitalVisionScreens.push(tex);
 }
-makeDigitalVision(4,-11,0);
-makeDigitalVision(-16,9,Math.PI*0.6);
+// 4 billboards, each cycling a different set of ~10 Eiken pre-2 level
+// words chosen for a positive, future-city feel
+makeDigitalVision(4,-11,0, ['FUTURE','TECHNOLOGY','DREAM BIG','ADVENTURE','DISCOVER','EXPLORE']);
+makeDigitalVision(-16,9,Math.PI*0.6, ['ACHIEVE','CREATE','IMAGINE','CONNECT','INSPIRE','INVENT','IMPROVE','SUCCEED','DISCOVER','EXPLORE']);
+makeDigitalVision(19,16,Math.PI*1.1, ['AMAZING','WONDERFUL','BRILLIANT','POSSIBLE','POWERFUL','ADVANCED','MODERN','BRIGHT','SMART','ORIGINAL']);
+makeDigitalVision(-7,-20,Math.PI*0.3, ['JOURNEY','ADVENTURE','PROGRESS','CHALLENGE','OPPORTUNITY','DREAM','GROWTH','VISION','HARMONY','FUTURE']);
 
 // glowing vending-machine robot
 function makeVendingBot(x,z){
