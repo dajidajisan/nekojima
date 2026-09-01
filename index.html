@@ -4159,10 +4159,8 @@ function makeFloatingMarker(emoji, y){
   ctx3.textAlign='center'; ctx3.textBaseline='middle';
   ctx3.fillText(emoji, 128, 136);
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true }));
-  spr.scale.set(4.8,4.8,1); // 8x the original 0.6 display size
-  // shift up to compensate for the much bigger sprite, so its bottom
-  // edge still clears the structure below instead of clipping into it
-  spr.position.set(0, y + 2.1, 0);
+  spr.scale.set(3.0,3.0,1); // 5x the original 0.6 display size
+  spr.position.set(0,y,0);
   return spr;
 }
 
