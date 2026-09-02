@@ -4893,9 +4893,23 @@ let playerFacing = 0;
 const INTERACT_DIST = 2.6;
 let nearNPC = null;
 let nearLandmark = null;
+let quizOpen = false;
 const interactBtn = document.getElementById('interactBtn');
 const hintPill = document.getElementById('hintPill');
 setTimeout(()=> hintPill.classList.add('hide'), 4500);
+
+// TEMPORARY debug indicators — remove once the interact-button issue is
+// confirmed fixed. Two separate elements: one shows LIVE per-frame state
+// (updates 60x/sec), the other is a click-time snapshot that stays put
+// until the next click (otherwise the live one would overwrite it
+// instantly, making it unreadable).
+const interactDebugEl = document.createElement('div');
+interactDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
+document.body.appendChild(interactDebugEl);
+const interactClickLogEl = document.createElement('div');
+interactClickLogEl.style.cssText = 'position:fixed; top:30px; left:4px; z-index:9999; background:rgba(200,40,40,0.85); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
+interactClickLogEl.textContent = '（まだクリックされていません）';
+document.body.appendChild(interactClickLogEl);
 
 // returns [x,z] along the monorail loop at progress t (0..1)
 function monorailPointAt(t){
@@ -5074,7 +5088,6 @@ window.addEventListener('resize', ()=>{
 /* =========================================================
    QUIZ LOGIC
 ========================================================= */
-let quizOpen = false;
 let activeNPC = null;
 let activeQueue = [];
 let quizIndex = 0;
@@ -5735,19 +5748,6 @@ function lrDraw(){
   }
 }
 
-
-// TEMPORARY debug indicators — remove once the interact-button issue is
-// confirmed fixed. Two separate elements: one shows LIVE per-frame state
-// (updates 60x/sec), the other is a click-time snapshot that stays put
-// until the next click (otherwise the live one would overwrite it
-// instantly, making it unreadable).
-const interactDebugEl = document.createElement('div');
-interactDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
-document.body.appendChild(interactDebugEl);
-const interactClickLogEl = document.createElement('div');
-interactClickLogEl.style.cssText = 'position:fixed; top:30px; left:4px; z-index:9999; background:rgba(200,40,40,0.85); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
-interactClickLogEl.textContent = '（まだクリックされていません）';
-document.body.appendChild(interactClickLogEl);
 
 interactBtn.addEventListener('click', ()=>{
   interactClickLogEl.textContent = `クリック時: nearNPC=${nearNPC?nearNPC.def.name:'null'} nearLandmark=${nearLandmark?nearLandmark.type:'null'} quizOpen=${quizOpen}`;
