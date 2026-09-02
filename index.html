@@ -2721,7 +2721,7 @@ const ISLANDS = [
   {
     id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
-    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9], future:[6,15], robot:[-14,-11] },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-13,-9], future:[6,15], robot:[17,-14] },
   },
   {
     id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
@@ -3832,10 +3832,10 @@ function updateSkyPodRide(dt){
     player.position.set(RIDE_STATION_POS.x, 0, RIDE_STATION_POS.z);
     player.rotation.z = 0;
     flyingPodMesh.visible = false;
-    coins += 3;
+    coins += 1;
     updateCoinHUD();
     saveProgress();
-    showToast('🚀 空中散歩、おつかれさま！ +3🪙');
+    showToast('🚀 空中散歩、おつかれさま！ +1🪙');
     const el = document.getElementById('rideCaption');
     if(el) el.style.opacity = '0';
   }
@@ -4067,21 +4067,31 @@ makeCarousel(-6,-2);
 // through the air, no functional ride (matches the "mini/decorative"
 // scope, keeps zero collision risk)
 function makeMiniCoasterRail(){
-  const points = [[-22,-24],[-15,-22],[-10,-26],[-4,-22],[-2,-16],[-8,-12],[-14,-15],[-20,-18]];
-  const railMat = new THREE.MeshPhongMaterial({color:0xFFD93D, shininess:100});
-  for(let i=0;i<points.length;i++){
-    const [x1,z1] = points[i], [x2,z2] = points[(i+1)%points.length];
-    const midX=(x1+x2)/2, midZ=(z1+z2)/2;
-    const len = Math.hypot(x2-x1,z2-z1);
-    const angle = Math.atan2(x2-x1,z2-z1);
-    const h = 2.5 + Math.sin(i*1.3)*1.2;
-    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,len+0.3,6), railMat);
-    seg.rotation.z = Math.PI/2;
-    seg.rotation.y = -angle;
-    seg.position.set(midX, h, midZ);
-    themeparkDecorGroup.add(seg);
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,h,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
-    pillar.position.set(x1, h/2, z1);
+  // control points (with height baked in per-point, so it interpolates
+  // smoothly along the whole curve — the old version computed height
+  // per SEGMENT instead, causing a visible jump/kink at every joint)
+  const points3d = [
+    [-25,-27,2.5], [-17,-21,5.5], [-8,-25,8], [1,-19,5],
+    [8,-25,6.5], [14,-18,3.5], [10,-9,5.5], [1,-7,8],
+    [-8,-5,4.5], [-17,-8,6.5], [-24,-15,3],
+  ].map(([x,z,y]) => new THREE.Vector3(x,y,z));
+  const curve = new THREE.CatmullRomCurve3(points3d, true, 'catmullrom', 0.4);
+  const railMat = new THREE.MeshPhongMaterial({color:0xFFD93D, shininess:110});
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 220, 0.16, 8, true), railMat);
+  themeparkDecorGroup.add(tube);
+  // a thinner second rail alongside, for a proper twin-track look
+  const railMat2 = new THREE.MeshPhongMaterial({color:0xFF6BC4, shininess:110});
+  const offsetPoints = points3d.map(p => p.clone().add(new THREE.Vector3(0.35,0.05,0)));
+  const curve2 = new THREE.CatmullRomCurve3(offsetPoints, true, 'catmullrom', 0.4);
+  const tube2 = new THREE.Mesh(new THREE.TubeGeometry(curve2, 220, 0.1, 6, true), railMat2);
+  themeparkDecorGroup.add(tube2);
+  // support pillars at intervals along the curve
+  const pillarMat = new THREE.MeshLambertMaterial({color:0xAEB4C7});
+  const pillarCount = 18;
+  for(let i=0;i<pillarCount;i++){
+    const p = curve.getPointAt(i/pillarCount);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.12,p.y,6), pillarMat);
+    pillar.position.set(p.x, p.y/2, p.z);
     themeparkDecorGroup.add(pillar);
   }
 }
@@ -4089,20 +4099,52 @@ makeMiniCoasterRail();
 
 // ティーカップ — colorful cups that slowly spin in place
 const teacups = [];
+function makeCupStripeTexture(baseHex, accentHex){
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#' + baseHex.toString(16).padStart(6,'0');
+  ctx.fillRect(0,0,128,64);
+  ctx.fillStyle = '#' + accentHex.toString(16).padStart(6,'0');
+  for(let i=-1;i<8;i++){
+    ctx.beginPath();
+    ctx.moveTo(i*16, 0);
+    ctx.lineTo(i*16+8, 0);
+    ctx.lineTo(i*16+16, 64);
+    ctx.lineTo(i*16+8, 64);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  return tex;
+}
 function makeTeacups(x,z){
   const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.7,0.2,20), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:70}));
-  base.position.y = 0.1;
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.6,0.25,28), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:80}));
+  base.position.y = 0.13;
   g.add(base);
-  const colors = [0xFF8FA3,0x6BCBFF,0xFFD873];
-  for(let i=0;i<3;i++){
-    const a = (i/3)*Math.PI*2;
-    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.35,0.5,16), new THREE.MeshPhongMaterial({color:colors[i], shininess:100}));
-    cup.position.set(Math.cos(a)*0.9, 0.45, Math.sin(a)*0.9);
+  const hub = new THREE.Mesh(new THREE.ConeGeometry(0.5,1.0,16), new THREE.MeshPhongMaterial({color:0xFFD873, shininess:100}));
+  hub.position.y = 0.8;
+  g.add(hub);
+  const colorPairs = [[0xFF8FA3,0xFFFFFF],[0x6BCBFF,0xFFFFFF],[0xFFD873,0xFF8FA3],[0xB9A6E8,0xFFFFFF]];
+  const cupCount = colorPairs.length;
+  for(let i=0;i<cupCount;i++){
+    const a = (i/cupCount)*Math.PI*2;
+    const stripeTex = makeCupStripeTexture(colorPairs[i][0], colorPairs[i][1]);
+    const cup = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.85,0.6,0.85,20,1,true),
+      new THREE.MeshPhongMaterial({map:stripeTex, shininess:110, side:THREE.DoubleSide})
+    );
+    cup.position.set(Math.cos(a)*1.6, 0.7, Math.sin(a)*1.6);
     g.add(cup);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.85,0.06,8,20), new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:120}));
+    rim.rotation.x = Math.PI/2;
+    rim.position.set(Math.cos(a)*1.6, 1.12, Math.sin(a)*1.6);
+    g.add(rim);
     teacups.push({ mesh:cup, phase:i });
   }
-  g.add(makeBlobShadow(1.8));
+  g.add(makeBlobShadow(2.8));
   g.position.set(x,0,z);
   themeparkDecorGroup.add(g);
 }
@@ -4159,9 +4201,9 @@ function makeGiantCandy(x,z,color){
   g.position.set(x,0,z);
   themeparkDecorGroup.add(g);
 }
-makeGiantCandy(-2,20,0xFF8FA3);
-makeGiantCandy(3,20,0x6BCBFF);
-makeGiantCandy(-16,-20,0xFFD873);
+makeGiantCandy(-8,20,0xFF8FA3);
+makeGiantCandy(8,20,0x6BCBFF);
+makeGiantCandy(-16,-26,0xFFD873);
 
 // 光る噴水 — a fountain that slowly cycles through colors, reusing the
 // pond-style base with an added upward water jet
@@ -4218,7 +4260,7 @@ function makeThemeparkGateArch(x,z){
   g.position.set(x,0,z);
   themeparkDecorGroup.add(g);
 }
-makeThemeparkGateArch(0,26);
+makeThemeparkGateArch(0,29);
 
 // ポップコーン・わたあめの屋台
 function makeSnackStand(x,z,roofColor,topColor){
@@ -6452,43 +6494,125 @@ async function renderHouseOfHorror(landmark){
 }
 
 /* ---------- パンダのプーちゃん: mascot greeting ---------- */
-const PANDA_REACTIONS = [
-  { en:"Give me a high five!", ja:"ハイタッチしよう！", reply:"Yay! That was fun!", replyJa:"やった！楽しかった！" },
-  { en:"Let's take a photo together!", ja:"一緒に写真を撮ろう！", reply:"Say cheese! 📸", replyJa:"はい、チーズ！📸" },
-  { en:"Come here for a big hug!", ja:"こっちに来てハグしよう！", reply:"Aww, thank you!", replyJa:"わぁ、ありがとう！" },
-  { en:"Let's wave to everyone!", ja:"みんなに手を振ろう！", reply:"They waved back!", replyJa:"みんなも手を振り返してくれたよ！" },
+/* ---------- パンダのプーちゃん: free-form English writing practice ---------- */
+const PANDA_PROMPT_FALLBACK = [
+  { ja:"今日は天気がいいね。", hint:"It's nice weather today." },
+  { ja:"いっしょに公園に行かない？", hint:"Do you want to go to the park together?" },
+  { ja:"このケーキ、とてもおいしいよ。", hint:"This cake is very delicious." },
+  { ja:"明日は早く起きないといけないんだ。", hint:"I have to wake up early tomorrow." },
+  { ja:"新しいゲームを買ったよ。", hint:"I bought a new game." },
 ];
-function renderPandaMascot(landmark){
+
+async function generatePandaPrompt(){
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、人なつっこいパンダのキャラクターです。
+プレイヤーに英作文の練習をしてもらうため、あなたが話しかけたい内容を「日本語」で1文考えてください。
+条件：
+- 英検準2級レベルの単語・文法で英訳できる、やさしい日常会話の一文にすること（10語以内で英訳できる長さ）
+- あいさつ、誘い、感想、日常の出来事など、パンダが話しかけそうな自然な内容にすること
+- 毎回すこし違う内容にすること
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"ja":"日本語の一文"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || !parsed.ja) return null;
+    return { ja: parsed.ja };
+  } catch(e){
+    return null;
+  }
+}
+
+async function gradePandaAnswer(japaneseText, userEnglish){
+  const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームで、英作文を採点するやさしい先生です。
+以下の日本語を、プレイヤーが英語に訳しました。意味が正しく伝わっているか、3段階で採点してください。
+
+日本語の原文: "${japaneseText}"
+プレイヤーの英訳: "${userEnglish}"
+
+採点基準：
+- 3: 意味が正しく伝わる、自然な英文（多少の文法の細かいミスは許容してよい）
+- 2: 意味はだいたい伝わるが、単語や文法にはっきりした間違いがある
+- 1: 意味がほとんど伝わらない、または空欄・全く関係ない内容
+
+フィードバックは、小学生が読んでも分かる、やさしく前向きな日本語の一言にすること（間違いがあれば軽く教えてあげる、良ければしっかりほめる）。
+出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
+{"grade":3,"feedback":"日本語のフィードバック","modelAnswer":"自然な英訳の例"}`;
+  try{
+    const data = await callClaudeProxy(prompt);
+    const text = (data.content || []).map(b=>b.text||'').join('').trim();
+    const parsed = extractJSON(text);
+    if(!parsed || ![1,2,3].includes(parsed.grade)) return null;
+    return parsed;
+  } catch(e){
+    return null;
+  }
+}
+
+let currentPandaPrompt = null;
+
+async function renderPandaMascot(landmark){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">🐼</div>
+    <p>話したいことを考え中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const generated = await generatePandaPrompt();
+  currentPandaPrompt = generated || PANDA_PROMPT_FALLBACK[Math.floor(Math.random()*PANDA_PROMPT_FALLBACK.length)];
+
   quizBody.innerHTML = `
     <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
-    <div class="dialogue-bubble"><span class="en">Hi there! Nice to meet you!</span><span class="ja">やあ！会えてうれしいな！</span></div>
-    <div class="choices" id="pandaChoices"></div>
+    <div class="dialogue-bubble"><span class="ja" style="font-size:16px;">${currentPandaPrompt.ja}</span></div>
+    <div class="ja-hint">この日本語を、えいごにしてみよう！</div>
+    <div class="type-answer-row">
+      <input type="text" id="pandaAnswerInput" class="type-answer-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="えいごで にゅうりょく">
+      <button class="type-answer-submit" id="pandaAnswerSubmit">こたえる</button>
+    </div>
   `;
-  speakEnglish("Hi there! Nice to meet you!");
-  nextBtn.classList.remove('show');
-  const cw = document.getElementById('pandaChoices');
-  PANDA_REACTIONS.forEach(r=>{
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.textContent = r.en;
-    btn.onclick = ()=> reactWithPanda(r, landmark);
-    cw.appendChild(btn);
-  });
+  const input = document.getElementById('pandaAnswerInput');
+  const submit = document.getElementById('pandaAnswerSubmit');
+  const doSubmit = ()=>{
+    const val = input.value.trim();
+    if(!val) return;
+    submitPandaAnswer(val, landmark);
+  };
+  submit.onclick = doSubmit;
+  input.addEventListener('keydown', e=>{ if(e.key === 'Enter') doSubmit(); });
+  setTimeout(()=> input.focus(), 200);
 }
-function reactWithPanda(r, landmark){
-  coins += 1;
+
+async function submitPandaAnswer(userEnglish, landmark){
+  quizBody.innerHTML = `<div class="npc-done-panel">
+    <div class="emoji thinking-emoji">🐼</div>
+    <p>採点中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
+  </div>`;
+  nextBtn.classList.remove('show');
+
+  const result = await gradePandaAnswer(currentPandaPrompt.ja, userEnglish);
+  const grade = result ? result.grade : 2;
+  const feedback = result ? result.feedback : 'よくがんばったね！';
+  const modelAnswer = result ? result.modelAnswer : (currentPandaPrompt.hint || '');
+  const coinsEarned = grade; // 3/2/1 coins matching the grade
+
+  coins += coinsEarned;
   updateCoinHUD();
   saveProgress();
-  playCorrectSound();
+
+  const gradeLabel = grade === 3 ? '🌟 大成功！' : grade === 2 ? '✅ よくできました！' : '💪 もう少し！';
+  const bannerClass = grade === 3 ? 'correct' : grade === 2 ? 'correct' : 'wrong';
+  if(grade >= 2) playCorrectSound(); else playWrongSound();
+
   quizBody.innerHTML = `
     <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
-    <div class="dialogue-bubble"><span class="en">${r.en}</span><span class="ja">${r.ja}</span></div>
-    <div class="feedback-banner correct">✅ +1🪙</div>
-    <div class="reaction-bubble"><span class="en">${r.reply}</span><span class="ja">${r.replyJa}</span></div>
+    <div class="dialogue-bubble"><span class="ja" style="font-size:15px;">${currentPandaPrompt.ja}</span></div>
+    <div class="reaction-bubble"><span class="en">${userEnglish}</span></div>
+    <div class="feedback-banner ${bannerClass}">${gradeLabel} +${coinsEarned}🪙</div>
+    <div class="ja-hint">${feedback}</div>
+    ${vocabCallout(modelAnswer, 'こんな英文でもOK！')}
   `;
-  speakEnglish(`${r.en} ${r.reply}`);
-  burstSparkles(document.querySelector('.feedback-banner'));
-  nextBtn.textContent = 'また あいさつする 🐼';
+  if(grade === 3) burstSparkles(document.querySelector('.feedback-banner'));
+  nextBtn.textContent = 'つぎの練習 🐼';
   nextBtn.classList.add('show');
   nextBtn.onclick = ()=> renderPandaMascot(landmark);
 }
