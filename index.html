@@ -3718,6 +3718,93 @@ function exitMaze(){
   camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
 }
 
+/* =========================================================
+   SKY POD RIDE — a short automated scenic flight through the city.
+   Rather than free-roam vehicle controls (which would need a whole new
+   collision/physics system — exactly the kind of thing that's caused
+   repeated bugs for the maze), this animates player.position along a
+   fixed path over time. The camera already always follows
+   player.position, so it "just works" with zero new camera code.
+========================================================= */
+let rideActive = false;
+let rideElapsed = 0;
+const RIDE_DURATION = 16; // seconds
+const RIDE_STATION_POS = { x:-2, z:-6 };
+// waypoints: [x, z, y] — rises from the station, loops past several
+// city landmarks at altitude, then descends back to the station
+const RIDE_PATH = [
+  [-2,-6, 1], [3,-9, 4], [9,-8, 6.5], [15,-3, 7.5], [16,6, 7.5],
+  [9,10, 6.5], [0,9, 5], [-9,7, 4.5], [-14,0, 3], [-8,-6, 1.5], [-2,-6, 1],
+];
+const RIDE_CAPTIONS = [
+  { at:0.05, en:"Welcome aboard! Enjoy the view.", ja:"ようこそ！景色を楽しんでね。" },
+  { at:0.28, en:"Look! The towers shine at night.", ja:"見て！タワーが夜に光っているよ。" },
+  { at:0.52, en:"We're flying above the city now.", ja:"今、街の上空を飛んでいるよ。" },
+  { at:0.75, en:"Almost back to the station!", ja:"もうすぐ乗り場に戻るよ！" },
+];
+
+function rideCaption(text){
+  let el = document.getElementById('rideCaption');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'rideCaption';
+    el.style.cssText = 'position:fixed; bottom:90px; left:50%; transform:translateX(-50%); z-index:500; background:rgba(30,20,50,0.82); color:#fff; font-weight:700; padding:10px 18px; border-radius:14px; text-align:center; max-width:88vw; pointer-events:none; transition:opacity .3s;';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = text;
+  el.style.opacity = '1';
+  return el;
+}
+
+function boardSkyPod(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  rideElapsed = 0;
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  rideCaption(`<span style="font-size:14px;">${RIDE_CAPTIONS[0].en}</span><br><span style="font-size:12px; opacity:.85;">${RIDE_CAPTIONS[0].ja}</span>`);
+}
+
+function updateSkyPodRide(dt){
+  if(!rideActive) return;
+  rideElapsed += dt;
+  const t = Math.min(1, rideElapsed / RIDE_DURATION);
+
+  // walk along RIDE_PATH proportional to t
+  const segs = RIDE_PATH.length - 1;
+  const scaled = t * segs;
+  const i = Math.min(segs-1, Math.floor(scaled));
+  const localT = scaled - i;
+  const [x1,z1,y1] = RIDE_PATH[i], [x2,z2,y2] = RIDE_PATH[i+1];
+  player.position.set(
+    x1 + (x2-x1)*localT,
+    y1 + (y2-y1)*localT,
+    z1 + (z2-z1)*localT
+  );
+  player.rotation.y = Math.atan2(x2-x1, z2-z1);
+
+  // show captions as we pass each trigger point
+  RIDE_CAPTIONS.forEach(c=>{
+    if(!c._shown && t >= c.at){
+      c._shown = true;
+      rideCaption(`<span style="font-size:14px;">${c.en}</span><br><span style="font-size:12px; opacity:.85;">${c.ja}</span>`);
+    }
+  });
+
+  if(t >= 1){
+    rideActive = false;
+    RIDE_CAPTIONS.forEach(c=> c._shown = false); // reset for next ride
+    player.position.set(RIDE_STATION_POS.x, 0, RIDE_STATION_POS.z);
+    coins += 3;
+    updateCoinHUD();
+    saveProgress();
+    showToast('🚀 空中散歩、おつかれさま！ +3🪙');
+    const el = document.getElementById('rideCaption');
+    if(el) el.style.opacity = '0';
+  }
+}
+
 // small entrance-gate building in themepark — this is the ONLY maze
 // footprint inside the normal shared world
 function makeMazeGate(x,z){
@@ -3742,6 +3829,39 @@ function makeMazeGate(x,z){
 }
 const mazeGateLandmark = { ...makeMazeGate(-9,16), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
 // (registered into `landmarks` further down, once that array actually exists — see near its declaration)
+
+// sky pod boarding platform: a landing pad + a sleek parked pod vehicle.
+// Riding it doesn't hand the player free-roam controls (that's a much
+// bigger, riskier undertaking) — instead, boarding starts a short
+// automated scenic flight along a preset path through the city, with
+// English narration, then returns control to the player. This reuses
+// the existing camera-follow logic entirely (it always follows
+// player.position, so animating that position along a path "just works"
+// with zero new camera code).
+function makeSkyPodStation(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.7,0.15,24), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:80}));
+  pad.position.y = 0.08;
+  g.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5,0.05,8,32), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = 0.17;
+  g.add(ring);
+  // parked pod (matches the hover-vehicle visual style already used elsewhere)
+  const pod = new THREE.Mesh(new THREE.SphereGeometry(0.6,18,14), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:150, specular:0xffffff}));
+  pod.scale.set(1.3,0.55,1);
+  pod.position.y = 0.55;
+  g.add(pod);
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.36,14,10), new THREE.MeshPhongMaterial({color:0xBFE6FF, transparent:true, opacity:0.6, shininess:150}));
+  canopy.scale.set(1,0.8,1);
+  canopy.position.y = 0.78;
+  g.add(canopy);
+  const marker = makeFloatingMarker('🚀', 2.3);
+  g.add(marker);
+  g.add(makeBlobShadow(1.7));
+  g.position.set(x,0,z);
+  return { group:g, marker, pod };
+}
 
 // roller coaster entrance: a colorful looping track + a parked cart,
 // purely decorative — the actual "ride" is a 2D reaction minigame
@@ -4362,12 +4482,13 @@ const landmarks = [
   { ...makeRobotCafe(-16,-2), id:'robotcafe', type:'robotcafe', title:'ロボットカフェ', sub:'えいごで注文してみよう', emoji:'☕', bg:'6BCBFF', label:'☕ 注文する' },
   { ...makeNewsKiosk(18,-2), id:'news', type:'news', title:'速報ニュース', sub:'みらいの街のニュースを見る', emoji:'📰', bg:'FF6BC4', label:'📰 ニュースを見る' },
   { ...makeSmartHomePod(-19,-8), id:'smarthome', type:'smarthome', title:'スマートホーム', sub:'おうちロボに指示してみよう', emoji:'🏠', bg:'6BCBFF', label:'🏠 指示する' },
+  { ...makeSkyPodStation(-2,-6), id:'skypod', type:'skypod', title:'スカイポッド乗り場', sub:'空中散歩に出発しよう', emoji:'🚀', bg:'FF6B9D', label:'🚀 のりこむ' },
   { ...makeCoasterGate(18,10), id:'coaster', type:'coaster', title:'ローラーコースター', sub:'指示についていこう！', emoji:'🎢', bg:'FF6B9D', label:'🎢 のる' },
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
-const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome']);
+const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda']);
 landmarks.forEach(l => scene.add(l.group));
@@ -4747,7 +4868,7 @@ let tapMarkerTimer = 0;
 
 canvas.addEventListener('pointerdown', e=>{
   if(isTouchOnUI(e.target)) return;
-  if(quizOpen) return;
+  if(quizOpen || rideActive) return;
 
   const ndc = new THREE.Vector2(
     (e.clientX / window.innerWidth) * 2 - 1,
@@ -4931,7 +5052,7 @@ function animate(){
   // there's no direction vector to reinterpret every frame, so there's
   // no reference-frame or feedback-loop bug for the controls to hide in.
   let moving = false;
-  if(moveTarget && !quizOpen){
+  if(moveTarget && !quizOpen && !rideActive){
     const dx = moveTarget.x - player.position.x;
     const dz = moveTarget.z - player.position.z;
     const dist = Math.hypot(dx, dz);
@@ -5053,6 +5174,7 @@ function animate(){
   }
 
   checkMazeGoal();
+  updateSkyPodRide(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -5753,6 +5875,7 @@ interactBtn.addEventListener('click', ()=>{
   interactClickLogEl.textContent = `クリック時: nearNPC=${nearNPC?nearNPC.def.name:'null'} nearLandmark=${nearLandmark?nearLandmark.type:'null'} quizOpen=${quizOpen}`;
   if(nearNPC) openQuiz(nearNPC);
   else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
+  else if(nearLandmark && nearLandmark.type === 'skypod') boardSkyPod(nearLandmark);
   else if(nearLandmark) openLandmark(nearLandmark);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
