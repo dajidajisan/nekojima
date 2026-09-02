@@ -4161,6 +4161,7 @@ function makeFloatingMarker(emoji, y){
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true }));
   spr.scale.set(1.8,1.8,1); // 3x the original 0.6 display size
   spr.position.set(0,y,0);
+  spr.userData.baseY = y;
   return spr;
 }
 
@@ -4996,13 +4997,15 @@ function animate(){
   });
   landmarks.forEach(l=>{
     if(!l.group.visible) return;
-    l.marker.position.y = 2.15 + Math.sin(t*2.5 + l.group.position.x)*0.1;
+    l.marker.position.y = l.marker.userData.baseY + Math.sin(t*2.5 + l.group.position.x)*0.1;
     if(l.ball) l.ball.rotation.y = t*0.6;
     if(l.star) l.star.rotation.y = t*0.8;
     const dist = player.position.distanceTo(l.group.position);
     if(dist < closestDist){ closestDist = dist; closest = l; closestKind = 'landmark'; }
   });
-  if(closest && closestDist < INTERACT_DIST){
+  const currentThreshold = (nearNPC || nearLandmark) ? INTERACT_DIST * 1.35 : INTERACT_DIST;
+  interactDebugEl.textContent = `毎フレーム: closest=${closest?(closestKind==='npc'?closest.def.name:closest.type):'なし'} dist=${closestDist.toFixed(2)} 判定基準=${currentThreshold.toFixed(2)} ボタン表示=${interactBtn.classList.contains('show')}`;
+  if(closest && closestDist < currentThreshold){
     nearNPC = closestKind === 'npc' ? closest : null;
     nearLandmark = closestKind === 'landmark' ? closest : null;
     interactBtn.textContent = closestKind === 'npc' ? '💬 はなしかける' : closest.label;
@@ -5733,7 +5736,21 @@ function lrDraw(){
 }
 
 
+// TEMPORARY debug indicators — remove once the interact-button issue is
+// confirmed fixed. Two separate elements: one shows LIVE per-frame state
+// (updates 60x/sec), the other is a click-time snapshot that stays put
+// until the next click (otherwise the live one would overwrite it
+// instantly, making it unreadable).
+const interactDebugEl = document.createElement('div');
+interactDebugEl.style.cssText = 'position:fixed; top:4px; left:4px; z-index:9999; background:rgba(0,0,0,0.75); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
+document.body.appendChild(interactDebugEl);
+const interactClickLogEl = document.createElement('div');
+interactClickLogEl.style.cssText = 'position:fixed; top:30px; left:4px; z-index:9999; background:rgba(200,40,40,0.85); color:#fff; font:11px monospace; padding:3px 8px; border-radius:6px; pointer-events:none; max-width:94vw;';
+interactClickLogEl.textContent = '（まだクリックされていません）';
+document.body.appendChild(interactClickLogEl);
+
 interactBtn.addEventListener('click', ()=>{
+  interactClickLogEl.textContent = `クリック時: nearNPC=${nearNPC?nearNPC.def.name:'null'} nearLandmark=${nearLandmark?nearLandmark.type:'null'} quizOpen=${quizOpen}`;
   if(nearNPC) openQuiz(nearNPC);
   else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
   else if(nearLandmark) openLandmark(nearLandmark);
