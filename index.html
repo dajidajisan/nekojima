@@ -3736,16 +3736,15 @@ const RIDE_STATION_POS = { x:-2, z:-6 };
 // reads as actually riding the pod rather than just floating)
 const flyingPodMesh = new THREE.Group();
 {
-  const pod = new THREE.Mesh(new THREE.SphereGeometry(0.55,18,14), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:150, specular:0xffffff}));
-  pod.scale.set(1.3,0.55,1);
-  flyingPodMesh.add(pod);
-  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.34,14,10), new THREE.MeshPhongMaterial({color:0xBFE6FF, transparent:true, opacity:0.6, shininess:150}));
-  canopy.scale.set(1,0.8,1);
-  canopy.position.y = 0.22;
-  flyingPodMesh.add(canopy);
-  const glow = new THREE.Mesh(new THREE.TorusGeometry(0.42,0.04,6,18), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+  const platform = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.68,0.12,20), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:150, specular:0xffffff}));
+  flyingPodMesh.add(platform);
+  const rail = new THREE.Mesh(new THREE.TorusGeometry(0.6,0.025,6,24,Math.PI*1.5), new THREE.MeshPhongMaterial({color:0xBFE6FF, shininess:150}));
+  rail.rotation.x = Math.PI/2;
+  rail.position.y = 0.32;
+  flyingPodMesh.add(rail);
+  const glow = new THREE.Mesh(new THREE.TorusGeometry(0.55,0.05,6,20), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
   glow.rotation.x = Math.PI/2;
-  glow.position.y = -0.2;
+  glow.position.y = -0.1;
   flyingPodMesh.add(glow);
 }
 flyingPodMesh.visible = false;
@@ -3784,9 +3783,8 @@ function boardSkyPod(landmark){
   moveTarget = null;
   interactBtn.classList.remove('show');
   playCorrectSound();
-  player.visible = false;
   flyingPodMesh.visible = true;
-  flyingPodMesh.position.copy(player.position);
+  flyingPodMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
   rideCaption(`<span style="font-size:14px;">${RIDE_CAPTIONS[0].en}</span><br><span style="font-size:12px; opacity:.85;">${RIDE_CAPTIONS[0].ja}</span>`);
 }
 
@@ -3807,12 +3805,18 @@ function updateSkyPodRide(dt){
     z1 + (z2-z1)*localT
   );
   player.rotation.y = Math.atan2(x2-x1, z2-z1);
-  flyingPodMesh.position.copy(player.position);
+  // platform sits right under the character's feet, so they visibly
+  // stand on it rather than being replaced by it
+  flyingPodMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
   flyingPodMesh.rotation.y = player.rotation.y;
   // a gentle bob + slight bank into turns, so it reads as flying rather
-  // than sliding
-  flyingPodMesh.position.y += Math.sin(rideElapsed*3)*0.08;
-  flyingPodMesh.rotation.z = Math.sin(rideElapsed*1.3)*0.08;
+  // than sliding — applied to both the platform and the rider together
+  const bob = Math.sin(rideElapsed*3)*0.08;
+  const bank = Math.sin(rideElapsed*1.3)*0.06;
+  flyingPodMesh.position.y += bob;
+  flyingPodMesh.rotation.z = bank;
+  player.position.y += bob;
+  player.rotation.z = bank;
 
   // show captions as we pass each trigger point
   RIDE_CAPTIONS.forEach(c=>{
@@ -3826,7 +3830,7 @@ function updateSkyPodRide(dt){
     rideActive = false;
     RIDE_CAPTIONS.forEach(c=> c._shown = false); // reset for next ride
     player.position.set(RIDE_STATION_POS.x, 0, RIDE_STATION_POS.z);
-    player.visible = true;
+    player.rotation.z = 0;
     flyingPodMesh.visible = false;
     coins += 3;
     updateCoinHUD();
