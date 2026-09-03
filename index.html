@@ -3516,103 +3516,83 @@ function makeGuideRobot(x,z,rotY){
    direction instruction the player has to read and follow correctly.
 ========================================================= */
 const MAZE_ZONE_CENTER = { x: 600, z: 600 }; // far enough that it's never reachable by normal walking
-const MAZE_ZONE_RADIUS = 22; // local boundary radius used for tap-to-move clamping while inside
-const MAZE_COLS = 5, MAZE_ROWS = 5; // 25 cells, a real branching maze with dead ends
+const MAZE_ZONE_RADIUS = 38; // local boundary radius used for tap-to-move clamping while inside
+const MAZE_COLS = 10, MAZE_ROWS = 10; // 100 cells, a real branching maze with many dead ends
 const MAZE_OFFSET = { x: MAZE_ZONE_CENTER.x - (MAZE_COLS*5)/2, z: MAZE_ZONE_CENTER.z - (MAZE_ROWS*5)/2 };
 const MAZE_WALL_THICKNESS = 0.5;
 const MAZE_WALL_HEIGHT = 1.6;
 let inMazeMode = false;
 let returnSpot = null; // where to teleport back to when leaving the maze
 
-// wall segments in maze-local coordinates (0..25 on both axes), built
-// as a spanning-tree maze (generated offline, verified solvable, and
-// hand-transcribed here) — entrance gap at the south of column 1,
-// exit gap at the west of row 0
+// wall segments in maze-local coordinates (0..50 on both axes), built
+// as a spanning-tree maze (generated offline, verified solvable
+// end-to-end by simulation before shipping — see conversation notes).
+// Entrance gap at the south of column 0; exit gap at the east of row 9.
 const MAZE_WALL_SEGMENTS = [
-  {x1:5,z1:0,x2:5,z2:5}, {x1:0,z1:10,x2:5,z2:10}, {x1:5,z1:10,x2:5,z2:15}, {x1:5,z1:15,x2:5,z2:20},
-  {x1:5,z1:5,x2:10,z2:5}, {x1:5,z1:10,x2:10,z2:10}, {x1:10,z1:15,x2:10,z2:20},
-  {x1:10,z1:5,x2:15,z2:5}, {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15},
-  {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20}, {x1:20,z1:10,x2:20,z2:15},
-  {x1:15,z1:15,x2:20,z2:15}, {x1:20,z1:20,x2:20,z2:25}, {x1:20,z1:5,x2:25,z2:5},
-  {x1:0,z1:0,x2:5,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0}, {x1:20,z1:0,x2:25,z2:0},
-  {x1:0,z1:25,x2:5,z2:25}, {x1:5,z1:25,x2:10,z2:25}, {x1:10,z1:25,x2:15,z2:25}, {x1:15,z1:25,x2:20,z2:25}, {x1:20,z1:25,x2:25,z2:25},
-  {x1:0,z1:5,x2:0,z2:10}, {x1:0,z1:10,x2:0,z2:15}, {x1:0,z1:15,x2:0,z2:20}, {x1:0,z1:20,x2:0,z2:25},
-  {x1:25,z1:0,x2:25,z2:5}, {x1:25,z1:5,x2:25,z2:10}, {x1:25,z1:10,x2:25,z2:15}, {x1:25,z1:15,x2:25,z2:20}, {x1:25,z1:20,x2:25,z2:25},
+  {x1:5,z1:0,x2:5,z2:5}, {x1:0,z1:10,x2:5,z2:10}, {x1:5,z1:10,x2:5,z2:15}, {x1:5,z1:20,x2:5,z2:25},
+  {x1:5,z1:25,x2:5,z2:30}, {x1:5,z1:30,x2:5,z2:35}, {x1:0,z1:40,x2:5,z2:40}, {x1:5,z1:40,x2:5,z2:45},
+  {x1:10,z1:5,x2:10,z2:10}, {x1:5,z1:10,x2:10,z2:10}, {x1:10,z1:15,x2:10,z2:20}, {x1:5,z1:20,x2:10,z2:20},
+  {x1:10,z1:25,x2:10,z2:30}, {x1:5,z1:35,x2:10,z2:35}, {x1:5,z1:40,x2:10,z2:40}, {x1:15,z1:0,x2:15,z2:5},
+  {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15}, {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20},
+  {x1:10,z1:25,x2:15,z2:25}, {x1:15,z1:30,x2:15,z2:35}, {x1:10,z1:35,x2:15,z2:35}, {x1:15,z1:35,x2:15,z2:40},
+  {x1:15,z1:40,x2:15,z2:45}, {x1:10,z1:45,x2:15,z2:45}, {x1:20,z1:5,x2:20,z2:10}, {x1:20,z1:10,x2:20,z2:15},
+  {x1:20,z1:15,x2:20,z2:20}, {x1:15,z1:20,x2:20,z2:20}, {x1:15,z1:25,x2:20,z2:25}, {x1:20,z1:25,x2:20,z2:30},
+  {x1:20,z1:30,x2:20,z2:35}, {x1:20,z1:40,x2:20,z2:45}, {x1:15,z1:45,x2:20,z2:45}, {x1:20,z1:5,x2:25,z2:5},
+  {x1:25,z1:10,x2:25,z2:15}, {x1:25,z1:15,x2:25,z2:20}, {x1:25,z1:20,x2:25,z2:25}, {x1:20,z1:25,x2:25,z2:25},
+  {x1:20,z1:35,x2:25,z2:35}, {x1:25,z1:35,x2:25,z2:40}, {x1:25,z1:40,x2:25,z2:45}, {x1:25,z1:45,x2:25,z2:50},
+  {x1:25,z1:5,x2:30,z2:5}, {x1:25,z1:10,x2:30,z2:10}, {x1:30,z1:15,x2:30,z2:20}, {x1:30,z1:20,x2:30,z2:25},
+  {x1:30,z1:25,x2:30,z2:30}, {x1:25,z1:30,x2:30,z2:30}, {x1:30,z1:30,x2:30,z2:35}, {x1:25,z1:40,x2:30,z2:40},
+  {x1:30,z1:5,x2:35,z2:5}, {x1:30,z1:10,x2:35,z2:10}, {x1:30,z1:15,x2:35,z2:15}, {x1:35,z1:20,x2:35,z2:25},
+  {x1:35,z1:30,x2:35,z2:35}, {x1:30,z1:35,x2:35,z2:35}, {x1:30,z1:40,x2:35,z2:40}, {x1:35,z1:40,x2:35,z2:45},
+  {x1:30,z1:45,x2:35,z2:45}, {x1:40,z1:5,x2:40,z2:10}, {x1:35,z1:10,x2:40,z2:10}, {x1:35,z1:15,x2:40,z2:15},
+  {x1:35,z1:20,x2:40,z2:20}, {x1:35,z1:25,x2:40,z2:25}, {x1:40,z1:25,x2:40,z2:30}, {x1:40,z1:30,x2:40,z2:35},
+  {x1:40,z1:35,x2:40,z2:40}, {x1:35,z1:40,x2:40,z2:40}, {x1:45,z1:0,x2:45,z2:5}, {x1:40,z1:10,x2:45,z2:10},
+  {x1:40,z1:15,x2:45,z2:15}, {x1:45,z1:15,x2:45,z2:20}, {x1:40,z1:25,x2:45,z2:25}, {x1:45,z1:25,x2:45,z2:30},
+  {x1:45,z1:30,x2:45,z2:35}, {x1:45,z1:40,x2:45,z2:45}, {x1:40,z1:45,x2:45,z2:45}, {x1:45,z1:15,x2:50,z2:15},
+  {x1:45,z1:40,x2:50,z2:40}, {x1:5,z1:0,x2:10,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0},
+  {x1:20,z1:0,x2:25,z2:0}, {x1:25,z1:0,x2:30,z2:0}, {x1:30,z1:0,x2:35,z2:0}, {x1:35,z1:0,x2:40,z2:0},
+  {x1:40,z1:0,x2:45,z2:0}, {x1:45,z1:0,x2:50,z2:0}, {x1:0,z1:50,x2:5,z2:50}, {x1:5,z1:50,x2:10,z2:50},
+  {x1:10,z1:50,x2:15,z2:50}, {x1:15,z1:50,x2:20,z2:50}, {x1:20,z1:50,x2:25,z2:50}, {x1:25,z1:50,x2:30,z2:50},
+  {x1:30,z1:50,x2:35,z2:50}, {x1:35,z1:50,x2:40,z2:50}, {x1:40,z1:50,x2:45,z2:50}, {x1:45,z1:50,x2:50,z2:50},
+  {x1:0,z1:0,x2:0,z2:5}, {x1:0,z1:5,x2:0,z2:10}, {x1:0,z1:10,x2:0,z2:15}, {x1:0,z1:15,x2:0,z2:20},
+  {x1:0,z1:20,x2:0,z2:25}, {x1:0,z1:25,x2:0,z2:30}, {x1:0,z1:30,x2:0,z2:35}, {x1:0,z1:35,x2:0,z2:40},
+  {x1:0,z1:40,x2:0,z2:45}, {x1:0,z1:45,x2:0,z2:50}, {x1:50,z1:0,x2:50,z2:5}, {x1:50,z1:5,x2:50,z2:10},
+  {x1:50,z1:10,x2:50,z2:15}, {x1:50,z1:15,x2:50,z2:20}, {x1:50,z1:20,x2:50,z2:25}, {x1:50,z1:25,x2:50,z2:30},
+  {x1:50,z1:30,x2:50,z2:35}, {x1:50,z1:35,x2:50,z2:40}, {x1:50,z1:40,x2:50,z2:45},
 ];
-
-// floor 2: a second, separate branching maze (verified solvable the
-// same way as floor 1), placed in its own clear XZ region within the
-// same remote zone and elevated to a real height — reachable via a
-// short scripted "climb" from floor 1's goal. Because it never overlaps
-// floor 1 in X/Z, the existing collision system needs zero changes:
-// a player on one floor can never be close enough to trigger the
-// other floor's walls.
-const MAZE_FLOOR2_OFFSET = { x: MAZE_OFFSET.x + 35, z: MAZE_OFFSET.z };
-const MAZE_FLOOR2_Y = 6;
-const MAZE_WALL_SEGMENTS_FLOOR2 = [
-  {x1:5,z1:0,x2:5,z2:5}, {x1:0,z1:10,x2:5,z2:10}, {x1:0,z1:20,x2:5,z2:20},
-  {x1:10,z1:5,x2:10,z2:10}, {x1:5,z1:10,x2:10,z2:10}, {x1:5,z1:15,x2:10,z2:15}, {x1:10,z1:15,x2:10,z2:20},
-  {x1:10,z1:5,x2:15,z2:5}, {x1:15,z1:5,x2:15,z2:10}, {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20},
-  {x1:20,z1:0,x2:20,z2:5}, {x1:15,z1:10,x2:20,z2:10}, {x1:15,z1:15,x2:20,z2:15}, {x1:20,z1:20,x2:20,z2:25},
-  {x1:20,z1:15,x2:25,z2:15},
-  {x1:5,z1:0,x2:10,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0}, {x1:20,z1:0,x2:25,z2:0},
-  {x1:0,z1:25,x2:5,z2:25}, {x1:5,z1:25,x2:10,z2:25}, {x1:10,z1:25,x2:15,z2:25}, {x1:15,z1:25,x2:20,z2:25},
-  {x1:0,z1:0,x2:0,z2:5}, {x1:0,z1:5,x2:0,z2:10}, {x1:0,z1:10,x2:0,z2:15}, {x1:0,z1:15,x2:0,z2:20}, {x1:0,z1:20,x2:0,z2:25},
-  {x1:25,z1:0,x2:25,z2:5}, {x1:25,z1:5,x2:25,z2:10}, {x1:25,z1:10,x2:25,z2:15}, {x1:25,z1:15,x2:25,z2:20}, {x1:25,z1:20,x2:25,z2:25},
-];
-let mazeFloor = 1; // which floor's goal to watch for in checkMazeGoal
 
 const mazeGroup = new THREE.Group();
 mazeGroup.visible = true; // this group only ever sits far away, so it can just stay visible always
 scene.add(mazeGroup);
 
-// build both the collision AABBs and the visible hedge meshes from a
-// segment list — used for both floors, just with a different offset
-// and base height. Floor 2's colliders get appended into the SAME
-// MAZE_COLLIDERS array as floor 1 (safe, since they never spatially
-// overlap), so isMazeBlocked needs no floor-aware logic at all.
+// build both the collision AABBs and the visible hedge meshes from the
+// same segment list, so they can never drift out of sync with each other
 const MAZE_COLLIDERS = [];
-function buildMazeWalls(segments, offset, yBase){
-  segments.forEach(seg=>{
-    const x1 = seg.x1 + offset.x, z1 = seg.z1 + offset.z;
-    const x2 = seg.x2 + offset.x, z2 = seg.z2 + offset.z;
-    const half = MAZE_WALL_THICKNESS/2;
-    MAZE_COLLIDERS.push({
-      minX: Math.min(x1,x2) - half, maxX: Math.max(x1,x2) + half,
-      minZ: Math.min(z1,z2) - half, maxZ: Math.max(z1,z2) + half,
-    });
-    const isVertical = (seg.x1 === seg.x2);
-    const len = Math.hypot(x2-x1, z2-z1) + MAZE_WALL_THICKNESS;
-    const wall = new THREE.Mesh(
-      new THREE.BoxGeometry(isVertical ? MAZE_WALL_THICKNESS : len, MAZE_WALL_HEIGHT, isVertical ? len : MAZE_WALL_THICKNESS),
-      new THREE.MeshLambertMaterial({color:0x4FA84A})
-    );
-    wall.position.set((x1+x2)/2, yBase + MAZE_WALL_HEIGHT/2, (z1+z2)/2);
-    mazeGroup.add(wall);
+MAZE_WALL_SEGMENTS.forEach(seg=>{
+  const x1 = seg.x1 + MAZE_OFFSET.x, z1 = seg.z1 + MAZE_OFFSET.z;
+  const x2 = seg.x2 + MAZE_OFFSET.x, z2 = seg.z2 + MAZE_OFFSET.z;
+  const half = MAZE_WALL_THICKNESS/2;
+  MAZE_COLLIDERS.push({
+    minX: Math.min(x1,x2) - half, maxX: Math.max(x1,x2) + half,
+    minZ: Math.min(z1,z2) - half, maxZ: Math.max(z1,z2) + half,
   });
-}
-buildMazeWalls(MAZE_WALL_SEGMENTS, MAZE_OFFSET, 0);
-buildMazeWalls(MAZE_WALL_SEGMENTS_FLOOR2, MAZE_FLOOR2_OFFSET, MAZE_FLOOR2_Y);
+  const isVertical = (seg.x1 === seg.x2);
+  const len = Math.hypot(x2-x1, z2-z1) + MAZE_WALL_THICKNESS;
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(isVertical ? MAZE_WALL_THICKNESS : len, MAZE_WALL_HEIGHT, isVertical ? len : MAZE_WALL_THICKNESS),
+    new THREE.MeshLambertMaterial({color:0x4FA84A})
+  );
+  wall.position.set((x1+x2)/2, MAZE_WALL_HEIGHT/2, (z1+z2)/2);
+  mazeGroup.add(wall);
+});
 
 // a flat ground disc under just the maze zone, so it doesn't float over
 // the void out there
 {
-  const mazeGround = new THREE.Mesh(new THREE.CircleGeometry(MAZE_ZONE_RADIUS+4, 32), new THREE.MeshLambertMaterial({color:0xFFD9EC}));
+  const mazeGround = new THREE.Mesh(new THREE.CircleGeometry(MAZE_ZONE_RADIUS+4, 40), new THREE.MeshLambertMaterial({color:0xFFD9EC}));
   mazeGround.rotation.x = -Math.PI/2;
   mazeGround.position.set(MAZE_ZONE_CENTER.x, -0.01, MAZE_ZONE_CENTER.z);
   mazeGroup.add(mazeGround);
-}
-// floor 2's own ground disc, elevated, plus a supporting column so it
-// doesn't look like it's floating in the void
-{
-  const f2CenterX = MAZE_FLOOR2_OFFSET.x + 12.5, f2CenterZ = MAZE_FLOOR2_OFFSET.z + 12.5;
-  const mazeGround2 = new THREE.Mesh(new THREE.CircleGeometry(MAZE_ZONE_RADIUS, 32), new THREE.MeshLambertMaterial({color:0xE8D8FF}));
-  mazeGround2.rotation.x = -Math.PI/2;
-  mazeGround2.position.set(f2CenterX, MAZE_FLOOR2_Y - 0.01, f2CenterZ);
-  mazeGroup.add(mazeGround2);
-  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(3,3.6,MAZE_FLOOR2_Y,20), new THREE.MeshLambertMaterial({color:0xC7CBE0}));
-  pillar.position.set(f2CenterX, MAZE_FLOOR2_Y/2, f2CenterZ);
-  mazeGroup.add(pillar);
 }
 
 function isMazeBlocked(x, z, radius){
@@ -3641,7 +3621,7 @@ function wrapSignText(ctx, text, cx, y, maxWidth, lineHeight){
   if(line) lines.push(line);
   lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
 }
-function makeSignpost(x,z,rotY,textEn,textJa,y){
+function makeSignpost(x,z,rotY,textEn,textJa){
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 140;
   const ctx = canvas.getContext('2d');
@@ -3667,53 +3647,42 @@ function makeSignpost(x,z,rotY,textEn,textJa,y){
     new THREE.PlaneGeometry(1.3,0.58),
     new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.FrontSide})
   );
-  plane.position.set(x, (y||0) + 1.75, z);
+  plane.position.set(x, 1.75, z);
   plane.rotation.y = rotY;
   return plane;
 }
 
-// floor 1 signs: one at the entrance, one at each of the 5 real
-// decision points (verified against the maze's actual graph), and one
-// confirming the final turn to the exit.
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z - 1.5, Math.PI,
-  "Welcome! Turn left to begin.", "ようこそ！左に曲がってスタート！"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 16, MAZE_OFFSET.z + 2.5, -Math.PI/2,
-  "Turn right here. Straight ahead is a dead end.", "ここを右に。まっすぐは行き止まりだよ。"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 17.5, MAZE_OFFSET.z + 6, Math.PI,
+// 10 signs, one at each real decision point along the verified solution
+// path (path length 76 steps across the full 10x10 grid)
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 4.0, MAZE_OFFSET.z + 17.5, Math.PI/2,
   "Turn left here.", "ここを左に曲がってね。"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 16, Math.PI,
-  "Turn right here. Straight ahead is a dead end.", "ここを右に。まっすぐは行き止まりだよ。"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19, MAZE_OFFSET.z + 17.5, Math.PI/2,
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z + 46.0, Math.PI,
   "Turn left here.", "ここを左に曲がってね。"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 9, MAZE_OFFSET.z + 22.5, Math.PI/2,
-  "Turn right here. The other path is a dead end.", "ここを右に。もう一方の道は行き止まりだよ。"));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 3.5, 0,
-  "Almost there! Go upstairs to floor 2!", "もうすぐ！2階へ進もう！"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19.0, MAZE_OFFSET.z + 37.5, Math.PI/2,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 37.5, MAZE_OFFSET.z + 4.0, 0,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 46.0, MAZE_OFFSET.z + 7.5, -Math.PI/2,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 34.0, MAZE_OFFSET.z + 27.5, Math.PI/2,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 42.5, MAZE_OFFSET.z + 21.0, Math.PI,
+  "Turn left here.", "ここを左に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 46.0, MAZE_OFFSET.z + 22.5, -Math.PI/2,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 44.0, MAZE_OFFSET.z + 37.5, Math.PI/2,
+  "Turn left here.", "ここを左に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 37.5, MAZE_OFFSET.z + 46.0, Math.PI,
+  "Turn left here.", "ここを左に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, Math.PI,
+  "Welcome! This is a big maze — good luck!", "ようこそ！大きな迷路だよ、がんばって！"));
 
-// floor 2 signs, at the same relative decision points computed and
-// verified for this floor's own maze layout
-mazeGroup.add(makeSignpost(MAZE_FLOOR2_OFFSET.x + 2.5, MAZE_FLOOR2_OFFSET.z - 1.5, Math.PI,
-  "Welcome to floor 2! Go straight ahead.", "2階へようこそ！まっすぐ進もう。", MAZE_FLOOR2_Y));
-mazeGroup.add(makeSignpost(MAZE_FLOOR2_OFFSET.x + 21, MAZE_FLOOR2_OFFSET.z + 7.5, -Math.PI/2,
-  "Turn right here. Straight ahead is a dead end.", "ここを右に。まっすぐは行き止まりだよ。", MAZE_FLOOR2_Y));
-mazeGroup.add(makeSignpost(MAZE_FLOOR2_OFFSET.x + 14, MAZE_FLOOR2_OFFSET.z + 12.5, Math.PI/2,
-  "Keep going straight. The path to the side is a dead end.", "そのまままっすぐ。横の道は行き止まりだよ。", MAZE_FLOOR2_Y));
-mazeGroup.add(makeSignpost(MAZE_FLOOR2_OFFSET.x + 7.5, MAZE_FLOOR2_OFFSET.z + 21, Math.PI,
-  "Turn left here.", "ここを左に曲がってね。", MAZE_FLOOR2_Y));
-mazeGroup.add(makeSignpost(MAZE_FLOOR2_OFFSET.x + 17.5, MAZE_FLOOR2_OFFSET.z + 19, 0,
-  "Turn right here.", "ここを右に曲がってね。", MAZE_FLOOR2_Y));
-
-// entrance point (just south of floor 1's entrance gap), used to place
-// the player right as they teleport in
-const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 7.5, z: MAZE_OFFSET.z - 1 };
-// floor 1's goal — reaching it climbs up to floor 2, doesn't exit yet
-const mazeFloor1GoalWorldPos = { x: MAZE_OFFSET.x - 1.5, z: MAZE_OFFSET.z + 2.5 };
-// floor 2's entrance (south side of its own grid)
-const mazeFloor2EntranceWorldPos = { x: MAZE_FLOOR2_OFFSET.x + 2.5, z: MAZE_FLOOR2_OFFSET.z - 1, y: MAZE_FLOOR2_Y };
-// floor 2's goal (north side of its grid) — reaching this exits the maze for real
-const mazeFloor2GoalWorldPos = { x: MAZE_FLOOR2_OFFSET.x + 22.5, z: MAZE_FLOOR2_OFFSET.z + 26, y: MAZE_FLOOR2_Y };
-
-function makeGoalFlag(pos, y){
+// entrance point (just south of the entrance gap), used to place the
+// player right as they teleport in
+const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z - 1 };
+// goal marker + reward, reachable just past the exit gap (east side of row 9)
+const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 51.5, z: MAZE_OFFSET.z + 47.5 };
+{
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
   pole.position.y = 0.9;
@@ -3722,48 +3691,29 @@ function makeGoalFlag(pos, y){
   banner.position.set(0.3,1.55,0);
   flag.add(banner);
   flag.add(makeBlobShadow(0.5));
-  flag.position.set(pos.x, y||0, pos.z);
+  flag.position.set(mazeGoalWorldPos.x, 0, mazeGoalWorldPos.z);
   mazeGroup.add(flag);
 }
-makeGoalFlag(mazeFloor1GoalWorldPos, 0);
-makeGoalFlag(mazeFloor2GoalWorldPos, MAZE_FLOOR2_Y);
-
 let mazeGoalClaimedToday = false;
 function checkMazeGoal(){
   if(!inMazeMode) return;
-  if(mazeFloor === 1){
-    const dist = Math.hypot(player.position.x - mazeFloor1GoalWorldPos.x, player.position.z - mazeFloor1GoalWorldPos.z);
-    if(dist < 1.8) climbToFloor2();
-  } else {
-    const dist = Math.hypot(player.position.x - mazeFloor2GoalWorldPos.x, player.position.z - mazeFloor2GoalWorldPos.z);
-    if(dist < 1.8){
-      if(!mazeGoalClaimedToday){
-        mazeGoalClaimedToday = true;
-        coins += 8;
-        updateCoinHUD();
-        saveProgress();
-        playCorrectSound();
-        showToast('🎉 めいろクリア！ +8🪙');
-      }
-      exitMaze();
+  const dist = Math.hypot(player.position.x - mazeGoalWorldPos.x, player.position.z - mazeGoalWorldPos.z);
+  if(dist < 1.8){
+    if(!mazeGoalClaimedToday){
+      mazeGoalClaimedToday = true;
+      coins += 8;
+      updateCoinHUD();
+      saveProgress();
+      playCorrectSound();
+      showToast('🎉 めいろクリア！ +8🪙');
     }
+    exitMaze();
   }
-}
-function climbToFloor2(){
-  mazeFloor = 2;
-  player.position.set(mazeFloor2EntranceWorldPos.x, mazeFloor2EntranceWorldPos.y, mazeFloor2EntranceWorldPos.z);
-  playerFacing = 0;
-  player.rotation.y = 0;
-  moveTarget = null;
-  camera.position.set(mazeFloor2EntranceWorldPos.x, mazeFloor2EntranceWorldPos.y + 2.6, mazeFloor2EntranceWorldPos.z - 6.8);
-  camera.lookAt(player.position.clone().add(new THREE.Vector3(0,1.1,0)));
-  showToast('🪜 2階に到着！');
 }
 
 function enterMaze(){
   returnSpot = { x: player.position.x, z: player.position.z, island: currentIslandId };
   inMazeMode = true;
-  mazeFloor = 1;
   player.position.set(mazeEntranceWorldPos.x, 0, mazeEntranceWorldPos.z);
   playerFacing = 0;
   player.rotation.y = 0;
@@ -5328,9 +5278,8 @@ canvas.addEventListener('pointerdown', e=>{
   raycaster.setFromCamera(ndc, camera);
   const hit = new THREE.Vector3();
   if(raycaster.ray.intersectPlane(groundPlane, hit)){
-    const floor2CenterX = MAZE_FLOOR2_OFFSET.x + 12.5, floor2CenterZ = MAZE_FLOOR2_OFFSET.z + 12.5;
-    const cx = inMazeMode ? (mazeFloor === 2 ? floor2CenterX : MAZE_ZONE_CENTER.x) : 0;
-    const cz = inMazeMode ? (mazeFloor === 2 ? floor2CenterZ : MAZE_ZONE_CENTER.z) : 0;
+    const cx = inMazeMode ? MAZE_ZONE_CENTER.x : 0;
+    const cz = inMazeMode ? MAZE_ZONE_CENTER.z : 0;
     const d = Math.hypot(hit.x - cx, hit.z - cz);
     const boundR = inMazeMode ? MAZE_ZONE_RADIUS : 32;
     if(d > boundR){ const s = boundR/d; hit.x = cx + (hit.x-cx)*s; hit.z = cz + (hit.z-cz)*s; } // stay within the current zone
