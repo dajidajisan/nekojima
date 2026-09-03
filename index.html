@@ -3621,7 +3621,7 @@ function wrapSignText(ctx, text, cx, y, maxWidth, lineHeight){
   if(line) lines.push(line);
   lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
 }
-function makeSignpost(x,z,rotY,textEn,textJa){
+function makeSignpost(x,z,rotY,textEn){
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 140;
   const ctx = canvas.getContext('2d');
@@ -3631,12 +3631,9 @@ function makeSignpost(x,z,rotY,textEn,textJa){
   ctx.strokeStyle = '#8A6D42'; ctx.lineWidth = 4;
   rr(6,6,308,128,12); ctx.stroke();
   ctx.fillStyle = '#4A3B5C';
-  ctx.font = '700 22px sans-serif';
+  ctx.font = '700 24px sans-serif';
   ctx.textAlign = 'center';
-  wrapSignText(ctx, textEn, 160, 42, 280, 27);
-  ctx.font = '600 15px sans-serif';
-  ctx.fillStyle = '#8878A0';
-  wrapSignText(ctx, textJa, 160, 112, 300, 20);
+  wrapSignText(ctx, textEn, 160, 70, 280, 30);
   const tex = new THREE.CanvasTexture(canvas);
   // a single front-facing plane, mounted flush on/near the hedge wall —
   // simpler and more reliable than a double-sided post: it's only ever
@@ -3655,27 +3652,27 @@ function makeSignpost(x,z,rotY,textEn,textJa){
 // 10 signs, one at each real decision point along the verified solution
 // path (path length 76 steps across the full 10x10 grid)
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 4.0, MAZE_OFFSET.z + 17.5, Math.PI/2,
-  "Turn left here.", "ここを左に曲がってね。"));
+  "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z + 46.0, Math.PI,
-  "Turn left here.", "ここを左に曲がってね。"));
+  "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19.0, MAZE_OFFSET.z + 37.5, Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 37.5, MAZE_OFFSET.z + 4.0, 0,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 46.0, MAZE_OFFSET.z + 7.5, -Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 34.0, MAZE_OFFSET.z + 27.5, Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 42.5, MAZE_OFFSET.z + 21.0, Math.PI,
-  "Turn left here.", "ここを左に曲がってね。"));
+  "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 46.0, MAZE_OFFSET.z + 22.5, -Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 44.0, MAZE_OFFSET.z + 37.5, Math.PI/2,
-  "Turn left here.", "ここを左に曲がってね。"));
+  "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 37.5, MAZE_OFFSET.z + 46.0, Math.PI,
-  "Turn left here.", "ここを左に曲がってね。"));
+  "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, Math.PI,
-  "Welcome! This is a big maze — good luck!", "ようこそ！大きな迷路だよ、がんばって！"));
+  "Welcome! This is a big maze — good luck!"));
 
 // entrance point (just south of the entrance gap), used to place the
 // player right as they teleport in
@@ -5582,15 +5579,21 @@ function animate(){
     }
   }
 
-  // camera follow (third person, behind player)
+  // camera follow (third person, behind player) — while in the maze,
+  // sit lower (closer to the hedge height) and look nearly level, so
+  // walls actually block the view instead of the player seeing the
+  // whole layout from above
+  const camHeight = inMazeMode ? 1.9 : 2.6;
+  const camDist = inMazeMode ? 5.2 : 6.8;
   const camOffset = new THREE.Vector3(
-    Math.sin(playerFacing) * -6.8,
-    2.6,
-    Math.cos(playerFacing) * -6.8
+    Math.sin(playerFacing) * -camDist,
+    camHeight,
+    Math.cos(playerFacing) * -camDist
   );
   const desiredCamPos = player.position.clone().add(camOffset);
   camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
-  const lookTarget = player.position.clone().add(new THREE.Vector3(0,1.1,0));
+  const lookHeight = inMazeMode ? 1.6 : 1.1;
+  const lookTarget = player.position.clone().add(new THREE.Vector3(0,lookHeight,0));
   camera.lookAt(lookTarget);
 
   renderer.render(scene, camera);
