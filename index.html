@@ -3507,30 +3507,37 @@ function makeGuideRobot(x,z,rotY){
    the shared themepark and can't overlap anything. Only a small gate
    building sits in themepark; interacting with it teleports the player
    to the remote zone, and reaching the exit teleports back.
+
+   This is a genuine branching maze (5x5 grid, generated as a spanning
+   tree so there is exactly ONE solution path with real dead ends —
+   not just a winding single corridor), verified solvable end-to-end by
+   simulation before shipping. Signs are placed at every real decision
+   point (where more than one direction is open) with a short English
+   direction instruction the player has to read and follow correctly.
 ========================================================= */
 const MAZE_ZONE_CENTER = { x: 600, z: 600 }; // far enough that it's never reachable by normal walking
-const MAZE_ZONE_RADIUS = 26; // local boundary radius used for tap-to-move clamping while inside
-const MAZE_COLS = 5, MAZE_ROWS = 4; // 20 cells — a long winding corridor, much bigger than before
+const MAZE_ZONE_RADIUS = 22; // local boundary radius used for tap-to-move clamping while inside
+const MAZE_COLS = 5, MAZE_ROWS = 5; // 25 cells, a real branching maze with dead ends
 const MAZE_OFFSET = { x: MAZE_ZONE_CENTER.x - (MAZE_COLS*5)/2, z: MAZE_ZONE_CENTER.z - (MAZE_ROWS*5)/2 };
 const MAZE_WALL_THICKNESS = 0.5;
 const MAZE_WALL_HEIGHT = 1.6;
 let inMazeMode = false;
 let returnSpot = null; // where to teleport back to when leaving the maze
 
-// a long serpentine path winding through all 20 cells of a 5x4 grid —
-// verified end-to-end walkable by simulation before shipping. Entrance
-// at the south of (row0,col0); exit at the north of (row3,col0).
-// each segment is the CENTERLINE of one wall, in maze-local coordinates
-// (0..25 on X, 0..20 on Z). Vertical segments have x1===x2 (wall runs
-// along Z); horizontal segments have z1===z2 (wall runs along X).
+// wall segments in maze-local coordinates (0..25 on both axes), built
+// as a spanning-tree maze (generated offline, verified solvable, and
+// hand-transcribed here) — entrance gap at the south of column 1,
+// exit gap at the west of row 0
 const MAZE_WALL_SEGMENTS = [
-  {x1:0,z1:0,x2:0,z2:5}, {x1:5,z1:0,x2:10,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0},
-  {x1:20,z1:0,x2:25,z2:0}, {x1:25,z1:0,x2:25,z2:5}, {x1:0,z1:5,x2:5,z2:5}, {x1:0,z1:5,x2:0,z2:10},
-  {x1:5,z1:5,x2:10,z2:5}, {x1:10,z1:5,x2:15,z2:5}, {x1:15,z1:5,x2:20,z2:5}, {x1:25,z1:5,x2:25,z2:10},
-  {x1:0,z1:10,x2:0,z2:15}, {x1:5,z1:10,x2:10,z2:10}, {x1:10,z1:10,x2:15,z2:10}, {x1:15,z1:10,x2:20,z2:10},
-  {x1:20,z1:10,x2:25,z2:10}, {x1:25,z1:10,x2:25,z2:15}, {x1:0,z1:15,x2:5,z2:15}, {x1:0,z1:15,x2:0,z2:20},
-  {x1:5,z1:15,x2:10,z2:15}, {x1:5,z1:20,x2:10,z2:20}, {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20},
-  {x1:15,z1:15,x2:20,z2:15}, {x1:15,z1:20,x2:20,z2:20}, {x1:20,z1:20,x2:25,z2:20}, {x1:25,z1:15,x2:25,z2:20},
+  {x1:5,z1:0,x2:5,z2:5}, {x1:0,z1:10,x2:5,z2:10}, {x1:5,z1:10,x2:5,z2:15}, {x1:5,z1:15,x2:5,z2:20},
+  {x1:5,z1:5,x2:10,z2:5}, {x1:5,z1:10,x2:10,z2:10}, {x1:10,z1:15,x2:10,z2:20},
+  {x1:10,z1:5,x2:15,z2:5}, {x1:15,z1:5,x2:15,z2:10}, {x1:15,z1:10,x2:15,z2:15},
+  {x1:10,z1:15,x2:15,z2:15}, {x1:10,z1:20,x2:15,z2:20}, {x1:20,z1:10,x2:20,z2:15},
+  {x1:15,z1:15,x2:20,z2:15}, {x1:20,z1:20,x2:20,z2:25}, {x1:20,z1:5,x2:25,z2:5},
+  {x1:0,z1:0,x2:5,z2:0}, {x1:10,z1:0,x2:15,z2:0}, {x1:15,z1:0,x2:20,z2:0}, {x1:20,z1:0,x2:25,z2:0},
+  {x1:0,z1:25,x2:5,z2:25}, {x1:5,z1:25,x2:10,z2:25}, {x1:10,z1:25,x2:15,z2:25}, {x1:15,z1:25,x2:20,z2:25}, {x1:20,z1:25,x2:25,z2:25},
+  {x1:0,z1:5,x2:0,z2:10}, {x1:0,z1:10,x2:0,z2:15}, {x1:0,z1:15,x2:0,z2:20}, {x1:0,z1:20,x2:0,z2:25},
+  {x1:25,z1:0,x2:25,z2:5}, {x1:25,z1:5,x2:25,z2:10}, {x1:25,z1:10,x2:25,z2:15}, {x1:25,z1:15,x2:25,z2:20}, {x1:25,z1:20,x2:25,z2:25},
 ];
 
 const mazeGroup = new THREE.Group();
@@ -3624,40 +3631,31 @@ function makeSignpost(x,z,rotY,textEn,textJa){
   return plane;
 }
 
-// signs placed at each U-turn of the serpentine path — this maze has
-// no dead ends (it's one long winding corridor), so the signs are all
-// encouragement + turn-direction guidance rather than warnings
-mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, 0,
-  "Welcome! Follow the path to the right.",
-  "ようこそ！右に道なりに進もう！"
-));
-mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 2.5, Math.PI/2,
-  "Turn left and go up here.",
-  "ここを左に曲がって進もう。"
-));
-mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 7.5, -Math.PI/2,
-  "Turn right and keep going.",
-  "ここを右に曲がって進もう。"
-));
-mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 12.5, Math.PI/2,
-  "Almost there! Turn left again.",
-  "もうすぐゴール！またここを左に！"
-));
-mazeGroup.add(makeSignpost(
-  MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 17.5, 0,
-  "The exit is just ahead!",
-  "出口はすぐそこだよ！"
-));
+// 7 signs total: one at the entrance, one at each of the 5 real
+// decision points (verified against the maze's actual graph), and one
+// confirming the final turn to the exit. Each direction (left/right)
+// was computed programmatically from the maze's own connection data,
+// not guessed — see the conversation notes for the derivation.
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z - 1.5, Math.PI,
+  "Welcome! Turn right to begin.", "ようこそ！右に曲がってスタート！"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 16, MAZE_OFFSET.z + 2.5, -Math.PI/2,
+  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 17.5, MAZE_OFFSET.z + 6, Math.PI,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 16, Math.PI,
+  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19, MAZE_OFFSET.z + 17.5, Math.PI/2,
+  "Turn right here.", "ここを右に曲がってね。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 9, MAZE_OFFSET.z + 22.5, Math.PI/2,
+  "Turn left here. The other path is a dead end.", "ここを左に。もう一方の道は行き止まりだよ。"));
+mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 3.5, 0,
+  "Turn right to find the exit!", "右に曲がると出口だよ！"));
 
-// entrance point (just south of the maze's south gap), used to place
-// the player right as they teleport in
-const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z - 1 };
-// goal marker + reward, reachable just past the north exit gap
-const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z + MAZE_ROWS*5 + 1.5 };
+// entrance point (just south of the entrance gap), used to place the
+// player right as they teleport in
+const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 7.5, z: MAZE_OFFSET.z - 1 };
+// goal marker + reward, reachable just past the exit gap (west side)
+const mazeGoalWorldPos = { x: MAZE_OFFSET.x - 1.5, z: MAZE_OFFSET.z + 2.5 };
 {
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
@@ -4006,20 +4004,25 @@ function makeSkyPodStation(x,z){
 // shown in the overlay, no 3D physics involved
 function makeCoasterGate(x,z){
   const g = new THREE.Group();
-  const loop = new THREE.Mesh(new THREE.TorusGeometry(1.1,0.09,10,28), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:90}));
-  loop.position.y = 1.3;
-  g.add(loop);
-  [-0.9,0.9].forEach(dx=>{
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.3,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
-    post.position.set(dx,0.65,0);
-    g.add(post);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.16,1.3,10), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+  post.position.y = 0.65;
+  g.add(post);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.9,0.12), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:100}));
+  board.position.y = 1.65;
+  g.add(board);
+  const boardTrim = new THREE.Mesh(new THREE.BoxGeometry(1.4,0.06,0.14), new THREE.MeshBasicMaterial({color:0xFFD93D}));
+  boardTrim.position.y = 2.05;
+  g.add(boardTrim);
+  // simple direction-arrow icons on the board, matching the reaction game
+  [-0.3,0,0.3].forEach((dx,i)=>{
+    const icon = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.24,4), new THREE.MeshBasicMaterial({color:0xFFFFFF}));
+    icon.rotation.z = [Math.PI/2, 0, -Math.PI/2][i];
+    icon.position.set(dx, 1.65, 0.08);
+    g.add(icon);
   });
-  const cart = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.4), new THREE.MeshPhongMaterial({color:0xFFD873, shininess:100}));
-  cart.position.set(0,0.35,0.6);
-  g.add(cart);
   const marker = makeFloatingMarker('🎢', 2.5);
   g.add(marker);
-  g.add(makeBlobShadow(1.3));
+  g.add(makeBlobShadow(1.1));
   g.position.set(x,0,z);
   return { group:g, marker };
 }
