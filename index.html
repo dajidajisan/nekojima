@@ -3646,6 +3646,18 @@ function makeSignpost(x,z,rotY,textEn){
   );
   plane.position.set(x, 1.75, z);
   plane.rotation.y = rotY;
+  // register a small collision box so the player stops at the sign
+  // instead of walking straight through it — signs in this maze only
+  // ever face a cardinal direction (0, ±90°, or 180°), so a simple
+  // axis-aligned box matches its footprint correctly either way
+  const isRotated90 = Math.abs(Math.abs(rotY) % Math.PI - Math.PI/2) < 0.1;
+  const halfWide = 0.35, halfThin = 0.12;
+  MAZE_COLLIDERS.push({
+    minX: x - (isRotated90 ? halfThin : halfWide),
+    maxX: x + (isRotated90 ? halfThin : halfWide),
+    minZ: z - (isRotated90 ? halfWide : halfThin),
+    maxZ: z + (isRotated90 ? halfWide : halfThin),
+  });
   return plane;
 }
 
@@ -5233,6 +5245,7 @@ const raycaster = new THREE.Raycaster();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 let moveTarget = null; // {x,z} in world space, or null when not walking
 let wasNearSomething = false; // tracks entering/leaving interact range, see proximity check below
+let outOfRangeTimer = 0; // seconds spent out of range — used to debounce the interact button so a single-frame dip in distance can't silently break clickability while the button is still visually fading out
 let conversationContext = ''; // the last full exchange (opener→reply→reaction), fed into the next AI generation prompt so consecutive questions with the same NPC feel like one ongoing conversation
 
 function formatExchange(item){
@@ -5526,6 +5539,7 @@ function animate(){
   });
   const currentThreshold = (nearNPC || nearLandmark) ? INTERACT_DIST * 1.35 : INTERACT_DIST;
   if(closest && closestDist < currentThreshold){
+    outOfRangeTimer = 0;
     nearNPC = closestKind === 'npc' ? closest : null;
     nearLandmark = closestKind === 'landmark' ? closest : null;
     interactBtn.textContent = closestKind === 'npc' ? '💬 はなしかける' : closest.label;
@@ -5533,10 +5547,13 @@ function animate(){
     if(!wasNearSomething) moveTarget = null; // stop only on first entering range, not every frame
     wasNearSomething = true;
   } else {
-    nearNPC = null;
-    nearLandmark = null;
-    interactBtn.classList.remove('show');
-    wasNearSomething = false;
+    outOfRangeTimer += dt;
+    if(outOfRangeTimer > 0.25){ // brief grace period before actually clearing — avoids a single-frame dip silently breaking clickability
+      nearNPC = null;
+      nearLandmark = null;
+      interactBtn.classList.remove('show');
+      wasNearSomething = false;
+    }
   }
   if(nearNPC){
     const dx = player.position.x - nearNPC.mesh.position.x;
@@ -5583,8 +5600,8 @@ function animate(){
   // sit lower (closer to the hedge height) and look nearly level, so
   // walls actually block the view instead of the player seeing the
   // whole layout from above
-  const camHeight = inMazeMode ? 1.9 : 2.6;
-  const camDist = inMazeMode ? 5.2 : 6.8;
+  const camHeight = inMazeMode ? 1.4 : 2.6;
+  const camDist = inMazeMode ? 4.2 : 6.8;
   const camOffset = new THREE.Vector3(
     Math.sin(playerFacing) * -camDist,
     camHeight,
@@ -5592,7 +5609,7 @@ function animate(){
   );
   const desiredCamPos = player.position.clone().add(camOffset);
   camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
-  const lookHeight = inMazeMode ? 1.6 : 1.1;
+  const lookHeight = inMazeMode ? 1.3 : 1.1;
   const lookTarget = player.position.clone().add(new THREE.Vector3(0,lookHeight,0));
   camera.lookAt(lookTarget);
 
@@ -6272,7 +6289,6 @@ function lrDraw(){
 
 
 interactBtn.addEventListener('click', ()=>{
-  alert('クリックされました！ nearNPC=' + (nearNPC ? nearNPC.def.name : 'null') + ' nearLandmark=' + (nearLandmark ? nearLandmark.type : 'null'));
   if(nearNPC) openQuiz(nearNPC);
   else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
   else if(nearLandmark && nearLandmark.type === 'skypod') boardSkyPod(nearLandmark);
