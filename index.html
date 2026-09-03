@@ -3600,7 +3600,7 @@ function wrapSignText(ctx, text, cx, y, maxWidth, lineHeight){
   if(line) lines.push(line);
   lines.forEach((l,i)=> ctx.fillText(l, cx, y + i*lineHeight));
 }
-function makeSignpost(x,z,rotY,textEn,textJa){
+function makeSignpost(x,z,rotY,textEn,textJa,arrowDir){
   const canvas = document.createElement('canvas');
   canvas.width = 320; canvas.height = 140;
   const ctx = canvas.getContext('2d');
@@ -3609,13 +3609,30 @@ function makeSignpost(x,z,rotY,textEn,textJa){
   rr(4,4,312,132,14); ctx.fill();
   ctx.strokeStyle = '#8A6D42'; ctx.lineWidth = 4;
   rr(6,6,308,128,12); ctx.stroke();
+  // a big, unambiguous colored arrow — a second, language-independent
+  // way to confirm the direction, so the text alone doesn't have to be
+  // trusted blindly
+  if(arrowDir === 'left' || arrowDir === 'right'){
+    ctx.save();
+    ctx.translate(272, 70);
+    if(arrowDir === 'left') ctx.scale(-1,1);
+    ctx.fillStyle = '#FF6BC4';
+    ctx.beginPath();
+    ctx.moveTo(-20,0); ctx.lineTo(15,-24); ctx.lineTo(15,-9); ctx.lineTo(30,-9);
+    ctx.lineTo(30,9); ctx.lineTo(15,9); ctx.lineTo(15,24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.fillStyle = '#4A3B5C';
   ctx.font = '700 22px sans-serif';
   ctx.textAlign = 'center';
-  wrapSignText(ctx, textEn, 160, 42, 280, 27);
+  wrapSignText(ctx, textEn, 130, 42, 220, 27);
   ctx.font = '600 15px sans-serif';
   ctx.fillStyle = '#8878A0';
-  ctx.fillText(textJa, 160, 112);
+  ctx.textAlign = 'left';
+  wrapSignText(ctx, textJa, 12, 112, 300, 20);
+  ctx.textAlign = 'center';
   const tex = new THREE.CanvasTexture(canvas);
   // a single front-facing plane, mounted flush on/near the hedge wall —
   // simpler and more reliable than a double-sided post: it's only ever
@@ -3637,19 +3654,19 @@ function makeSignpost(x,z,rotY,textEn,textJa){
 // was computed programmatically from the maze's own connection data,
 // not guessed — see the conversation notes for the derivation.
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z - 1.5, Math.PI,
-  "Welcome! Turn right to begin.", "ようこそ！右に曲がってスタート！"));
+  "Welcome! Turn right to begin.", "ようこそ！右に曲がってスタート！", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 16, MAZE_OFFSET.z + 2.5, -Math.PI/2,
-  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。"));
+  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 17.5, MAZE_OFFSET.z + 6, Math.PI,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here.", "ここを右に曲がってね。", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 16, Math.PI,
-  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。"));
+  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19, MAZE_OFFSET.z + 17.5, Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。"));
+  "Turn right here.", "ここを右に曲がってね。", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 9, MAZE_OFFSET.z + 22.5, Math.PI/2,
-  "Turn left here. The other path is a dead end.", "ここを左に。もう一方の道は行き止まりだよ。"));
+  "Turn left here. The other path is a dead end.", "ここを左に。もう一方の道は行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 3.5, 0,
-  "Turn right to find the exit!", "右に曲がると出口だよ！"));
+  "Turn right to find the exit!", "右に曲がると出口だよ！", 'right'));
 
 // entrance point (just south of the entrance gap), used to place the
 // player right as they teleport in
@@ -5425,7 +5442,8 @@ function animate(){
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
       playerFacing += diff * Math.min(1, dt*6);
       const speed = Math.min(2.8, dist*4); // ease in as it arrives, no overshoot-jitter
-      const step = Math.min(speed*dt, dist);
+      let step = Math.min(speed*dt, dist);
+      if(inMazeMode) step = Math.min(step, 0.08); // extra-safe cap in the maze specifically
       const stepX = Math.sin(playerFacing) * step;
       const stepZ = Math.cos(playerFacing) * step;
       const PLAYER_RADIUS = 0.35;
