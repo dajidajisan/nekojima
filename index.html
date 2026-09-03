@@ -3683,14 +3683,47 @@ mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 44.0, MAZE_OFFSET.z + 37.5, Math.PI/2
   "Turn left here."));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 37.5, MAZE_OFFSET.z + 46.0, Math.PI,
   "Turn left here."));
-mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, Math.PI,
-  "Welcome! This is a big maze — good luck!"));
+
+function makeStartGoalArch(x, z, rotY, label, color){
+  const g = new THREE.Group();
+  const postMat = new THREE.MeshPhongMaterial({color, shininess:90});
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.13,2.0,10), postMat);
+    post.position.set(side*1.1, 1.0, 0);
+    g.add(post);
+  });
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.18,0.18), postMat);
+  beam.position.set(0,2.0,0);
+  g.add(beam);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.fillRect(4,4,248,88);
+  ctx.strokeStyle = '#' + color.toString(16).padStart(6,'0');
+  ctx.lineWidth = 6;
+  ctx.strokeRect(6,6,244,84);
+  ctx.font = '700 48px sans-serif';
+  ctx.fillStyle = '#' + color.toString(16).padStart(6,'0');
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, 128, 50);
+  const tex = new THREE.CanvasTexture(canvas);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.68), new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.FrontSide}));
+  sign.position.set(0,1.4,0.1);
+  g.add(sign);
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  mazeGroup.add(g);
+}
+makeStartGoalArch(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z - 1.5, Math.PI, 'START', 0x4FA84A);
 
 // entrance point (just south of the entrance gap), used to place the
 // player right as they teleport in
 const mazeEntranceWorldPos = { x: MAZE_OFFSET.x + 2.5, z: MAZE_OFFSET.z - 1 };
 // goal marker + reward, reachable just past the exit gap (east side of row 9)
 const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 51.5, z: MAZE_OFFSET.z + 47.5 };
+makeStartGoalArch(mazeGoalWorldPos.x, mazeGoalWorldPos.z, -Math.PI/2, 'GOAL', 0xFF6B9D);
 {
   const flag = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.8,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
@@ -3703,11 +3736,76 @@ const mazeGoalWorldPos = { x: MAZE_OFFSET.x + 51.5, z: MAZE_OFFSET.z + 47.5 };
   flag.position.set(mazeGoalWorldPos.x, 0, mazeGoalWorldPos.z);
   mazeGroup.add(flag);
 }
+
+// scattered decorations + a few bonus coin pickups along the route, so
+// the long corridor doesn't feel monotonous the whole way through
+function makeMazeLantern(x,z){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,1.2,6), new THREE.MeshLambertMaterial({color:0x8A6D42}));
+  pole.position.y = 0.6;
+  g.add(pole);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15,10,8), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  lamp.position.y = 1.3;
+  g.add(lamp);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.24,10,8), new THREE.MeshBasicMaterial({color:0xFFD873, transparent:true, opacity:0.3}));
+  glow.position.y = 1.3;
+  g.add(glow);
+  g.add(makeBlobShadow(0.3));
+  g.position.set(x,0,z);
+  mazeGroup.add(g);
+}
+function makeMazePlant(x,z){
+  const g = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.12,0.2,8), new THREE.MeshLambertMaterial({color:0xC97B4A}));
+  pot.position.y = 0.1;
+  g.add(pot);
+  for(let i=0;i<5;i++){
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.35,6), new THREE.MeshLambertMaterial({color:0x6FBE5A}));
+    const a = (i/5)*Math.PI*2;
+    leaf.position.set(Math.cos(a)*0.08, 0.35, Math.sin(a)*0.08);
+    leaf.rotation.z = Math.cos(a)*0.3;
+    leaf.rotation.x = Math.sin(a)*0.3;
+    g.add(leaf);
+  }
+  g.add(makeBlobShadow(0.25));
+  g.position.set(x,0,z);
+  mazeGroup.add(g);
+}
+[[9,17],[38,12],[42,19]].forEach(([x,z]) => makeMazeLantern(MAZE_OFFSET.x + x, MAZE_OFFSET.z + z));
+[[14,41],[13,22],[27,37]].forEach(([x,z]) => makeMazePlant(MAZE_OFFSET.x + x, MAZE_OFFSET.z + z));
+
+const mazeBonusCoins = [];
+function addMazeBonusCoin(x,z){
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.06,20), new THREE.MeshPhongMaterial({color:0xFFD54A, shininess:150, specular:0xffffff}));
+  mesh.rotation.x = Math.PI/2;
+  mesh.position.set(x, 1.0, z);
+  mazeGroup.add(mesh);
+  mazeBonusCoins.push({ mesh, x, z, claimed:false });
+}
+addMazeBonusCoin(MAZE_OFFSET.x + 17.5, MAZE_OFFSET.z + 37.5);
+addMazeBonusCoin(MAZE_OFFSET.x + 42.5, MAZE_OFFSET.z + 42.5);
+function updateMazeBonusCoins(t){
+  if(!inMazeMode) return;
+  mazeBonusCoins.forEach(c=>{
+    if(c.claimed){ c.mesh.visible = false; return; }
+    c.mesh.rotation.z = t*2;
+    c.mesh.position.y = 1.0 + Math.sin(t*3)*0.08;
+    const dist = Math.hypot(player.position.x - c.x, player.position.z - c.z);
+    if(dist < 1.2){
+      c.claimed = true;
+      coins += 2;
+      updateCoinHUD();
+      saveProgress();
+      playCorrectSound();
+      showToast('✨ ボーナスコイン！ +2🪙');
+    }
+  });
+}
 let mazeGoalClaimedToday = false;
 function checkMazeGoal(){
   if(!inMazeMode) return;
   const dist = Math.hypot(player.position.x - mazeGoalWorldPos.x, player.position.z - mazeGoalWorldPos.z);
-  if(dist < 1.8){
+  if(dist < 2.6){
     if(!mazeGoalClaimedToday){
       mazeGoalClaimedToday = true;
       coins += 8;
@@ -5576,6 +5674,7 @@ function animate(){
   }
 
   checkMazeGoal();
+  updateMazeBonusCoins(t);
   updateSkyPodRide(dt);
   updateCoasterRide(dt);
   if(themeparkDecorGroup.visible){
