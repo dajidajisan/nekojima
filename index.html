@@ -3740,6 +3740,118 @@ const flyingPodMesh = new THREE.Group();
 flyingPodMesh.visible = false;
 scene.add(flyingPodMesh);
 
+// theme park coaster ride — same mechanism as the sky pod (scripted
+// path, no new collision/physics), just a different themed car + path
+const coasterRideCarMesh = new THREE.Group();
+{
+  const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.6,0.14,20), new THREE.MeshPhongMaterial({color:0xFFD93D, shininess:140, specular:0xffffff}));
+  coasterRideCarMesh.add(seat);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.3,0.4,12), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:140}));
+  nose.rotation.x = Math.PI/2;
+  nose.position.set(0,0.05,0.55);
+  coasterRideCarMesh.add(nose);
+  const bar = new THREE.Mesh(new THREE.TorusGeometry(0.5,0.03,6,20,Math.PI), new THREE.MeshBasicMaterial({color:0x2A2F45}));
+  bar.rotation.z = Math.PI/2;
+  bar.rotation.y = Math.PI/2;
+  bar.position.y = 0.28;
+  coasterRideCarMesh.add(bar);
+}
+coasterRideCarMesh.visible = false;
+scene.add(coasterRideCarMesh);
+
+const COASTER_RIDE_STATION_POS = { x:13, z:2 };
+const COASTER_RIDE_PATH = [
+  [13,2, 1], [17,-4, 3.5], [15,-11, 5.5], [9,-16, 3.5],
+  [2,-15, 1.5], [-3,-10, 3], [-2,-3, 1.5], [13,2, 1],
+];
+const COASTER_RIDE_CAPTIONS = [
+  { at:0.03, en:"Hold on tight! Here we go!", ja:"しっかりつかまって！出発だよ！" },
+  { at:0.3, en:"Whoosh! Feel the wind!", ja:"びゅーん！風を感じるね！" },
+  { at:0.55, en:"Hang on, here comes a big drop!", ja:"つかまって、大きな下りが来るよ！" },
+  { at:0.8, en:"We're heading back to the station!", ja:"乗り場に戻るよ！" },
+];
+
+function boardCoasterRide(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  rideElapsed = 0;
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  coasterRideCarMesh.visible = true;
+  coasterRideCarMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
+  COASTER_RIDE_CAPTIONS.forEach(c=> c._shown = false);
+  rideCaption(`<span style="font-size:14px;">${COASTER_RIDE_CAPTIONS[0].en}</span><br><span style="font-size:12px; opacity:.85;">${COASTER_RIDE_CAPTIONS[0].ja}</span>`);
+}
+
+function updateCoasterRide(dt){
+  if(!rideActive || !coasterRideCarMesh.visible) return;
+  rideElapsed += dt;
+  const t = Math.min(1, rideElapsed / RIDE_DURATION);
+
+  const segs = COASTER_RIDE_PATH.length - 1;
+  const scaled = t * segs;
+  const i = Math.min(segs-1, Math.floor(scaled));
+  const localT = scaled - i;
+  const [x1,z1,y1] = COASTER_RIDE_PATH[i], [x2,z2,y2] = COASTER_RIDE_PATH[i+1];
+  player.position.set(
+    x1 + (x2-x1)*localT,
+    y1 + (y2-y1)*localT,
+    z1 + (z2-z1)*localT
+  );
+  player.rotation.y = Math.atan2(x2-x1, z2-z1);
+  coasterRideCarMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
+  coasterRideCarMesh.rotation.y = player.rotation.y;
+  // a bit punchier than the sky pod's gentle bob — feels more like a coaster
+  const bob = Math.sin(rideElapsed*5)*0.1;
+  const bank = Math.sin(rideElapsed*1.8)*0.12;
+  coasterRideCarMesh.position.y += bob;
+  coasterRideCarMesh.rotation.z = bank;
+  player.position.y += bob;
+  player.rotation.z = bank;
+
+  COASTER_RIDE_CAPTIONS.forEach(c=>{
+    if(!c._shown && t >= c.at){
+      c._shown = true;
+      rideCaption(`<span style="font-size:14px;">${c.en}</span><br><span style="font-size:12px; opacity:.85;">${c.ja}</span>`);
+    }
+  });
+
+  if(t >= 1){
+    rideActive = false;
+    player.position.set(COASTER_RIDE_STATION_POS.x, 0, COASTER_RIDE_STATION_POS.z);
+    player.rotation.z = 0;
+    coasterRideCarMesh.visible = false;
+    coins += 1;
+    updateCoinHUD();
+    saveProgress();
+    showToast('🎢 コースター、おつかれさま！ +1🪙');
+    const el = document.getElementById('rideCaption');
+    if(el) el.style.opacity = '0';
+  }
+}
+
+// small boarding station for the ride
+function makeCoasterRideStation(x,z){
+  const g = new THREE.Group();
+  const platform = new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.4,0.15,20), new THREE.MeshPhongMaterial({color:0xE4E6EE, shininess:70}));
+  platform.position.y = 0.08;
+  g.add(platform);
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.1,8), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+    post.position.set(side*1.1, 0.55, 0);
+    g.add(post);
+  });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.06,0.06), new THREE.MeshBasicMaterial({color:0xFFD93D}));
+  bar.position.y = 1.05;
+  g.add(bar);
+  const marker = makeFloatingMarker('🎢', 2.2);
+  g.add(marker);
+  g.add(makeBlobShadow(1.5));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
 // waypoints: [x, z, y] — rises from the station, loops past several
 // city landmarks at altitude, then descends back to the station
 const RIDE_PATH = [
@@ -3779,7 +3891,7 @@ function boardSkyPod(landmark){
 }
 
 function updateSkyPodRide(dt){
-  if(!rideActive) return;
+  if(!rideActive || !flyingPodMesh.visible) return;
   rideElapsed += dt;
   const t = Math.min(1, rideElapsed / RIDE_DURATION);
 
@@ -4743,13 +4855,14 @@ const landmarks = [
   { ...makeSmartHomePod(-19,-8), id:'smarthome', type:'smarthome', title:'スマートホーム', sub:'おうちロボに指示してみよう', emoji:'🏠', bg:'6BCBFF', label:'🏠 指示する' },
   { ...makeSkyPodStation(-2,-6), id:'skypod', type:'skypod', title:'スカイポッド乗り場', sub:'空中散歩に出発しよう', emoji:'🚀', bg:'FF6B9D', label:'🚀 のりこむ' },
   { ...makeCoasterGate(18,10), id:'coaster', type:'coaster', title:'ローラーコースター', sub:'指示についていこう！', emoji:'🎢', bg:'FF6B9D', label:'🎢 のる' },
+  { ...makeCoasterRideStation(13,2), id:'coasterride', type:'coasterride', title:'コースター乗り場', sub:'実際にコースターに乗ってみよう', emoji:'🎢', bg:'FFD93D', label:'🎢 コースターにのる' },
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
-const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda']);
+const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride']);
 landmarks.forEach(l => scene.add(l.group));
 
 /* =========================================================
@@ -5420,6 +5533,7 @@ function animate(){
 
   checkMazeGoal();
   updateSkyPodRide(dt);
+  updateCoasterRide(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -6128,6 +6242,7 @@ interactBtn.addEventListener('click', ()=>{
   if(nearNPC) openQuiz(nearNPC);
   else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
   else if(nearLandmark && nearLandmark.type === 'skypod') boardSkyPod(nearLandmark);
+  else if(nearLandmark && nearLandmark.type === 'coasterride') boardCoasterRide(nearLandmark);
   else if(nearLandmark) openLandmark(nearLandmark);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
