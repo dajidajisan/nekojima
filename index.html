@@ -3395,28 +3395,17 @@ function makeDigitalVision(x,z,rotY,words){
   // screen's fixed physical size
   tex.repeat.x = (512 * SCALE) / canvas.width;
 
-  // back face: a plane simply rotated 180° to face the other way would
-  // show the text mirrored (like viewing a printed page from behind) —
-  // so we pre-mirror the PIXELS onto a second canvas first; that mirror
-  // plus the 180° rotation's mirror cancel out, leaving correctly
-  // readable (non-backwards) text on the back
-  const backCanvas = document.createElement('canvas');
-  backCanvas.width = canvas.width;
-  backCanvas.height = canvas.height;
-  const backCtx = backCanvas.getContext('2d');
-  backCtx.translate(backCanvas.width, 0);
-  backCtx.scale(-1, 1);
-  backCtx.drawImage(canvas, 0, 0);
-  const backTex = new THREE.CanvasTexture(backCanvas);
-  backTex.wrapS = THREE.RepeatWrapping;
-  backTex.repeat.x = tex.repeat.x;
-
   const screenW = 3.6 * SCALE, screenH = 0.9 * SCALE;
   const frameHalfDepth = 0.045 * SCALE;
   const screenOffset = frameHalfDepth + 0.01; // sit clearly outside the frame's surface, not exactly coplanar with it (avoids z-fighting that let the dark frame win the depth test and hide the text)
+  // NOTE: a plane rotated 180° to face the other way already shows its
+  // texture correctly on its own — rotation alone preserves left-to-right
+  // reading order, so both faces just share the same texture; only the
+  // rotation differs (mirroring the texture on top of that would flip
+  // it twice, back into backwards text)
   const screenFront = new THREE.Mesh(new THREE.PlaneGeometry(screenW,screenH), new THREE.MeshBasicMaterial({map:tex}));
   screenFront.position.z = screenOffset;
-  const screenBack = new THREE.Mesh(new THREE.PlaneGeometry(screenW,screenH), new THREE.MeshBasicMaterial({map:backTex}));
+  const screenBack = new THREE.Mesh(new THREE.PlaneGeometry(screenW,screenH), new THREE.MeshBasicMaterial({map:tex}));
   screenBack.rotation.y = Math.PI;
   screenBack.position.z = -screenOffset;
 
@@ -3428,7 +3417,7 @@ function makeDigitalVision(x,z,rotY,words){
   g.position.set(x, 3.5*SCALE, z);
   g.rotation.y = rotY;
   cityGroup.add(g);
-  digitalVisionScreens.push(tex, backTex);
+  digitalVisionScreens.push(tex);
 }
 // 4 billboards, each cycling a different set of ~10 Eiken pre-2 level
 // words chosen for a positive, future-city feel
@@ -4098,13 +4087,44 @@ function makeMiniCoasterRail(){
   // a small cart that actually travels along the rail, so it reads as a
   // real ride rather than just a static track
   const cart = new THREE.Group();
-  const cartBody = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.32,0.7), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:120}));
-  cart.add(cartBody);
-  const cartFront = new THREE.Mesh(new THREE.ConeGeometry(0.28,0.4,4), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:120}));
-  cartFront.rotation.x = Math.PI/2;
-  cartFront.rotation.y = Math.PI/4;
-  cartFront.position.set(0,0.02,0.42);
-  cart.add(cartFront);
+  const carColors = [0xFF6B9D, 0x6BCBFF, 0xFFD873];
+  for(let ci=0; ci<3; ci++){
+    const car = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.26,0.48), new THREE.MeshPhongMaterial({color:carColors[ci], shininess:130, specular:0xffffff}));
+    body.position.y = 0.14;
+    car.add(body);
+    // two seat bumps facing forward, giving it a proper "ride car" silhouette
+    [-0.13,0.13].forEach(dz=>{
+      const seat = new THREE.Mesh(new THREE.SphereGeometry(0.16,10,8), new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:110}));
+      seat.scale.set(1,0.75,0.9);
+      seat.position.set(0,0.32,dz);
+      car.add(seat);
+    });
+    // safety bar across the front
+    const bar = new THREE.Mesh(new THREE.TorusGeometry(0.24,0.028,6,14,Math.PI), new THREE.MeshBasicMaterial({color:0x2A2F45}));
+    bar.rotation.z = Math.PI/2;
+    bar.rotation.y = Math.PI/2;
+    bar.position.set(0.16,0.32,0);
+    car.add(bar);
+    // small wheels underneath
+    [-0.18,0.18].forEach(dx=>{
+      [-0.19,0.19].forEach(dz=>{
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.06,10), new THREE.MeshLambertMaterial({color:0x2A2F45}));
+        wheel.rotation.x = Math.PI/2;
+        wheel.position.set(dx,0.02,dz);
+        car.add(wheel);
+      });
+    });
+    car.position.z = (ci-1)*0.56; // spread cars front-to-back into a train
+    cart.add(car);
+  }
+  // couplings linking the cars
+  for(let ci=0;ci<2;ci++){
+    const link = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.24,6), new THREE.MeshLambertMaterial({color:0xAEB4C7}));
+    link.rotation.x = Math.PI/2;
+    link.position.set(0, 0.14, (ci-0.5)*0.56);
+    cart.add(link);
+  }
   themeparkDecorGroup.add(cart);
   coasterCart = { mesh:cart, curve };
 }
@@ -4240,10 +4260,18 @@ function makeGiantCandy(x,z,colorA){
   stick.position.y = 0.75;
   g.add(stick);
   const tex = makeLollipopSwirlTexture(colorA, 0xFFFFFF);
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.16,36), new THREE.MeshPhongMaterial({map:tex, shininess:130}));
-  disc.rotation.z = Math.PI/2;
-  disc.position.y = 1.65;
-  g.add(disc);
+  const faceMat = new THREE.MeshPhongMaterial({map:tex, shininess:130});
+  const front = new THREE.Mesh(new THREE.CircleGeometry(0.6,36), faceMat);
+  front.position.set(0,1.65,0.07);
+  g.add(front);
+  const back = new THREE.Mesh(new THREE.CircleGeometry(0.6,36), faceMat);
+  back.rotation.y = Math.PI;
+  back.position.set(0,1.65,-0.07);
+  g.add(back);
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.14,36,1,true), new THREE.MeshPhongMaterial({color:colorA, shininess:100}));
+  rim.rotation.x = Math.PI/2;
+  rim.position.y = 1.65;
+  g.add(rim);
   // twisted wrapper flourish at the base of the disc, cellophane-style
   const wrap = new THREE.Mesh(new THREE.ConeGeometry(0.14,0.3,10), new THREE.MeshPhongMaterial({color:0xFFFFFF, transparent:true, opacity:0.55, shininess:90}));
   wrap.position.y = 1.25;
@@ -4319,21 +4347,15 @@ function makeThemeparkGateArch(x,z,rotY){
   ctx.fillText('ゆめのくにテーマパーク', 256, 50);
   const tex = new THREE.CanvasTexture(canvas);
 
-  // pre-mirror a second copy for the inward-facing side — rotating a
-  // plane 180° alone shows the text backwards (like reading a page from
-  // behind); mirroring the pixels first cancels that out correctly
-  const backCanvas = document.createElement('canvas');
-  backCanvas.width = canvas.width; backCanvas.height = canvas.height;
-  const backCtx = backCanvas.getContext('2d');
-  backCtx.translate(backCanvas.width, 0);
-  backCtx.scale(-1, 1);
-  backCtx.drawImage(canvas, 0, 0);
-  const backTex = new THREE.CanvasTexture(backCanvas);
-
+  // NOTE: a plane simply rotated 180° to face the other way already
+  // shows its texture correctly (rotation alone preserves left-to-right
+  // reading order) — mirroring the texture on top of that would flip it
+  // twice, back into backwards text. So both signs use the same,
+  // unmirrored texture; only the rotation differs.
   const outSign = new THREE.Mesh(new THREE.PlaneGeometry(4.4,0.85), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
   outSign.position.set(0,3.9,0.06);
   g.add(outSign);
-  const inSign = new THREE.Mesh(new THREE.PlaneGeometry(4.4,0.85), new THREE.MeshBasicMaterial({map:backTex, transparent:true}));
+  const inSign = new THREE.Mesh(new THREE.PlaneGeometry(4.4,0.85), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
   inSign.rotation.y = Math.PI;
   inSign.position.set(0,3.9,-0.06);
   g.add(inSign);
@@ -4345,18 +4367,54 @@ function makeThemeparkGateArch(x,z,rotY){
 makeThemeparkGateArch(20,20,-Math.PI/4);
 
 // ポップコーン・わたあめの屋台
+function makeAwningStripeTexture(stripeColor){
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0,0,128,128);
+  ctx.fillStyle = '#' + stripeColor.toString(16).padStart(6,'0');
+  for(let i=0;i<8;i+=2){
+    ctx.fillRect(i*16,0,16,128);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.x = 3;
+  return tex;
+}
 function makeSnackStand(x,z,roofColor,topColor,label){
   const g = new THREE.Group();
   const counter = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.75,0.75), new THREE.MeshPhongMaterial({color:0xFFF3EC, shininess:70}));
   counter.position.y = 0.37;
   g.add(counter);
-  const awning = new THREE.Mesh(new THREE.ConeGeometry(1.3,0.85,4), new THREE.MeshLambertMaterial({color:roofColor}));
-  awning.rotation.y = Math.PI/4;
-  awning.position.y = 1.35;
+  const counterTrim = new THREE.Mesh(new THREE.BoxGeometry(1.65,0.1,0.8), new THREE.MeshPhongMaterial({color:roofColor, shininess:70}));
+  counterTrim.position.y = 0.02;
+  g.add(counterTrim);
+
+  // support posts holding up the awning
+  [-0.7,0.7].forEach(dx=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.1,8), new THREE.MeshLambertMaterial({color:0xE4E6EE}));
+    post.position.set(dx, 1.1, -0.3);
+    g.add(post);
+  });
+  const awningTex = makeAwningStripeTexture(roofColor);
+  const awning = new THREE.Mesh(new THREE.ConeGeometry(1.3,0.85,10), new THREE.MeshPhongMaterial({map:awningTex, shininess:60}));
+  awning.position.y = 1.7;
   g.add(awning);
+  const awningTrim = new THREE.Mesh(new THREE.TorusGeometry(1.28,0.04,6,20), new THREE.MeshBasicMaterial({color:roofColor}));
+  awningTrim.rotation.x = Math.PI/2;
+  awningTrim.position.y = 1.32;
+  g.add(awningTrim);
+
   const jar = new THREE.Mesh(new THREE.SphereGeometry(0.3,14,12), new THREE.MeshBasicMaterial({color:topColor, transparent:true, opacity:0.85}));
   jar.position.set(0,0.9,0.2);
   g.add(jar);
+  // a couple of treat items poking out of the jar / sitting on the counter
+  [-0.15,0.15].forEach((dx,i)=>{
+    const treat = new THREE.Mesh(new THREE.ConeGeometry(0.1,0.22,8), new THREE.MeshPhongMaterial({color: i===0?0xFFD873:0xFF8FA3, shininess:80}));
+    treat.position.set(dx, 1.15, 0.2);
+    g.add(treat);
+  });
 
   // sign board naming the stand, mounted on the front of the counter
   const canvas = document.createElement('canvas');
@@ -4379,7 +4437,7 @@ function makeSnackStand(x,z,roofColor,topColor,label){
   sign.position.set(0,0.5,0.39);
   g.add(sign);
 
-  g.add(makeBlobShadow(1.2));
+  g.add(makeBlobShadow(1.4));
   g.position.set(x,0,z);
   themeparkDecorGroup.add(g);
 }
@@ -4461,7 +4519,7 @@ function makeFloatingMarker(emoji, y){
   ctx3.textAlign='center'; ctx3.textBaseline='middle';
   ctx3.fillText(emoji, 128, 136);
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true }));
-  spr.scale.set(1.3,1.3,1); // ~2.2x the original 0.6 display size
+  spr.scale.set(0.9,0.9,1); // ~1.5x the original 0.6 display size
   spr.position.set(0,y,0);
   spr.userData.baseY = y;
   return spr;
