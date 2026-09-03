@@ -6272,6 +6272,7 @@ function lrDraw(){
 
 
 interactBtn.addEventListener('click', ()=>{
+  alert('クリックされました！ nearNPC=' + (nearNPC ? nearNPC.def.name : 'null') + ' nearLandmark=' + (nearLandmark ? nearLandmark.type : 'null'));
   if(nearNPC) openQuiz(nearNPC);
   else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
   else if(nearLandmark && nearLandmark.type === 'skypod') boardSkyPod(nearLandmark);
