@@ -3643,7 +3643,7 @@ function makeSignpost(x,z,rotY,textEn,textJa,arrowDir){
     new THREE.PlaneGeometry(1.3,0.58),
     new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.FrontSide})
   );
-  plane.position.set(x, 1.15, z);
+  plane.position.set(x, 1.75, z);
   plane.rotation.y = rotY;
   return plane;
 }
@@ -3654,19 +3654,19 @@ function makeSignpost(x,z,rotY,textEn,textJa,arrowDir){
 // was computed programmatically from the maze's own connection data,
 // not guessed — see the conversation notes for the derivation.
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 7.5, MAZE_OFFSET.z - 1.5, Math.PI,
-  "Welcome! Turn right to begin.", "ようこそ！右に曲がってスタート！", 'right'));
+  "Welcome! Turn left to begin.", "ようこそ！左に曲がってスタート！", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 16, MAZE_OFFSET.z + 2.5, -Math.PI/2,
-  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。", 'left'));
+  "Turn right here. Straight ahead is a dead end.", "ここを右に。まっすぐは行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 17.5, MAZE_OFFSET.z + 6, Math.PI,
-  "Turn right here.", "ここを右に曲がってね。", 'right'));
+  "Turn left here.", "ここを左に曲がってね。", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 22.5, MAZE_OFFSET.z + 16, Math.PI,
-  "Turn left here. Straight ahead is a dead end.", "ここを左に。まっすぐは行き止まりだよ。", 'left'));
+  "Turn right here. Straight ahead is a dead end.", "ここを右に。まっすぐは行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 19, MAZE_OFFSET.z + 17.5, Math.PI/2,
-  "Turn right here.", "ここを右に曲がってね。", 'right'));
+  "Turn left here.", "ここを左に曲がってね。", 'right'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 9, MAZE_OFFSET.z + 22.5, Math.PI/2,
-  "Turn left here. The other path is a dead end.", "ここを左に。もう一方の道は行き止まりだよ。", 'left'));
+  "Turn right here. The other path is a dead end.", "ここを右に。もう一方の道は行き止まりだよ。", 'left'));
 mazeGroup.add(makeSignpost(MAZE_OFFSET.x + 2.5, MAZE_OFFSET.z + 3.5, 0,
-  "Turn right to find the exit!", "右に曲がると出口だよ！", 'right'));
+  "Turn left to find the exit!", "左に曲がると出口だよ！", 'right'));
 
 // entrance point (just south of the entrance gap), used to place the
 // player right as they teleport in
