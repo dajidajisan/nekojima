@@ -2711,17 +2711,17 @@ const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
     theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
-    landmarkPos:{ comedy:[-15,3], fortune:[9.1,-11.6], praise:[-3,-4], future:[9,14], robot:[-9,16] },
+    landmarkPos:{ comedy:[-15,3], fortune:[9.1,-11.6], praise:[-3,-4], future:[9,14], robot:[-9,16], essay:[7,5] },
   },
   {
     id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:250, status:'ready',
     theme:{ groundDay:0xC7C9D4, groundNight:0x33364A, path:0x9098A8, wall:0xE4E6EE, roofs:[0x6B7A99,0x8993B0,0x5E6B87], buildingScaleY:2.1, natureVisible:false },
-    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14], future:[-8,-16], robot:[12,-16] },
+    landmarkPos:{ comedy:[11,9], fortune:[-13,7], praise:[5,-14], future:[-8,-16], robot:[12,-16], essay:[7,5] },
   },
   {
     id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
-    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-11.6,-5.3], future:[6,15], robot:[17,-14] },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-11.6,-5.3], future:[6,15], robot:[17,-14], essay:[7,5] },
   },
   {
     id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
@@ -4219,6 +4219,52 @@ function makePandaMascot(x,z){
   return { group:g, marker };
 }
 
+// 英作文チャレンジ: a small writing desk with an open notebook and pencil
+function makeMagicPostbox(x,z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.38,0.15,16), new THREE.MeshLambertMaterial({color:0xE4E6EE}));
+  base.position.y = 0.08;
+  g.add(base);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.11,0.5,10), new THREE.MeshPhongMaterial({color:0x9B6BFF, shininess:80}));
+  post.position.y = 0.4;
+  g.add(post);
+  // main rounded postbox body
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.7,20), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:100, specular:0xffffff}));
+  body.position.y = 1.0;
+  g.add(body);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.34,20,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshPhongMaterial({color:0xFF6B9D, shininess:100, specular:0xffffff}));
+  dome.position.y = 1.35;
+  g.add(dome);
+  // glowing mail slot
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.05,0.06), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  slot.position.set(0,1.1,0.32);
+  g.add(slot);
+  // sparkly ring of stars around the body
+  for(let i=0;i<5;i++){
+    const a = (i/5)*Math.PI*2;
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.045,0), new THREE.MeshBasicMaterial({color:[0xFFD873,0x6BCBFF,0xFFFFFF][i%3]}));
+    star.position.set(Math.cos(a)*0.37, 0.85 + (i%2)*0.3, Math.sin(a)*0.37);
+    g.add(star);
+  }
+  // glowing star finial on top
+  const finial = new THREE.Mesh(new THREE.OctahedronGeometry(0.09,0), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  finial.position.y = 1.72;
+  g.add(finial);
+  const finialGlow = new THREE.Mesh(new THREE.SphereGeometry(0.14,10,8), new THREE.MeshBasicMaterial({color:0xFFD873, transparent:true, opacity:0.3}));
+  finialGlow.position.y = 1.72;
+  g.add(finialGlow);
+  // a little envelope peeking out of the slot
+  const envelope = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.02,0.11), new THREE.MeshBasicMaterial({color:0xFFFFFF}));
+  envelope.rotation.x = -0.3;
+  envelope.position.set(0,1.16,0.36);
+  g.add(envelope);
+  const marker = makeFloatingMarker('📮', 2.3);
+  g.add(marker);
+  g.add(makeBlobShadow(0.9));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
 /* =========================================================
    THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
    noted, all shown only in ゆめのくにテーマパーク
@@ -4985,6 +5031,7 @@ const landmarks = [
   { ...makePraisePedestal(-3,-4), id:'praise', type:'praise', title:'ほめポイント', sub:'とにかくほめてもらう', emoji:'💖', bg:'FF8FA3', label:'💖 ほめてもらう' },
   { ...makeFutureOrb(9,14), id:'future', type:'future', title:'未来予想ポイント', sub:'未来のことを予想する', emoji:'🔭', bg:'6BCBFF', label:'🔭 未来を のぞく' },
   { ...makeCatRobot(-9,16), id:'robot', type:'robot', title:'ねこロボ', sub:'じゃんけんで勝負！', emoji:'🤖', bg:'9B6BFF', label:'🤖 じゃんけんする' },
+  { ...makeMagicPostbox(7,5), id:'essay', type:'essay', title:'まほうのポスト', sub:'日本語を英語にして手紙を書こう', emoji:'📮', bg:'FF6B9D', label:'📮 てがみを書く' },
   mazeGateLandmark,
   { ...makeRobotCafe(-16,-2), id:'robotcafe', type:'robotcafe', title:'ロボットカフェ', sub:'えいごで注文してみよう', emoji:'☕', bg:'6BCBFF', label:'☕ 注文する' },
   { ...makeNewsKiosk(20,-5.4), id:'news', type:'news', title:'速報ニュース', sub:'みらいの街のニュースを見る', emoji:'📰', bg:'FF6BC4', label:'📰 ニュースを見る' },
@@ -5344,6 +5391,25 @@ const groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
 let moveTarget = null; // {x,z} in world space, or null when not walking
 let wasNearSomething = false; // tracks entering/leaving interact range, see proximity check below
 let outOfRangeTimer = 0; // seconds spent out of range — used to debounce the interact button so a single-frame dip in distance can't silently break clickability while the button is still visually fading out
+
+// shared distance computation — used both by the per-frame proximity
+// loop AND directly by the interact button's click handler, so a click
+// always acts on a freshly-computed result instead of a global variable
+// that could theoretically be a frame stale relative to the click event
+function findClosestInteractable(){
+  let closest = null, closestDist = Infinity, closestKind = null;
+  npcs.forEach(n=>{
+    if(!n.mesh.visible) return;
+    const dist = player.position.distanceTo(n.mesh.position);
+    if(dist < closestDist){ closestDist = dist; closest = n; closestKind = 'npc'; }
+  });
+  landmarks.forEach(l=>{
+    if(!l.group.visible) return;
+    const dist = player.position.distanceTo(l.group.position);
+    if(dist < closestDist){ closestDist = dist; closest = l; closestKind = 'landmark'; }
+  });
+  return { closest, closestDist, closestKind };
+}
 let conversationContext = ''; // the last full exchange (opener→reply→reaction), fed into the next AI generation prompt so consecutive questions with the same NPC feel like one ongoing conversation
 
 function formatExchange(item){
@@ -5618,23 +5684,19 @@ function animate(){
   });
 
   // npc idle bob + nearest check (NPCs and special landmarks share the interact button)
-  let closest = null, closestDist = Infinity, closestKind = null;
   npcs.forEach(n=>{
     if(!n.mesh.visible) return; // belongs to a different world, not shown right now
     n.mesh.position.y = Math.abs(Math.sin(t*1.8 + n.def.pos[0]))*0.05;
     n.marker.position.y = 3.05 + Math.sin(t*3 + n.def.pos[0])*0.08;
     n.marker.visible = !allMastered(n);
-    const dist = player.position.distanceTo(n.mesh.position);
-    if(dist < closestDist){ closestDist = dist; closest = n; closestKind = 'npc'; }
   });
   landmarks.forEach(l=>{
     if(!l.group.visible) return;
     l.marker.position.y = l.marker.userData.baseY + Math.sin(t*2.5 + l.group.position.x)*0.1;
     if(l.ball) l.ball.rotation.y = t*0.6;
     if(l.star) l.star.rotation.y = t*0.8;
-    const dist = player.position.distanceTo(l.group.position);
-    if(dist < closestDist){ closestDist = dist; closest = l; closestKind = 'landmark'; }
   });
+  const { closest, closestDist, closestKind } = findClosestInteractable();
   const currentThreshold = (nearNPC || nearLandmark) ? INTERACT_DIST * 1.35 : INTERACT_DIST;
   if(closest && closestDist < currentThreshold){
     outOfRangeTimer = 0;
@@ -5642,6 +5704,7 @@ function animate(){
     nearLandmark = closestKind === 'landmark' ? closest : null;
     interactBtn.textContent = closestKind === 'npc' ? '💬 はなしかける' : closest.label;
     interactBtn.classList.add('show');
+    interactBtn.style.pointerEvents = 'auto';
     if(!wasNearSomething) moveTarget = null; // stop only on first entering range, not every frame
     wasNearSomething = true;
   } else {
@@ -5650,6 +5713,7 @@ function animate(){
       nearNPC = null;
       nearLandmark = null;
       interactBtn.classList.remove('show');
+      interactBtn.style.pointerEvents = 'none';
       wasNearSomething = false;
     }
   }
@@ -6388,11 +6452,19 @@ function lrDraw(){
 
 
 interactBtn.addEventListener('click', ()=>{
-  if(nearNPC) openQuiz(nearNPC);
-  else if(nearLandmark && nearLandmark.type === 'mazegate') enterMaze();
-  else if(nearLandmark && nearLandmark.type === 'skypod') boardSkyPod(nearLandmark);
-  else if(nearLandmark && nearLandmark.type === 'coasterride') boardCoasterRide(nearLandmark);
-  else if(nearLandmark) openLandmark(nearLandmark);
+  // recompute fresh right now, rather than trusting the last per-frame
+  // snapshot — closes the gap where a click could land in the same
+  // frame the proximity state was about to update
+  const { closest, closestDist, closestKind } = findClosestInteractable();
+  const clickThreshold = INTERACT_DIST * 1.35; // generous — the button was already visible, so this just confirms it's still plausible
+  const clickNPC = (closestKind === 'npc' && closestDist < clickThreshold) ? closest : nearNPC;
+  const clickLandmark = (closestKind === 'landmark' && closestDist < clickThreshold) ? closest : nearLandmark;
+
+  if(clickNPC) openQuiz(clickNPC);
+  else if(clickLandmark && clickLandmark.type === 'mazegate') enterMaze();
+  else if(clickLandmark && clickLandmark.type === 'skypod') boardSkyPod(clickLandmark);
+  else if(clickLandmark && clickLandmark.type === 'coasterride') boardCoasterRide(clickLandmark);
+  else if(clickLandmark) openLandmark(clickLandmark);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
 
@@ -7006,7 +7078,7 @@ let currentPandaPrompt = null;
 
 async function renderPandaMascot(landmark){
   quizBody.innerHTML = `<div class="npc-done-panel">
-    <div class="emoji thinking-emoji">🐼</div>
+    <div class="emoji thinking-emoji">${landmark.emoji}</div>
     <p>話したいことを考え中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
   </div>`;
   nextBtn.classList.remove('show');
@@ -7015,7 +7087,7 @@ async function renderPandaMascot(landmark){
   currentPandaPrompt = generated || PANDA_PROMPT_FALLBACK[Math.floor(Math.random()*PANDA_PROMPT_FALLBACK.length)];
 
   quizBody.innerHTML = `
-    <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
+    <span class="exercise-tag" style="background:#${landmark.bg};">${landmark.emoji} ${landmark.title}</span>
     <div class="dialogue-bubble"><span class="ja" style="font-size:16px;">${currentPandaPrompt.ja}</span></div>
     <div class="ja-hint">この日本語を、えいごにしてみよう！</div>
     <div class="type-answer-row">
@@ -7037,7 +7109,7 @@ async function renderPandaMascot(landmark){
 
 async function submitPandaAnswer(userEnglish, landmark){
   quizBody.innerHTML = `<div class="npc-done-panel">
-    <div class="emoji thinking-emoji">🐼</div>
+    <div class="emoji thinking-emoji">${landmark.emoji}</div>
     <p>採点中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
   </div>`;
   nextBtn.classList.remove('show');
@@ -7057,7 +7129,7 @@ async function submitPandaAnswer(userEnglish, landmark){
   if(grade >= 2) playCorrectSound(); else playWrongSound();
 
   quizBody.innerHTML = `
-    <span class="exercise-tag" style="background:#2A2A2A;">🐼 パンダのプーちゃん</span>
+    <span class="exercise-tag" style="background:#${landmark.bg};">${landmark.emoji} ${landmark.title}</span>
     <div class="dialogue-bubble"><span class="ja" style="font-size:15px;">${currentPandaPrompt.ja}</span></div>
     <div class="reaction-bubble"><span class="en">${userEnglish}</span></div>
     <div class="feedback-banner ${bannerClass}">${gradeLabel} +${coinsEarned}🪙</div>
@@ -7065,7 +7137,7 @@ async function submitPandaAnswer(userEnglish, landmark){
     ${vocabCallout(modelAnswer, 'こんな英文でもOK！')}
   `;
   if(grade === 3) burstSparkles(document.querySelector('.feedback-banner'));
-  nextBtn.textContent = 'つぎの練習 🐼';
+  nextBtn.textContent = 'つぎの練習 ' + landmark.emoji;
   nextBtn.classList.add('show');
   nextBtn.onclick = ()=> renderPandaMascot(landmark);
 }
@@ -7205,6 +7277,9 @@ function renderLandmarkContent(landmark){
     renderHouseOfHorror(landmark);
 
   } else if(landmark.type === 'panda'){
+    renderPandaMascot(landmark);
+
+  } else if(landmark.type === 'essay'){
     renderPandaMascot(landmark);
   }
 }
