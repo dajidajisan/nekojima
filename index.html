@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.1';
+const GAME_VERSION = 'v1.0.2';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5506,11 +5506,13 @@ function makeCharacter({ bodyColor, earColor, earType }){
     [-1,1].forEach(side=>{
       const ear = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.34,8), toon(bodyColor));
       ear.scale.set(1,1,0.5); // flatten front-to-back so it reads as a flat triangle
+      ear.rotation.x = Math.PI; // point outward/up, not into the head
       ear.position.set(side*0.44, 2.02, -0.02);
       // straight up and perky, just the slightest outward angle
       ear.rotation.z = side*0.08;
       const earInner = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.2,8), toon(earColor));
       earInner.scale.set(1,1,0.5);
+      earInner.rotation.x = Math.PI;
       earInner.position.set(side*0.44, 1.99, 0.09);
       earInner.rotation.z = side*0.08;
       g.add(ear, earInner);
