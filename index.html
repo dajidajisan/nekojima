@@ -6452,19 +6452,19 @@ function lrDraw(){
 
 
 interactBtn.addEventListener('click', ()=>{
-  // recompute fresh right now, rather than trusting the last per-frame
-  // snapshot — closes the gap where a click could land in the same
-  // frame the proximity state was about to update
+  // recompute fresh right now, rather than trusting any per-frame
+  // snapshot — this is the single source of truth for what a click
+  // should act on, so there's no chance of routing to a stale leftover
+  // NPC/landmark reference from an earlier interaction
   const { closest, closestDist, closestKind } = findClosestInteractable();
-  const clickThreshold = INTERACT_DIST * 1.35; // generous — the button was already visible, so this just confirms it's still plausible
-  const clickNPC = (closestKind === 'npc' && closestDist < clickThreshold) ? closest : nearNPC;
-  const clickLandmark = (closestKind === 'landmark' && closestDist < clickThreshold) ? closest : nearLandmark;
+  const clickThreshold = INTERACT_DIST * 1.6; // generous — the button was already visible a moment ago, so this just confirms it's still plausible
+  if(!closest || closestDist >= clickThreshold) return; // genuinely not near anything right now
 
-  if(clickNPC) openQuiz(clickNPC);
-  else if(clickLandmark && clickLandmark.type === 'mazegate') enterMaze();
-  else if(clickLandmark && clickLandmark.type === 'skypod') boardSkyPod(clickLandmark);
-  else if(clickLandmark && clickLandmark.type === 'coasterride') boardCoasterRide(clickLandmark);
-  else if(clickLandmark) openLandmark(clickLandmark);
+  if(closestKind === 'npc') openQuiz(closest);
+  else if(closest.type === 'mazegate') enterMaze();
+  else if(closest.type === 'skypod') boardSkyPod(closest);
+  else if(closest.type === 'coasterride') boardCoasterRide(closest);
+  else openLandmark(closest);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
 
@@ -7021,19 +7021,43 @@ async function renderHouseOfHorror(landmark){
 /* ---------- パンダのプーちゃん: mascot greeting ---------- */
 /* ---------- パンダのプーちゃん: free-form English writing practice ---------- */
 const PANDA_PROMPT_FALLBACK = [
-  { ja:"今日は天気がいいね。", hint:"It's nice weather today." },
-  { ja:"いっしょに公園に行かない？", hint:"Do you want to go to the park together?" },
-  { ja:"このケーキ、とてもおいしいよ。", hint:"This cake is very delicious." },
-  { ja:"明日は早く起きないといけないんだ。", hint:"I have to wake up early tomorrow." },
-  { ja:"新しいゲームを買ったよ。", hint:"I bought a new game." },
+  { ja:"わたしは今、少し眠いよ。", hint:"I'm a little sleepy now." },
+  { ja:"昨日、公園で友だちと遊んだよ。", hint:"I played with my friends at the park yesterday." },
+  { ja:"来週、おばあちゃんの家に行くんだ。", hint:"I'm going to my grandma's house next week." },
+  { ja:"あなたはどんな音楽が好き？", hint:"What kind of music do you like?" },
+  { ja:"窓を閉めてもらえる？", hint:"Can you close the window?" },
+  { ja:"いっしょに図書館に行かない？", hint:"Do you want to go to the library together?" },
+  { ja:"わたしは自転車に乗れるよ。", hint:"I can ride a bike." },
+  { ja:"このケーキ、あのケーキより甘いね。", hint:"This cake is sweeter than that one." },
+  { ja:"雨が降っているから、家にいるよ。", hint:"I'm staying home because it's raining." },
+  { ja:"この映画、とても面白いと思うよ。", hint:"I think this movie is very interesting." },
+];
+
+const PANDA_PROMPT_PATTERNS = [
+  { name:'現在の気持ち・状態', example:'私は今、少し眠いです。' },
+  { name:'過去の出来事', example:'昨日、公園で友だちと遊びました。' },
+  { name:'未来の予定', example:'来週、おばあちゃんの家に行きます。' },
+  { name:'質問（〜ですか？）', example:'あなたはどんな音楽が好きですか？' },
+  { name:'お願い・依頼', example:'窓を閉めてもらえますか？' },
+  { name:'提案・誘い（〜しませんか？）', example:'一緒に図書館に行きませんか？' },
+  { name:'能力（〜できる）', example:'わたしは自転車に乗れます。' },
+  { name:'比較（〜より…）', example:'このケーキはあのケーキより甘いです。' },
+  { name:'理由（〜なので）', example:'雨がふっているので、家にいます。' },
+  { name:'感想・意見', example:'この映画はとても面白いと思います。' },
+  { name:'習慣（いつも〜する）', example:'わたしはいつも7時に起きます。' },
+  { name:'禁止・注意（〜してはいけない）', example:'ここで走ってはいけません。' },
 ];
 
 async function generatePandaPrompt(){
+  const pattern = PANDA_PROMPT_PATTERNS[Math.floor(Math.random()*PANDA_PROMPT_PATTERNS.length)];
   const prompt = `あなたは日本の小学校高学年の女の子向け英語学習ゲームに出てくる、人なつっこいパンダのキャラクターです。
 プレイヤーに英作文の練習をしてもらうため、あなたが話しかけたい内容を「日本語」で1文考えてください。
+
+今回は必ず「${pattern.name}」というパターンの文にしてください（例：「${pattern.example}」のような形）。「今日〜しよう」「今日〜した？」ばかりに偏らないよう、このパターンを守ること。
+
 条件：
 - 英検準2級レベルの単語・文法で英訳できる、やさしい日常会話の一文にすること（10語以内で英訳できる長さ）
-- あいさつ、誘い、感想、日常の出来事など、パンダが話しかけそうな自然な内容にすること
+- 上で指定したパターンに沿った、パンダが話しかけそうな自然な内容にすること
 - 毎回すこし違う内容にすること
 出力は次のJSON形式だけを返し、説明文やコードブロック記号は絶対に付けないでください：
 {"ja":"日本語の一文"}`;
