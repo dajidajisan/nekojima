@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.11';
+const GAME_VERSION = 'v1.0.12';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5529,11 +5529,9 @@ function makeCharacter({ bodyColor, earColor, earType }){
       const ear = makeEarShape(1, 0.14, bodyColor);
       ear.position.set(side*0.44, 1.8, -0.02); // nudged down so the base overlaps into the head, hiding the seam
       ear.rotation.z = side*0.22; // lean outward
-      ear.rotation.x = -0.25; // lean forward, a more natural perked angle
       const earInner = makeEarShape(0.55, 0.08, earColor);
       earInner.position.set(side*0.44, 1.85, 0.1);
       earInner.rotation.z = side*0.22;
-      earInner.rotation.x = -0.25;
       g.add(ear, earInner);
     });
     // nose + mouth, drawn as a small canvas decal so the mouth can be a
