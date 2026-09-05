@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.12';
+const GAME_VERSION = 'v1.0.13';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5503,36 +5503,23 @@ function makeCharacter({ bodyColor, earColor, earType }){
       g.add(ear, earInner);
     });
   } else if(earType === 'cat'){
-    // confirmed orientation: base at local y=0 (sits at the head),
-    // point at higher local y. Uses a CONCAVE curve (control points
-    // pull inward toward the center axis, not outward) — this is
-    // mathematically guaranteed to stay narrower than the base at
-    // every height, so there's no way for it to bulge wider partway up
-    // like the earlier convex-curve attempt did. The base edge itself
-    // curves downward to roughly match the head sphere's curvature,
-    // and the whole ear is nudged down into the head + tilted outward
-    // so it visually merges rather than sitting flush on a tangent
-    // plane (which left a visible seam/gap against the round head).
-    function makeEarShape(scale, depth, color){
-      const w = 0.17*scale, h = 0.34*scale, tipR = 0.045*scale;
-      const shape = new THREE.Shape();
-      shape.moveTo(-w, 0);
-      shape.quadraticCurveTo(-w*0.32, h*0.58, -tipR, h - tipR*0.5); // concave curve inward, up toward the tip
-      shape.quadraticCurveTo(0, h, tipR, h - tipR*0.5); // small rounded tip
-      shape.quadraticCurveTo(w*0.32, h*0.58, w, 0); // concave curve back down
-      shape.quadraticCurveTo(0, -0.05*scale, -w, 0); // base curves downward, to hug the head's roundness
-      const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
-      geo.translate(0, 0, -depth/2);
-      return new THREE.Mesh(geo, toon(color));
-    }
+    // proper 3D volumetric cone (not a flat extruded cutout, which
+    // looked thin/papery from behind) — confirmed orientation from an
+    // earlier diagnostic: unrotated ConeGeometry has its apex at +Y, so
+    // no rotation needed for the point to face up/out. Sized and
+    // positioned to match a standard cute cat-mascot look: fairly
+    // large ears, generously overlapped into the head so there's no
+    // visible seam, and rounded (12 radial segments) rather than a
+    // sharp low-poly look.
     [-1,1].forEach(side=>{
-      const ear = makeEarShape(1, 0.14, bodyColor);
-      ear.position.set(side*0.44, 1.8, -0.02); // nudged down so the base overlaps into the head, hiding the seam
-      ear.rotation.z = side*0.22; // lean outward
-      const earInner = makeEarShape(0.55, 0.08, earColor);
-      earInner.position.set(side*0.44, 1.85, 0.1);
-      earInner.rotation.z = side*0.22;
-      g.add(ear, earInner);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.24,0.42,12), toon(bodyColor));
+      ear.position.set(side*0.4, 1.82, -0.02); // overlaps down into the head, hiding the seam
+      ear.rotation.z = side*0.18; // lean outward
+      g.add(ear);
+      const earInner = new THREE.Mesh(new THREE.ConeGeometry(0.14,0.26,12), toon(earColor));
+      earInner.position.set(side*0.4, 1.85, 0.12);
+      earInner.rotation.z = side*0.18;
+      g.add(earInner);
     });
     // nose + mouth, drawn as a small canvas decal so the mouth can be a
     // proper cute curved "w" smile rather than something built out of 3D
