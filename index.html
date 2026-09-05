@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.6';
+const GAME_VERSION = 'v1.0.7';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5504,22 +5504,22 @@ function makeCharacter({ bodyColor, earColor, earType }){
     });
   } else if(earType === 'cat'){
     // confirmed orientation: base at local y=0 (sits at the head),
-    // curving up to a single sharp point at higher local y. The base
-    // must stay near the head surface; only the sharpness/color changed
-    // from the diagnostic version.
+    // point at higher local y. Made deliberately tall and narrow with
+    // straight edges — the earlier gentle curve was nearly
+    // indistinguishable from a plain triangle at this screen size.
     function makeEarShape(scale, depth, color){
       const shape = new THREE.Shape();
-      shape.moveTo(-0.17*scale, 0);
-      shape.quadraticCurveTo(-0.2*scale, 0.22*scale, 0, 0.4*scale); // curve up to one sharp point at the top
-      shape.quadraticCurveTo(0.2*scale, 0.22*scale, 0.17*scale, 0); // curve back down to the base
-      shape.lineTo(-0.17*scale, 0);
+      shape.moveTo(-0.14*scale, 0);
+      shape.lineTo(0.14*scale, 0);
+      shape.lineTo(0, 0.48*scale); // tall, sharp single point
+      shape.lineTo(-0.14*scale, 0);
       const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
       geo.translate(0, 0, -depth/2);
       return new THREE.Mesh(geo, toon(color));
     }
     [-1,1].forEach(side=>{
       const ear = makeEarShape(1, 0.14, bodyColor);
-      ear.position.set(side*0.44, 1.87, -0.02); // base at the head surface, point curves up/out
+      ear.position.set(side*0.44, 1.87, -0.02); // base at the head surface, point extends up/out
       ear.rotation.z = side*0.08;
       const earInner = makeEarShape(0.55, 0.08, earColor);
       earInner.position.set(side*0.44, 1.91, 0.1);
