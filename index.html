@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.5';
+const GAME_VERSION = 'v1.0.6-diag';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5503,29 +5503,18 @@ function makeCharacter({ bodyColor, earColor, earType }){
       g.add(ear, earInner);
     });
   } else if(earType === 'cat'){
-    // a curved, leaf-shaped ear silhouette (not a plain symmetric
-    // triangle, which turned out too ambiguous to tell point-from-base
-    // at this scale) — wide rounded base at local y=0 (sits at the
-    // head), curving up to a clearly narrow point at higher local y
-    function makeEarShape(scale, depth, color){
-      const shape = new THREE.Shape();
-      shape.moveTo(-0.17*scale, 0);
-      shape.quadraticCurveTo(-0.21*scale, 0.19*scale, -0.03*scale, 0.36*scale);
-      shape.quadraticCurveTo(0, 0.4*scale, 0.03*scale, 0.36*scale);
-      shape.quadraticCurveTo(0.21*scale, 0.19*scale, 0.17*scale, 0);
-      shape.lineTo(-0.17*scale, 0);
-      const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
-      geo.translate(0, 0, -depth/2);
-      return new THREE.Mesh(geo, toon(color));
-    }
+    // DIAGNOSTIC SHAPE: an unmistakable round base ball with a thin
+    // spike sticking out of it, in a contrasting color — this removes
+    // all ambiguity about which end is "the point" vs "the base",
+    // since three different shape attempts were all reported as
+    // looking the same as the original.
     [-1,1].forEach(side=>{
-      const ear = makeEarShape(1, 0.14, bodyColor);
-      ear.position.set(side*0.44, 1.86, -0.02); // base sits at the head surface, point curves up/out
-      ear.rotation.z = side*0.08;
-      const earInner = makeEarShape(0.55, 0.08, earColor);
-      earInner.position.set(side*0.44, 1.9, 0.1);
-      earInner.rotation.z = side*0.08;
-      g.add(ear, earInner);
+      const base = new THREE.Mesh(new THREE.SphereGeometry(0.16,12,10), new THREE.MeshBasicMaterial({color:0x00AA00})); // GREEN ball = base/attachment point
+      base.position.set(side*0.44, 1.87, -0.02);
+      g.add(base);
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.35,8), new THREE.MeshBasicMaterial({color:0xFF00FF})); // MAGENTA spike = the point
+      spike.position.set(side*0.44, 1.87 + 0.17, -0.02); // sitting on top of the green ball, extending upward
+      g.add(spike);
     });
     // nose + mouth, drawn as a small canvas decal so the mouth can be a
     // proper cute curved "w" smile rather than something built out of 3D
