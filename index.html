@@ -6465,6 +6465,7 @@ interactBtn.addEventListener('click', ()=>{
     + ' | 現在地=(' + player.position.x.toFixed(1) + ',' + player.position.z.toFixed(1) + ')');
   if(!closest || closestDist >= clickThreshold) return; // genuinely not near anything right now
 
+  alert('診断2: closestKind=' + closestKind + ' | closest.type=' + closest.type + ' | openLandmarkを呼びます');
   if(closestKind === 'npc') openQuiz(closest);
   else if(closest.type === 'mazegate') enterMaze();
   else if(closest.type === 'skypod') boardSkyPod(closest);
@@ -6675,6 +6676,7 @@ const PRAISES = [
 ];
 
 function openLandmark(landmark){
+  alert('診断3: openLandmark開始 type=' + landmark.type);
   activeNPC = null;
   quizOpen = true;
   quizOverlay.classList.add('show');
