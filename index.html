@@ -2711,7 +2711,7 @@ const ISLANDS = [
   {
     id:'meadow', name:'はじまりの島', emoji:'🌳', unlockAt:0, status:'ready',
     theme:{ groundDay:0x9FDDA0, groundNight:0x3E5A4A, path:0xFFE9C7, wall:0xFFF3EC, roofs:[0xFF8FA3,0x6FE0C2,0xB9A6E8], buildingScaleY:1, natureVisible:true },
-    landmarkPos:{ comedy:[-15,3], fortune:[9.1,-11.6], praise:[-3,-4], future:[9,14], robot:[-9,16], essay:[7,5] },
+    landmarkPos:{ comedy:[-15,3], fortune:[7.6,-11.4], praise:[-3,-4], future:[9,14], robot:[-11.5,16.1], essay:[7,5] },
   },
   {
     id:'city', name:'みらいシティねこ島', emoji:'🏙️', unlockAt:250, status:'ready',
@@ -2721,7 +2721,7 @@ const ISLANDS = [
   {
     id:'themepark', name:'ゆめのくにテーマパーク', emoji:'🎡', unlockAt:550, status:'ready',
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
-    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-11.6,-5.3], future:[6,15], robot:[17,-14], essay:[7,5] },
+    landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-11.6,-5.3], future:[6,15], robot:[17.2,-16], essay:[7,5] },
   },
   {
     id:'maze', name:'めいろねこ島', emoji:'🧩', unlockAt:850, status:'comingSoon',
@@ -2776,6 +2776,7 @@ function travelToIsland(id){
   landmarks.forEach(l=>{
     if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'city');
     if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'themepark');
+    if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (id !== 'meadow');
   });
 
   // each of the 30 NPCs belongs to exactly one world now (they each teach
@@ -4096,7 +4097,7 @@ function makeMazeGate(x,z){
   g.position.set(x,0,z);
   return { group:g, marker };
 }
-const mazeGateLandmark = { ...makeMazeGate(-9,16), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
+const mazeGateLandmark = { ...makeMazeGate(-11.5,16.1), id:'mazegate', type:'mazegate', title:'めいろの入口', sub:'えいごの案内板を読んで進もう', emoji:'🌀', bg:'4FA84A', label:'🌀 めいろに はいる' };
 // (registered into `landmarks` further down, once that array actually exists — see near its declaration)
 
 // sky pod boarding platform: a landing pad + a sleek parked pod vehicle.
@@ -5037,7 +5038,7 @@ const landmarks = [
   { ...makeNewsKiosk(20,-5.4), id:'news', type:'news', title:'速報ニュース', sub:'みらいの街のニュースを見る', emoji:'📰', bg:'FF6BC4', label:'📰 ニュースを見る' },
   { ...makeSmartHomePod(-19,-8), id:'smarthome', type:'smarthome', title:'スマートホーム', sub:'おうちロボに指示してみよう', emoji:'🏠', bg:'6BCBFF', label:'🏠 指示する' },
   { ...makeSkyPodStation(-2,-6), id:'skypod', type:'skypod', title:'スカイポッド乗り場', sub:'空中散歩に出発しよう', emoji:'🚀', bg:'FF6B9D', label:'🚀 のりこむ' },
-  { ...makeCoasterGate(18,10), id:'coaster', type:'coaster', title:'ローラーコースター', sub:'指示についていこう！', emoji:'🎢', bg:'FF6B9D', label:'🎢 のる' },
+  { ...makeCoasterGate(17,7.7), id:'coaster', type:'coaster', title:'ローラーコースター', sub:'指示についていこう！', emoji:'🎢', bg:'FF6B9D', label:'🎢 のる' },
   { ...makeCoasterRideStation(13,2), id:'coasterride', type:'coasterride', title:'コースター乗り場', sub:'実際にコースターに乗ってみよう', emoji:'🎢', bg:'FFD93D', label:'🎢 コースターにのる' },
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
@@ -5046,6 +5047,7 @@ const landmarks = [
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride']);
+const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
 
 /* =========================================================
@@ -6451,7 +6453,8 @@ function lrDraw(){
 }
 
 
-interactBtn.addEventListener('click', ()=>{
+interactBtn.addEventListener('pointerdown', (e)=>{
+  e.preventDefault();
   // recompute fresh right now, rather than trusting any per-frame
   // snapshot — this is the single source of truth for what a click
   // should act on, so there's no chance of routing to a stale leftover
@@ -8343,6 +8346,7 @@ themeparkDecorGroup.visible = (currentIslandId === 'themepark');
 landmarks.forEach(l=>{
   if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'city');
   if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'themepark');
+  if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId !== 'meadow');
 });
 
 </script>
