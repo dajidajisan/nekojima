@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.7';
+const GAME_VERSION = 'v1.0.8';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5504,15 +5504,16 @@ function makeCharacter({ bodyColor, earColor, earType }){
     });
   } else if(earType === 'cat'){
     // confirmed orientation: base at local y=0 (sits at the head),
-    // point at higher local y. Made deliberately tall and narrow with
-    // straight edges — the earlier gentle curve was nearly
-    // indistinguishable from a plain triangle at this screen size.
+    // point at higher local y. A pronounced rounded bulge (like a real
+    // ear's soft outer curve) converging to ONE genuinely sharp point —
+    // enough curve to look cute, but the point stays unambiguous
+    // because it's a single vertex, not a flattened double-curve.
     function makeEarShape(scale, depth, color){
       const shape = new THREE.Shape();
-      shape.moveTo(-0.14*scale, 0);
-      shape.lineTo(0.14*scale, 0);
-      shape.lineTo(0, 0.48*scale); // tall, sharp single point
-      shape.lineTo(-0.14*scale, 0);
+      shape.moveTo(-0.16*scale, 0);
+      shape.quadraticCurveTo(-0.25*scale, 0.24*scale, 0, 0.4*scale);
+      shape.quadraticCurveTo(0.25*scale, 0.24*scale, 0.16*scale, 0);
+      shape.lineTo(-0.16*scale, 0);
       const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
       geo.translate(0, 0, -depth/2);
       return new THREE.Mesh(geo, toon(color));
