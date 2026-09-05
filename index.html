@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.3';
+const GAME_VERSION = 'v1.0.4';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5503,15 +5503,25 @@ function makeCharacter({ bodyColor, earColor, earType }){
       g.add(ear, earInner);
     });
   } else if(earType === 'cat'){
+    // built as an explicit triangle (base at local y=0, apex at higher
+    // local y) so the point-vs-base orientation is unambiguous — no
+    // reliance on which way a default cone geometry happens to point
+    function makeEarTriangle(halfWidth, height, depth, color){
+      const shape = new THREE.Shape();
+      shape.moveTo(-halfWidth, 0);
+      shape.lineTo(halfWidth, 0);
+      shape.lineTo(0, height);
+      shape.lineTo(-halfWidth, 0);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
+      geo.translate(0, 0, -depth/2);
+      return new THREE.Mesh(geo, toon(color));
+    }
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.25,0.34,8), toon(bodyColor));
-      ear.scale.set(1,1,0.5); // flatten front-to-back so it reads as a flat triangle
-      ear.position.set(side*0.44, 2.02, -0.02);
-      // straight up and perky, just the slightest outward angle
+      const ear = makeEarTriangle(0.19, 0.32, 0.14, bodyColor);
+      ear.position.set(side*0.44, 1.86, -0.02); // base sits at the head surface, apex points up/out
       ear.rotation.z = side*0.08;
-      const earInner = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.2,8), toon(earColor));
-      earInner.scale.set(1,1,0.5);
-      earInner.position.set(side*0.44, 1.99, 0.09);
+      const earInner = makeEarTriangle(0.1, 0.17, 0.08, earColor);
+      earInner.position.set(side*0.44, 1.9, 0.1);
       earInner.rotation.z = side*0.08;
       g.add(ear, earInner);
     });
