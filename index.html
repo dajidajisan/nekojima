@@ -599,6 +599,59 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   margin:4px;
 }
 .lr-endcard button.secondary{ background:#FBF9FF; color:var(--plum-soft); border:2px solid #ECE5FA; }
+
+/* ---------- MOGURA (whac-a-mole) MINIGAME ---------- */
+#moguraOverlay{
+  position:fixed; inset:0; z-index:200; display:none;
+  align-items:center; justify-content:center;
+  background:linear-gradient(180deg, #8FD6A8 0%, #6FBE86 60%, #5CA872 100%);
+}
+#moguraOverlay.show{ display:flex; }
+.mg-frame{
+  width:100%; height:100%; max-width:520px; max-height:100vh;
+  display:flex; flex-direction:column; align-items:center;
+  padding:14px; box-sizing:border-box; position:relative;
+  font-family:'M PLUS Rounded 1c',sans-serif;
+}
+.mg-hud{ width:100%; display:flex; align-items:center; gap:10px; color:#fff; margin-bottom:6px; }
+.mg-close{
+  background:rgba(255,255,255,0.25); border:none; color:#fff; width:34px; height:34px;
+  border-radius:50%; font-size:16px; cursor:pointer; flex-shrink:0;
+}
+.mg-score{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; white-space:nowrap; }
+.mg-prompt-card{
+  background:#fff; border-radius:20px; padding:16px 20px; text-align:center;
+  width:100%; box-sizing:border-box; margin-bottom:10px; box-shadow:0 6px 16px rgba(0,0,0,0.15);
+}
+.mg-prompt-label{ font-size:11px; font-weight:700; color:var(--plum-soft); }
+.mg-prompt-ja{ font-family:'Fredoka',sans-serif; font-size:22px; color:var(--plum); font-weight:700; margin-top:2px; }
+.mg-timerbar{ width:100%; height:8px; background:#ECE5FA; border-radius:999px; overflow:hidden; margin-top:10px; }
+.mg-timerfill{ height:100%; background:linear-gradient(90deg, var(--mint-deep), var(--mint)); width:100%; transition:width .1s linear; }
+.mg-field{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
+  width:100%; flex:1; align-content:center;
+}
+.mg-hole{
+  position:relative; aspect-ratio:1/1; border-radius:50%;
+  background:radial-gradient(ellipse at center, #3E2E1F 0%, #5C4530 60%, #7A5C40 100%);
+  display:flex; align-items:flex-end; justify-content:center; overflow:hidden;
+  box-shadow:inset 0 6px 10px rgba(0,0,0,0.5);
+}
+.mg-mole{
+  width:82%; height:82%; border-radius:50% 50% 46% 46%; background:#C9A96E;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  font-weight:800; font-size:13px; color:#4A3B5C; padding:6px; box-sizing:border-box;
+  border:none; cursor:pointer; line-height:1.25;
+  transform:translateY(100%); transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+.mg-hole.up .mg-mole{ transform:translateY(6%); }
+.mg-mole.correct{ background:var(--mint-deep); color:#fff; }
+.mg-mole.wrong{ background:var(--coral-deep); color:#fff; }
+.mg-endpanel{
+  position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(30,60,40,0.5);
+}
+.mg-endpanel.show{ display:flex; }
 </style>
 
 <div id="quizOverlay">
@@ -695,6 +748,13 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
           <div class="minigame-status">タップしてあそぶ！</div>
         </div>
       </div>
+      <div class="minigame-card playable" id="moguraCard">
+        <div class="minigame-emoji">🔨</div>
+        <div>
+          <div class="minigame-name">たんごモグラたたき</div>
+          <div class="minigame-status">タップしてあそぶ！</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -719,6 +779,22 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
       </div>
     </div>
     <div class="lr-endpanel" id="lrEndPanel"></div>
+  </div>
+</div>
+
+<div id="moguraOverlay">
+  <div class="mg-frame">
+    <div class="mg-hud">
+      <button class="mg-close" id="mgCloseBtn">✕</button>
+      <div class="mg-score" id="mgScore">🪙 0　ラウンド 1/8</div>
+    </div>
+    <div class="mg-prompt-card">
+      <div class="mg-prompt-label">この日本語にあう えいごを たたこう！</div>
+      <div class="mg-prompt-ja" id="mgPromptJa">…</div>
+      <div class="mg-timerbar"><div class="mg-timerfill" id="mgTimerFill"></div></div>
+    </div>
+    <div class="mg-field" id="mgField"></div>
+    <div class="mg-endpanel" id="mgEndPanel"></div>
   </div>
 </div>
 
@@ -4117,19 +4193,17 @@ function makeSasukeTower(x,z){
   return { group:g, marker, roofY: TOWER_H + 0.28 };
 }
 
-const SASUKE_TOWER_BASE_POS = { x: -1.1, z: -21.6 };
+const SASUKE_TOWER_BASE_POS = { x: -5.9, z: 26 };
 const SASUKE_TOWER_ROOF_Y = 26.28;
-const SASUKE_RIDE_PATH = [
-  [0, 0, 1], [0, 0, SASUKE_TOWER_ROOF_Y],
-  [0.4, 0.3, SASUKE_TOWER_ROOF_Y+0.1], [-0.4, -0.2, SASUKE_TOWER_ROOF_Y+0.15], [0, 0.4, SASUKE_TOWER_ROOF_Y+0.05],
-  [0, 0, SASUKE_TOWER_ROOF_Y], [0, 0, 1],
-].map(([dx,dz,y]) => [SASUKE_TOWER_BASE_POS.x+dx, SASUKE_TOWER_BASE_POS.z+dz, y]);
+const SASUKE_RIDE_RISE_END = 0.22;   // fraction of total ride spent rising
+const SASUKE_RIDE_SPIN_END = 0.82;   // fraction spent spinning at the top (rise_end..spin_end)
 const SASUKE_CAPTIONS = [
   { at:0.02, en:"Let's climb to the top!", ja:"てっぺんまで のぼろう！" },
-  { at:0.28, en:"Wow, look at that view!", ja:"わあ、すごいながめ！" },
-  { at:0.75, en:"Time to climb back down.", ja:"そろそろ おりるよ。" },
+  { at:0.24, en:"Wow, look at that view!", ja:"わあ、すごいながめ！" },
+  { at:0.84, en:"Time to climb back down.", ja:"そろそろ おりるよ。" },
 ];
 let sasukeRideActive = false;
+let sasukeStartFacing = 0;
 
 function boardSasukeTower(landmark){
   if(rideActive) return;
@@ -4139,6 +4213,7 @@ function boardSasukeTower(landmark){
   interactBtn.classList.remove('show');
   playCorrectSound();
   player.rotation.z = 0;
+  sasukeStartFacing = playerFacing;
   coasterRideCarMesh.visible = true;
   coasterRideCarMesh.rotation.set(0,0,0);
   coasterRideCarMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
@@ -4149,19 +4224,30 @@ function boardSasukeTower(landmark){
 function updateSasukeTowerRide(dt){
   if(!rideActive || !sasukeRideActive) return;
   rideElapsed += dt;
-  const t = Math.min(1, rideElapsed / (RIDE_DURATION*0.85));
+  const t = Math.min(1, rideElapsed / (RIDE_DURATION*0.9));
 
-  const segs = SASUKE_RIDE_PATH.length - 1;
-  const scaled = t * segs;
-  const i = Math.min(segs-1, Math.floor(scaled));
-  const localT = scaled - i;
-  const [x1,z1,y1] = SASUKE_RIDE_PATH[i], [x2,z2,y2] = SASUKE_RIDE_PATH[i+1];
-  player.position.set(
-    x1 + (x2-x1)*localT,
-    y1 + (y2-y1)*localT,
-    z1 + (z2-z1)*localT
-  );
+  let y;
+  if(t < SASUKE_RIDE_RISE_END){
+    // rising
+    const rt = t / SASUKE_RIDE_RISE_END;
+    y = 1 + (SASUKE_TOWER_ROOF_Y - 1) * rt;
+  } else if(t < SASUKE_RIDE_SPIN_END){
+    // holding at the top, spinning around for the view — this alone
+    // drives the panorama, by reusing the existing third-person camera
+    // (which always orbits based on playerFacing), no special camera
+    // code needed
+    y = SASUKE_TOWER_ROOF_Y;
+    const spinT = (t - SASUKE_RIDE_RISE_END) / (SASUKE_RIDE_SPIN_END - SASUKE_RIDE_RISE_END);
+    playerFacing = sasukeStartFacing + spinT * Math.PI * 2.2; // a bit over one full turn
+    player.rotation.y = playerFacing;
+  } else {
+    // descending
+    const dt2 = (t - SASUKE_RIDE_SPIN_END) / (1 - SASUKE_RIDE_SPIN_END);
+    y = SASUKE_TOWER_ROOF_Y + (1 - SASUKE_TOWER_ROOF_Y) * dt2;
+  }
+  player.position.set(SASUKE_TOWER_BASE_POS.x, y, SASUKE_TOWER_BASE_POS.z);
   coasterRideCarMesh.position.set(player.position.x, player.position.y - 0.06, player.position.z);
+  coasterRideCarMesh.rotation.y = player.rotation.y;
 
   SASUKE_CAPTIONS.forEach(c=>{
     if(!c._shown && t >= c.at){
@@ -4173,6 +4259,8 @@ function updateSasukeTowerRide(dt){
   if(t >= 1){
     rideActive = false;
     sasukeRideActive = false;
+    playerFacing = sasukeStartFacing;
+    player.rotation.y = playerFacing;
     player.position.set(SASUKE_TOWER_BASE_POS.x, 0, SASUKE_TOWER_BASE_POS.z);
     coasterRideCarMesh.visible = false;
     coins += 2;
@@ -5242,7 +5330,7 @@ const landmarks = [
   { ...makeCoasterRideStation(13,2), id:'coasterride', type:'coasterride', title:'コースター乗り場', sub:'実際にコースターに乗ってみよう', emoji:'🎢', bg:'FFD93D', label:'🎢 コースターにのる' },
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
-  { ...makeSasukeTower(-1.1,-21.6), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
+  { ...makeSasukeTower(-5.9,26), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
@@ -6673,6 +6761,138 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   else openLandmark(closest);
 });
 document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
+
+/* =========================================================
+   MOGURA (whac-a-mole) MINIGAME — quizzes drawn straight from the
+   real vocabulary bank (the same VOCAB used everywhere else), so it
+   reinforces the same words rather than being a separate word list.
+========================================================= */
+const MOGURA_ROUNDS = 8;
+const MOGURA_HOLE_COUNT = 6;
+const MOGURA_ROUND_TIME = 4.5; // seconds moles stay up before time runs out
+let moguraState = null;
+
+function mgOpen(){
+  document.getElementById('moguraOverlay').classList.add('show');
+  document.getElementById('mgEndPanel').classList.remove('show');
+  moguraState = { round: 0, coins: 0, timerHandle: null, answered: false };
+  mgNextRound();
+}
+function mgClose(){
+  document.getElementById('moguraOverlay').classList.remove('show');
+  if(moguraState && moguraState.timerHandle) clearInterval(moguraState.timerHandle);
+  moguraState = null;
+}
+document.getElementById('moguraCard').addEventListener('click', mgOpen);
+document.getElementById('mgCloseBtn').addEventListener('click', mgClose);
+
+function mgPickWords(){
+  const pool = VOCAB;
+  const targetIdx = Math.floor(Math.random()*pool.length);
+  const target = pool[targetIdx];
+  const usedEn = new Set([target.en]);
+  const distractors = [];
+  let guard = 0;
+  while(distractors.length < MOGURA_HOLE_COUNT - 1 && guard < 200){
+    guard++;
+    const cand = pool[Math.floor(Math.random()*pool.length)];
+    if(usedEn.has(cand.en)) continue;
+    usedEn.add(cand.en);
+    distractors.push(cand);
+  }
+  const options = [target, ...distractors];
+  for(let i=options.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [options[i],options[j]] = [options[j],options[i]];
+  }
+  return { target, options };
+}
+
+function mgNextRound(){
+  if(!moguraState) return;
+  moguraState.round++;
+  if(moguraState.round > MOGURA_ROUNDS){ mgShowEnd(); return; }
+  moguraState.answered = false;
+  const { target, options } = mgPickWords();
+  moguraState.target = target;
+  document.getElementById('mgPromptJa').textContent = target.ja;
+  document.getElementById('mgScore').textContent = `🪙 ${moguraState.coins}　ラウンド ${moguraState.round}/${MOGURA_ROUNDS}`;
+
+  const field = document.getElementById('mgField');
+  field.innerHTML = '';
+  options.forEach((opt, i)=>{
+    const hole = document.createElement('div');
+    hole.className = 'mg-hole';
+    const mole = document.createElement('button');
+    mole.className = 'mg-mole';
+    mole.textContent = opt.en;
+    mole.onclick = ()=> mgWhack(opt, mole);
+    hole.appendChild(mole);
+    field.appendChild(hole);
+    setTimeout(()=> hole.classList.add('up'), 80*i + Math.random()*120);
+  });
+
+  let elapsed = 0;
+  const fill = document.getElementById('mgTimerFill');
+  fill.style.width = '100%';
+  if(moguraState.timerHandle) clearInterval(moguraState.timerHandle);
+  moguraState.timerHandle = setInterval(()=>{
+    elapsed += 0.1;
+    fill.style.width = Math.max(0, 100 - (elapsed/MOGURA_ROUND_TIME)*100) + '%';
+    if(elapsed >= MOGURA_ROUND_TIME){
+      clearInterval(moguraState.timerHandle);
+      if(!moguraState.answered) mgTimeUp();
+    }
+  }, 100);
+}
+
+function mgWhack(opt, moleEl){
+  if(!moguraState || moguraState.answered) return;
+  if(opt.en === moguraState.target.en){
+    moguraState.answered = true;
+    clearInterval(moguraState.timerHandle);
+    moleEl.classList.add('correct');
+    moguraState.coins += 1;
+    coins += 1;
+    updateCoinHUD();
+    saveProgress();
+    playCorrectSound();
+    setTimeout(mgNextRound, 700);
+  } else {
+    moleEl.classList.add('wrong');
+    playWrongSound();
+    setTimeout(()=> moleEl.classList.remove('wrong'), 400);
+  }
+}
+
+function mgTimeUp(){
+  moguraState.answered = true;
+  playWrongSound();
+  document.querySelectorAll('#mgField .mg-mole').forEach(m=>{
+    if(m.textContent === moguraState.target.en) m.classList.add('correct');
+  });
+  setTimeout(mgNextRound, 900);
+}
+
+function mgShowEnd(){
+  const panel = document.getElementById('mgEndPanel');
+  panel.innerHTML = `
+    <div class="lr-endcard">
+      <div class="emoji">🏆</div>
+      <h3>おつかれさま！</h3>
+      <p>${MOGURA_ROUNDS}もんちゅう、${moguraState.coins}こ せいかい！</p>
+      <button id="mgRetryBtn">もういちど</button>
+      <button class="secondary" id="mgExitBtn">とじる</button>
+    </div>
+  `;
+  panel.classList.add('show');
+  document.getElementById('mgRetryBtn').onclick = ()=>{
+    panel.classList.remove('show');
+    moguraState = { round: 0, coins: 0, timerHandle: null, answered: false };
+    mgNextRound();
+  };
+  document.getElementById('mgExitBtn').onclick = mgClose;
+}
 
 /* =========================================================
    NPC PROFILE CARD
