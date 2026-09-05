@@ -2839,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.9';
+const GAME_VERSION = 'v1.0.10';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5504,21 +5504,20 @@ function makeCharacter({ bodyColor, earColor, earType }){
     });
   } else if(earType === 'cat'){
     // confirmed orientation: base at local y=0 (sits at the head),
-    // point at higher local y. Built from the confirmed-correct
-    // straight-sided taper (base clearly widest, monotonically
-    // narrowing to the tip) — only the corners are lightly rounded for
-    // softness, since curving the SIDES themselves risked making the
-    // ear bulge wider than the base partway up (looked backwards again)
+    // point at higher local y. Uses a CONCAVE curve (control points
+    // pull inward toward the center axis, not outward) — this is
+    // mathematically guaranteed to stay narrower than the base at
+    // every height, so there's no way for it to bulge wider partway up
+    // like the earlier convex-curve attempt did. Shorter and with a
+    // visibly rounded (not razor-sharp) tip for a cuter look.
     function makeEarShape(scale, depth, color){
-      const w = 0.15*scale, h = 0.44*scale, r = 0.028*scale;
+      const w = 0.17*scale, h = 0.34*scale, tipR = 0.045*scale;
       const shape = new THREE.Shape();
-      shape.moveTo(-w+r, 0);
-      shape.lineTo(w-r, 0);
-      shape.quadraticCurveTo(w, 0, w*0.88, h*0.1); // soften the base-right corner only
-      shape.lineTo(r*0.4, h - r*2.2); // straight taper up
-      shape.quadraticCurveTo(0, h, -r*0.4, h - r*2.2); // small rounded tip, still clearly the narrow end
-      shape.lineTo(-w*0.88, h*0.1); // straight taper down
-      shape.quadraticCurveTo(-w, 0, -w+r, 0); // soften the base-left corner only
+      shape.moveTo(-w, 0);
+      shape.quadraticCurveTo(-w*0.32, h*0.58, -tipR, h - tipR*0.5); // concave curve inward, up toward the tip
+      shape.quadraticCurveTo(0, h, tipR, h - tipR*0.5); // small rounded tip
+      shape.quadraticCurveTo(w*0.32, h*0.58, w, 0); // concave curve back down
+      shape.lineTo(-w, 0);
       const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled:false });
       geo.translate(0, 0, -depth/2);
       return new THREE.Mesh(geo, toon(color));
