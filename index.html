@@ -637,8 +637,9 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
   width:100%; flex:1; align-content:center; position:relative;
 }
+.mg-cell{ position:relative; aspect-ratio:1/1; }
 .mg-hole{
-  position:relative; aspect-ratio:1/1; border-radius:50%;
+  position:absolute; inset:0; border-radius:50%;
   background:radial-gradient(ellipse at center, #B99BD6 0%, #C9AEE0 55%, #E4D4F2 100%);
   display:flex; align-items:flex-end; justify-content:center; overflow:hidden;
   box-shadow:inset 0 6px 10px rgba(90,50,110,0.35), 0 3px 0 rgba(255,255,255,0.6);
@@ -648,23 +649,25 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   position:relative; width:80%; height:80%; display:flex; align-items:center; justify-content:center;
   transform:translateY(105%); transition:transform .18s cubic-bezier(.34,1.56,.64,1);
 }
-.mg-hole.up .mg-mole{ transform:translateY(14%); }
+.mg-cell.up .mg-mole{ transform:translateY(14%); }
 .mg-cat-head{
   position:relative; width:78%; height:78%; border-radius:50%;
   background:#FFD9A0; display:flex; align-items:center; justify-content:center;
   font-size:26px; box-shadow:0 3px 0 rgba(0,0,0,0.08);
 }
 .mg-cat-head::before, .mg-cat-head::after{
-  content:''; position:absolute; top:-22%; width:0; height:0;
-  border-left:13px solid transparent; border-right:13px solid transparent; border-bottom:22px solid #FFD9A0;
+  content:''; position:absolute; top:-16%; width:0; height:0;
+  border-left:11px solid transparent; border-right:11px solid transparent; border-bottom:16px solid #FFD9A0;
 }
 .mg-cat-head::before{ left:2%; transform:rotate(-18deg); }
 .mg-cat-head::after{ right:2%; transform:rotate(18deg); }
 .mg-word-tag{
-  position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+  position:absolute; top:-2px; left:50%; transform:translateX(-50%);
   background:#fff; border-radius:999px; padding:3px 9px; font-size:11px; font-weight:800;
   color:#4A3B5C; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15); border:2px solid #FFE0F0;
+  z-index:2; opacity:0; transition:opacity .18s;
 }
+.mg-cell.up .mg-word-tag{ opacity:1; }
 .mg-mole.correct .mg-cat-head, .mg-mole.correct .mg-cat-head::before, .mg-mole.correct .mg-cat-head::after{ background:#FFB3D0; }
 .mg-mole.wrong .mg-cat-head, .mg-mole.wrong .mg-cat-head::before, .mg-mole.wrong .mg-cat-head::after{ background:#C9C4D6; }
 .mg-mole.wrong{ animation:mgShake .35s ease; }
@@ -2836,7 +2839,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.0.0';
+const GAME_VERSION = 'v1.0.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6856,19 +6859,26 @@ function mgNextRound(){
   const field = document.getElementById('mgField');
   field.innerHTML = '';
   options.forEach((opt, i)=>{
+    const cell = document.createElement('div');
+    cell.className = 'mg-cell';
+
+    const tag = document.createElement('span');
+    tag.className = 'mg-word-tag';
+    tag.textContent = opt.en;
+    cell.appendChild(tag);
+
     const hole = document.createElement('div');
     hole.className = 'mg-hole';
     const mole = document.createElement('button');
     mole.className = 'mg-mole';
     mole.dataset.word = opt.en;
-    mole.innerHTML = `
-      <span class="mg-word-tag">${opt.en}</span>
-      <span class="mg-cat-head">🐱</span>
-    `;
+    mole.innerHTML = `<span class="mg-cat-head">🐱</span>`;
     mole.onclick = (e)=> mgWhack(opt, mole, e);
     hole.appendChild(mole);
-    field.appendChild(hole);
-    setTimeout(()=> hole.classList.add('up'), 80*i + Math.random()*120);
+    cell.appendChild(hole);
+
+    field.appendChild(cell);
+    setTimeout(()=> cell.classList.add('up'), 80*i + Math.random()*120);
   });
 
   let elapsed = 0;
