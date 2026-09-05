@@ -51,10 +51,10 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   color:#fff; border:none; border-radius:999px; padding:16px 22px;
   font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; font-size:15px;
   box-shadow:0 6px 18px rgba(240,106,130,0.45);
-  opacity:0; transform:translateY(12px) scale(0.9); pointer-events:none;
+  opacity:0; transform:translateY(12px) scale(0.9);
   transition:all .2s ease;
 }
-#interactBtn.show{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+#interactBtn.show{opacity:1; transform:translateY(0) scale(1);}
 #interactBtn:active{transform:scale(0.94);}
 
 /* ---------- QUIZ OVERLAY ---------- */
@@ -6458,14 +6458,8 @@ interactBtn.addEventListener('click', ()=>{
   // NPC/landmark reference from an earlier interaction
   const { closest, closestDist, closestKind } = findClosestInteractable();
   const clickThreshold = INTERACT_DIST * 1.6; // generous — the button was already visible a moment ago, so this just confirms it's still plausible
-  alert('診断: closest=' + (closest ? (closest.title || closest.def?.name || closest.id) : 'null')
-    + ' | closestDist=' + closestDist.toFixed(2)
-    + ' | closestKind=' + closestKind
-    + ' | threshold=' + clickThreshold.toFixed(2)
-    + ' | 現在地=(' + player.position.x.toFixed(1) + ',' + player.position.z.toFixed(1) + ')');
   if(!closest || closestDist >= clickThreshold) return; // genuinely not near anything right now
 
-  alert('診断2: closestKind=' + closestKind + ' | closest.type=' + closest.type + ' | openLandmarkを呼びます');
   if(closestKind === 'npc') openQuiz(closest);
   else if(closest.type === 'mazegate') enterMaze();
   else if(closest.type === 'skypod') boardSkyPod(closest);
@@ -6676,7 +6670,6 @@ const PRAISES = [
 ];
 
 function openLandmark(landmark){
-  alert('診断3: openLandmark開始 type=' + landmark.type);
   activeNPC = null;
   quizOpen = true;
   quizOverlay.classList.add('show');
