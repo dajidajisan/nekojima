@@ -6458,6 +6458,11 @@ interactBtn.addEventListener('click', ()=>{
   // NPC/landmark reference from an earlier interaction
   const { closest, closestDist, closestKind } = findClosestInteractable();
   const clickThreshold = INTERACT_DIST * 1.6; // generous — the button was already visible a moment ago, so this just confirms it's still plausible
+  alert('診断: closest=' + (closest ? (closest.title || closest.def?.name || closest.id) : 'null')
+    + ' | closestDist=' + closestDist.toFixed(2)
+    + ' | closestKind=' + closestKind
+    + ' | threshold=' + clickThreshold.toFixed(2)
+    + ' | 現在地=(' + player.position.x.toFixed(1) + ',' + player.position.z.toFixed(1) + ')');
   if(!closest || closestDist >= clickThreshold) return; // genuinely not near anything right now
 
   if(closestKind === 'npc') openQuiz(closest);
