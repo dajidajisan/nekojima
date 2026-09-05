@@ -4193,7 +4193,7 @@ function makeSasukeTower(x,z){
   return { group:g, marker, roofY: TOWER_H + 0.28 };
 }
 
-const SASUKE_TOWER_BASE_POS = { x: -5.9, z: 26 };
+const SASUKE_TOWER_BASE_POS = { x: 26, z: -7 };
 const SASUKE_TOWER_ROOF_Y = 26.28;
 const SASUKE_RIDE_RISE_END = 0.22;   // fraction of total ride spent rising
 const SASUKE_RIDE_SPIN_END = 0.82;   // fraction spent spinning at the top (rise_end..spin_end)
@@ -5330,7 +5330,7 @@ const landmarks = [
   { ...makeCoasterRideStation(13,2), id:'coasterride', type:'coasterride', title:'コースター乗り場', sub:'実際にコースターに乗ってみよう', emoji:'🎢', bg:'FFD93D', label:'🎢 コースターにのる' },
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
-  { ...makeSasukeTower(-5.9,26), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
+  { ...makeSasukeTower(26,-7), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
@@ -6769,7 +6769,7 @@ document.getElementById('closeQuiz').addEventListener('click', closeQuiz);
 ========================================================= */
 const MOGURA_ROUNDS = 8;
 const MOGURA_HOLE_COUNT = 6;
-const MOGURA_ROUND_TIME = 4.5; // seconds moles stay up before time runs out
+const MOGURA_ROUND_TIME = 7; // seconds moles stay up before time runs out
 let moguraState = null;
 
 function mgOpen(){
