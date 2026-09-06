@@ -262,6 +262,24 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 </head>
 <body>
 
+<!-- Environment Banner: Shows in dev/preview, not in production -->
+<div id="envBanner" style="
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: #FFD873; color: #6b4a00; text-align: center;
+  padding: 8px 14px; font-weight: 800; font-size: 13px;
+  display: none; font-family: 'M PLUS Rounded 1c', sans-serif;
+">
+  🧪 検証環境
+</div>
+
+<script>
+// Show environment banner in dev/preview
+const hostname = window.location.hostname;
+if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.includes('preview')) {
+  document.getElementById('envBanner').style.display = 'block';
+}
+</script>
+
 <div id="errBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:999; background:#F06A82; color:#fff; font:12px/1.4 monospace; padding:10px 14px; white-space:pre-wrap; max-height:40vh; overflow:auto;"></div>
 <script>
   window.addEventListener('error', function(e){
