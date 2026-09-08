@@ -350,7 +350,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.1.3</span>
+      <span class="settings-row-value" id="versionLabel">v1.1.4</span>
     </div>
   </div>
 </div>
@@ -597,7 +597,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   margin-top:2px; border:none; border-radius:8px; padding:6px; font-size:11px; font-weight:800; cursor:pointer;
   background:var(--coral-deep); color:#fff; font-family:'M PLUS Rounded 1c',sans-serif;
 }
-.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#FFD873; cursor:default; }
+.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#4A3B5C; cursor:default; }
 .cat-card .owned-label{ font-size:11px; font-weight:800; color:var(--mint-deep); margin-top:2px; }
 
 #catDetailOverlay{
@@ -2922,7 +2922,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.1.3';
+const GAME_VERSION = 'v1.1.4';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -4743,7 +4743,7 @@ function makeCarousel(x,z){
     mount.position.set(Math.cos(a)*pr, 0.85, Math.sin(a)*pr);
     spinner.add(mount);
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.14,6), mount.material);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06,0.1,6), mount.material);
       ear.position.set(Math.cos(a)*pr+side*0.12, 1.08, Math.sin(a)*pr);
       spinner.add(ear);
     });
@@ -5689,7 +5689,7 @@ function makeCharacter({ bodyColor, earColor, earType }){
     });
   } else if(earType === 'owl'){
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.2,4), toon(bodyColor));
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.13,4), toon(bodyColor));
       ear.position.set(side*0.26, 1.9, -0.05);
       g.add(ear);
     });
@@ -6589,7 +6589,6 @@ function petCat(id, el){
   }
 
   // friendship milestone — a bigger celebration
-  // (coin bonus removed as of this update)
   // only the first time each threshold is crossed
   if(FRIEND_MILESTONES.includes(newCount)){
     const toast = document.createElement('div');
@@ -6597,7 +6596,7 @@ function petCat(id, el){
     const level = friendLevel(newCount);
     toast.innerHTML = `<div style="font-size:36px;">🎉</div>
       <div style="font-weight:800; color:var(--plum); font-size:15px; margin-top:4px;">${breed.name}と なかよし度アップ！</div>
-      <div style="font-size:13px; color:var(--plum-soft); margin-top:2px;">${'💗'.repeat(Math.min(level,3))} +3🪙</div>`;
+      <div style="font-size:13px; color:var(--plum-soft); margin-top:2px;">${'💗'.repeat(Math.min(level,3))}</div>`;
     document.body.appendChild(toast);
     setTimeout(()=> toast.remove(), 1800);
   }
@@ -8925,13 +8924,10 @@ function renderOrderExercise(item){
       };
       buildLine.appendChild(chip);
     });
-    renderDecisionBtn();
   }
 
   function renderDecisionBtn(){
-    // Show "決定" (decision) button when all words are selected
     const decisionBtn = document.getElementById('decisionBtn');
-    if(!decisionBtn) return; // button not yet in DOM
     if(built.length === tokens.length){
       decisionBtn.style.display = 'block';
     } else {
@@ -8979,7 +8975,6 @@ function renderOrderExercise(item){
     nextBtn.classList.add('show');
   }
 
-  // Set up the "決定" (decision) button
   document.getElementById('decisionBtn').onclick = ()=> checkOrder();
 
   renderChips();
@@ -9060,39 +9055,33 @@ function showToast(text){
 }
 
 function showDailyGoalModal(streak){
-  // Modal overlay
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed; inset:0; z-index:98; background:rgba(74,59,92,0.6); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
   
-  // Card
   const card = document.createElement('div');
   card.style.cssText = 'width:min(90vw, 380px); background:#fff; border-radius:24px; padding:32px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; font-family:"M PLUS Rounded 1c", sans-serif;';
   
-  // Celebration emoji
   const emoji = document.createElement('div');
-  emoji.style.cssText = 'font-size:56px; animation:pulse 0.6s ease-in-out;';
+  emoji.style.cssText = 'font-size:56px;';
   emoji.textContent = '🎉';
   card.appendChild(emoji);
   
-  // Message
   const msg = document.createElement('div');
   msg.style.cssText = 'font-size:18px; font-weight:800; color:var(--plum); line-height:1.5;';
   msg.innerHTML = `すごい！<br>今日の15問をやりきった！<br>（${streak}日れんぞく）`;
   card.appendChild(msg);
   
-  // Sub-message
   const submsg = document.createElement('div');
   submsg.style.cssText = 'font-size:13px; color:var(--plum-soft); font-weight:700; line-height:1.6;';
   submsg.innerHTML = `ゲームはそのまま続けられるよ 🐾<br>ボーナス <span style="color:var(--sunshine-deep); font-size:14px;">+10🪙</span>`;
   card.appendChild(submsg);
   
-  // OK Button
   const okBtn = document.createElement('button');
   okBtn.style.cssText = 'margin-top:12px; background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none; border-radius:12px; padding:14px 32px; font-weight:800; font-size:16px; cursor:pointer; font-family:"M PLUS Rounded 1c", sans-serif; box-shadow:0 4px 12px rgba(63,199,166,0.4);';
   okBtn.textContent = 'やった！';
+  okBtn.style.transition = 'transform 0.1s ease';
   okBtn.onmouseover = ()=> okBtn.style.transform = 'scale(1.05)';
   okBtn.onmouseout = ()=> okBtn.style.transform = 'scale(1)';
-  okBtn.style.transition = 'transform 0.1s ease';
   
   okBtn.onclick = ()=>{
     overlay.remove();
@@ -9102,10 +9091,8 @@ function showDailyGoalModal(streak){
   overlay.appendChild(card);
   document.body.appendChild(overlay);
   
-  // Focus the button
   okBtn.focus();
 }
-
 
 function burstSparkles(btn){
   const rect = btn.getBoundingClientRect();
