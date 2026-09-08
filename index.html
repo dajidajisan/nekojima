@@ -350,7 +350,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.1.6</span>
+      <span class="settings-row-value" id="versionLabel">v1.2.0</span>
     </div>
   </div>
 </div>
@@ -597,7 +597,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   margin-top:2px; border:none; border-radius:8px; padding:6px; font-size:11px; font-weight:800; cursor:pointer;
   background:var(--coral-deep); color:#fff; font-family:'M PLUS Rounded 1c',sans-serif;
 }
-.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#FFD873; cursor:default; }
+.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#4A3B5C; cursor:default; }
 .cat-card .owned-label{ font-size:11px; font-weight:800; color:var(--mint-deep); margin-top:2px; }
 
 #catDetailOverlay{
@@ -2922,7 +2922,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.1.6';
+const GAME_VERSION = 'v1.2.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -5594,23 +5594,21 @@ function makeCharacter({ bodyColor, earColor, earType }){
     // usual behind-the-character camera angle.
     function makeEarTexture(outer, inner){
       const c = document.createElement('canvas');
-      c.width = 140; c.height = 160;
+      c.width = 140; c.height = 120;
       const ctx = c.getContext('2d');
       const hex = n => '#' + n.toString(16).padStart(6,'0');
       ctx.fillStyle = hex(outer);
       ctx.beginPath();
-      ctx.moveTo(18, 160);
-      ctx.quadraticCurveTo(2, 95, 50, 18);
-      ctx.quadraticCurveTo(70, -6, 90, 18);
-      ctx.quadraticCurveTo(138, 95, 122, 160);
+      ctx.moveTo(8, 120);
+      ctx.lineTo(70, 8);
+      ctx.lineTo(132, 120);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = hex(inner);
       ctx.beginPath();
-      ctx.moveTo(38, 155);
-      ctx.quadraticCurveTo(28, 108, 58, 52);
-      ctx.quadraticCurveTo(70, 36, 82, 52);
-      ctx.quadraticCurveTo(112, 108, 102, 155);
+      ctx.moveTo(28, 108);
+      ctx.lineTo(70, 34);
+      ctx.lineTo(112, 108);
       ctx.closePath();
       ctx.fill();
       return new THREE.CanvasTexture(c);
@@ -5618,11 +5616,11 @@ function makeCharacter({ bodyColor, earColor, earType }){
     [-1,1].forEach(side=>{
       const tex = makeEarTexture(bodyColor, earColor);
       const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide});
-      const earGeo = new THREE.PlaneGeometry(0.46,0.53);
-      earGeo.translate(0, 0.265, 0); // move the pivot to the bottom edge (the base/attachment point), so rotation swings the tip, not the base
+      const earGeo = new THREE.PlaneGeometry(0.36,0.32);
+      earGeo.translate(0, 0.16, 0); // move the pivot to the bottom edge (the base/attachment point), so rotation swings the tip, not the base
       const ear = new THREE.Mesh(earGeo, mat);
-      ear.position.set(side*0.42, 1.83, -0.03); // base sits slightly inside the head surface (surface is ~1.885 here) for a seamless connection
-      ear.rotation.z = -side*(Math.PI/4); // 45° outward lean, pivoting from the base
+      ear.position.set(side*0.34, 1.88, -0.03); // base sits slightly inside the head surface (surface is ~1.885 here) for a seamless connection
+      ear.rotation.z = -side*(Math.PI/8); // slighter outward lean for a perkier, cat-like look
       g.add(ear);
     });
     // nose + mouth, drawn as a small canvas decal so the mouth can be a
@@ -6474,7 +6472,7 @@ function renderCatAlbum(){
       <span class="name">${owned ? c.name : '？？？'}</span>
       ${owned
         ? `<span class="owned-label">✓ タップでしょうさい</span>`
-        : `<button class="acquire-btn" data-id="${c.id}" ${canAfford?'':'disabled'}>${canAfford ? `てにいれる（${c.cost}🪙）` : `${c.cost}🪙 ひつよう`}</button>`
+        : `<button class="acquire-btn" data-id="${c.id}" ${canAfford?'':'disabled'}>${canAfford ? `てにいれる（${c.cost}🪙）` : `${c.cost}<svg viewBox="0 0 24 24" style="width:14px; height:14px; vertical-align:-2px; margin:0 1px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg> ひつよう`}</button>`
       }
     </div>`;
   }).join('');
