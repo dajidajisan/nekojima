@@ -262,6 +262,24 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 </head>
 <body>
 
+<!-- Environment Banner: Shows in dev/preview, not in production -->
+<div id="envBanner" style="
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: #FFD873; color: #6b4a00; text-align: center;
+  padding: 8px 14px; font-weight: 800; font-size: 13px;
+  display: none; font-family: 'M PLUS Rounded 1c', sans-serif;
+">
+  🧪 検証環境
+</div>
+
+<script>
+// Show environment banner in dev/preview
+const hostname = window.location.hostname;
+if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.includes('preview')) {
+  document.getElementById('envBanner').style.display = 'block';
+}
+</script>
+
 <div id="errBanner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:999; background:#F06A82; color:#fff; font:12px/1.4 monospace; padding:10px 14px; white-space:pre-wrap; max-height:40vh; overflow:auto;"></div>
 <script>
   window.addEventListener('error', function(e){
@@ -579,7 +597,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   margin-top:2px; border:none; border-radius:8px; padding:6px; font-size:11px; font-weight:800; cursor:pointer;
   background:var(--coral-deep); color:#fff; font-family:'M PLUS Rounded 1c',sans-serif;
 }
-.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#9088A8; cursor:default; }
+.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#FFD873; cursor:default; }
 .cat-card .owned-label{ font-size:11px; font-weight:800; color:var(--mint-deep); margin-top:2px; }
 
 #catDetailOverlay{
@@ -2667,7 +2685,7 @@ function recordDailyProgress(){
     else if(lastGoalDate !== todayStr()) streak = 1;
     lastGoalDate = todayStr();
     addCoins(10);
-    showToast(`🎉 今日の目標（15問）は達成したよ！（${streak}日れんぞく）でも… Keep going! 🐾 ボーナス +10🪙`);
+    showDailyGoalModal(streak);
   }
   updateDailyHUD();
   saveProgress();
@@ -3731,7 +3749,7 @@ function makeGuideRobot(x,z,rotY){
   head.position.y = 1.15;
   g.add(head);
   [-1,1].forEach(side=>{
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:100}));
     eye.position.set(side*0.08,1.17,0.19);
     g.add(eye);
   });
@@ -5324,14 +5342,14 @@ function makeCatRobot(x,z){
   g.add(head);
   // cat-ear attachments, keeping the robot recognizably "neko"
   [-1,1].forEach(side=>{
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.18,4), new THREE.MeshPhongMaterial({color:0xC7CBE0, shininess:100}));
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.12,4), new THREE.MeshPhongMaterial({color:0xC7CBE0, shininess:100}));
     ear.position.set(side*0.18, 1.42, 0);
     ear.rotation.y = Math.PI/4;
     g.add(ear);
   });
   // glowing LED eyes
   [-1,1].forEach(side=>{
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.06,12), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:100}));
     eye.position.set(side*0.12, 1.17, 0.23);
     g.add(eye);
   });
@@ -5689,9 +5707,9 @@ function makeCharacter({ bodyColor, earColor, earType }){
     g.add(cheek);
   });
 
-  // big simple round eyes (flat dots, closer to the clean line-art look)
-  const eyeGeo = new THREE.CircleGeometry(0.115,16);
-  const eyeMat = new THREE.MeshBasicMaterial({color:0x2E2A3A});
+  // big simple round eyes (3D spheres for a rounder look)
+  const eyeGeo = new THREE.SphereGeometry(0.115,12,12);
+  const eyeMat = new THREE.MeshPhongMaterial({color:0x2E2A3A, shininess:80});
   [-1,1].forEach(side=>{
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
     eye.position.set(side*0.26, 1.36, 0.665);
@@ -6570,12 +6588,10 @@ function petCat(id, el){
     }, i*90);
   }
 
-  // friendship milestone — a bigger celebration + small coin bonus,
+  // friendship milestone — a bigger celebration
+  // (coin bonus removed as of this update)
   // only the first time each threshold is crossed
   if(FRIEND_MILESTONES.includes(newCount)){
-    coins += 3;
-    updateCoinHUD();
-    saveProgress();
     const toast = document.createElement('div');
     toast.className = 'garden-milestone-toast';
     const level = friendLevel(newCount);
@@ -7004,6 +7020,10 @@ function mgClose(){
   document.getElementById('moguraOverlay').classList.remove('show');
   if(moguraState && moguraState.timerHandle) clearInterval(moguraState.timerHandle);
   moguraState = null;
+  // Remove the hammer and any remaining paw prints
+  if(mgHammerEl && mgHammerEl.parentNode) mgHammerEl.parentNode.removeChild(mgHammerEl);
+  mgHammerEl = null;
+  document.querySelectorAll('.mg-paw-burst').forEach(el=> el.remove());
 }
 document.getElementById('moguraCard').addEventListener('click', mgOpen);
 document.getElementById('mgCloseBtn').addEventListener('click', mgClose);
@@ -8854,6 +8874,7 @@ function renderOrderExercise(item){
       <button class="speak-btn" id="speakBtn" aria-label="お手本を聞く">
         <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       </button>
+      <button class="undo-btn" id="decisionBtn" style="display:none; background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff;">✅ 決定</button>
     </div>
     <div class="chip-pool" id="chipPool"></div>
     <div id="feedbackSlot"></div>
@@ -8883,7 +8904,7 @@ function renderOrderExercise(item){
         built.push(idx);
         renderChips();
         renderBuild();
-        if(built.length === tokens.length) checkOrder();
+        renderDecisionBtn();
       };
       chipPool.appendChild(chip);
     });
@@ -8900,9 +8921,22 @@ function renderOrderExercise(item){
         built = built.filter(i=>i!==idx);
         renderChips();
         renderBuild();
+        renderDecisionBtn();
       };
       buildLine.appendChild(chip);
     });
+    renderDecisionBtn();
+  }
+
+  function renderDecisionBtn(){
+    // Show "決定" (decision) button when all words are selected
+    const decisionBtn = document.getElementById('decisionBtn');
+    if(!decisionBtn) return; // button not yet in DOM
+    if(built.length === tokens.length){
+      decisionBtn.style.display = 'block';
+    } else {
+      decisionBtn.style.display = 'none';
+    }
   }
 
   function checkOrder(){
@@ -8944,6 +8978,9 @@ function renderOrderExercise(item){
     }
     nextBtn.classList.add('show');
   }
+
+  // Set up the "決定" (decision) button
+  document.getElementById('decisionBtn').onclick = ()=> checkOrder();
 
   renderChips();
 }
@@ -9021,6 +9058,54 @@ function showToast(text){
   document.body.appendChild(t);
   setTimeout(()=> t.remove(), 5000);
 }
+
+function showDailyGoalModal(streak){
+  // Modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; inset:0; z-index:98; background:rgba(74,59,92,0.6); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
+  
+  // Card
+  const card = document.createElement('div');
+  card.style.cssText = 'width:min(90vw, 380px); background:#fff; border-radius:24px; padding:32px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; font-family:"M PLUS Rounded 1c", sans-serif;';
+  
+  // Celebration emoji
+  const emoji = document.createElement('div');
+  emoji.style.cssText = 'font-size:56px; animation:pulse 0.6s ease-in-out;';
+  emoji.textContent = '🎉';
+  card.appendChild(emoji);
+  
+  // Message
+  const msg = document.createElement('div');
+  msg.style.cssText = 'font-size:18px; font-weight:800; color:var(--plum); line-height:1.5;';
+  msg.innerHTML = `すごい！<br>今日の15問をやりきった！<br>（${streak}日れんぞく）`;
+  card.appendChild(msg);
+  
+  // Sub-message
+  const submsg = document.createElement('div');
+  submsg.style.cssText = 'font-size:13px; color:var(--plum-soft); font-weight:700; line-height:1.6;';
+  submsg.innerHTML = `ゲームはそのまま続けられるよ 🐾<br>ボーナス <span style="color:var(--sunshine-deep); font-size:14px;">+10🪙</span>`;
+  card.appendChild(submsg);
+  
+  // OK Button
+  const okBtn = document.createElement('button');
+  okBtn.style.cssText = 'margin-top:12px; background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none; border-radius:12px; padding:14px 32px; font-weight:800; font-size:16px; cursor:pointer; font-family:"M PLUS Rounded 1c", sans-serif; box-shadow:0 4px 12px rgba(63,199,166,0.4);';
+  okBtn.textContent = 'やった！';
+  okBtn.onmouseover = ()=> okBtn.style.transform = 'scale(1.05)';
+  okBtn.onmouseout = ()=> okBtn.style.transform = 'scale(1)';
+  okBtn.style.transition = 'transform 0.1s ease';
+  
+  okBtn.onclick = ()=>{
+    overlay.remove();
+  };
+  card.appendChild(okBtn);
+  
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  
+  // Focus the button
+  okBtn.focus();
+}
+
 
 function burstSparkles(btn){
   const rect = btn.getBoundingClientRect();
