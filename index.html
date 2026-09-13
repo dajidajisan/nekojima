@@ -350,7 +350,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.2.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.3.0</span>
     </div>
   </div>
 </div>
@@ -762,6 +762,58 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   background:rgba(200,110,160,0.45);
 }
 .mg-endpanel.show{ display:flex; }
+
+/* ---------- INVADER (ねずみインベーダー) MINIGAME ---------- */
+#invaderOverlay{
+  position:fixed; inset:0; z-index:200; display:none;
+  align-items:center; justify-content:center;
+  background:linear-gradient(180deg, #CFE8FF 0%, #BFDCFF 55%, #A9CDFB 100%);
+}
+#invaderOverlay.show{ display:flex; }
+.iv-frame{
+  width:100%; height:100%; max-width:520px; max-height:100vh;
+  display:flex; flex-direction:column; align-items:center;
+  padding:14px; box-sizing:border-box; position:relative;
+  font-family:'M PLUS Rounded 1c',sans-serif; overflow:hidden;
+}
+.iv-hud{ width:100%; display:flex; align-items:center; gap:10px; color:#2E4A6B; margin-bottom:8px; }
+.iv-close{
+  background:rgba(255,255,255,0.65); border:none; color:#2E4A6B; width:34px; height:34px;
+  border-radius:50%; font-size:16px; cursor:pointer; flex-shrink:0;
+}
+.iv-score{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; white-space:nowrap; flex:1; }
+.iv-wave-label{ font-size:12px; font-weight:800; color:#2E4A6B; background:rgba(255,255,255,0.65); padding:4px 10px; border-radius:999px; }
+.iv-field{
+  position:relative; width:100%; flex:1; border-radius:20px; overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 100%);
+  border:3px solid rgba(255,255,255,0.6); touch-action:none;
+}
+.iv-mouse{
+  position:absolute; width:34px; height:34px; font-size:26px;
+  display:flex; align-items:center; justify-content:center;
+  transform:translate(-50%,-50%); transition:top .18s linear, filter .15s;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15));
+}
+.iv-mouse.pop{ animation:ivPop .3s ease forwards; }
+@keyframes ivPop{ 0%{ transform:translate(-50%,-50%) scale(1); opacity:1;} 100%{ transform:translate(-50%,-50%) scale(1.8); opacity:0;} }
+.iv-player{
+  position:absolute; bottom:8px; width:48px; height:48px; font-size:38px;
+  display:flex; align-items:center; justify-content:center;
+  transform:translateX(-50%); transition:left .05s linear;
+  filter:drop-shadow(0 3px 3px rgba(0,0,0,0.2));
+}
+.iv-bullet{
+  position:absolute; width:10px; height:16px; border-radius:6px;
+  background:linear-gradient(180deg, #FFF6C9, #FFD873);
+  box-shadow:0 0 6px rgba(255,216,115,0.9);
+  transform:translate(-50%,-50%);
+}
+.iv-life-icon{ font-size:14px; }
+.iv-endpanel{
+  position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(60,100,160,0.45);
+}
+.iv-endpanel.show{ display:flex; }
 </style>
 
 
@@ -851,11 +903,11 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
 
     <div class="reward-section">
       <div class="reward-section-title">🎮 ミニゲーム</div>
-      <div class="minigame-card">
+      <div class="minigame-card playable" id="invaderCard">
         <div class="minigame-emoji">🐭</div>
         <div>
           <div class="minigame-name">ねずみインベーダー</div>
-          <div class="minigame-status">近日公開</div>
+          <div class="minigame-status">タップしてあそぶ！</div>
         </div>
       </div>
       <div class="minigame-card" id="loderunnerCard">
@@ -912,6 +964,20 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="mg-field" id="mgField"></div>
     <div class="mg-endpanel" id="mgEndPanel"></div>
+  </div>
+</div>
+
+<div id="invaderOverlay">
+  <div class="iv-frame">
+    <div class="iv-hud">
+      <button class="iv-close" id="ivCloseBtn">✕</button>
+      <div class="iv-score" id="ivScore">🪙 0</div>
+      <div class="iv-wave-label" id="ivWaveLabel">ウェーブ 1/3</div>
+    </div>
+    <div class="iv-field" id="ivField">
+      <div class="iv-player" id="ivPlayer">🐱</div>
+    </div>
+    <div class="iv-endpanel" id="ivEndPanel"></div>
   </div>
 </div>
 
@@ -2746,6 +2812,13 @@ function scheduleSRSReview(en){
 function advanceSRSReview(en){
   const existing = srsSchedule[en];
   if(!existing) return; // this word wasn't under active spaced review
+  if(existing.firstTry){
+    // this was the single lighter re-check for a word that was correct on
+    // the very first try — one successful review is enough to graduate it
+    delete srsSchedule[en];
+    saveProgress();
+    return;
+  }
   const nextStage = existing.stage + 1;
   if(nextStage >= SRS_INTERVALS.length){
     delete srsSchedule[en]; // graduated — reinforced enough times to drop it
@@ -2922,7 +2995,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.2.0';
+const GAME_VERSION = 'v1.3.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6304,16 +6377,19 @@ document.getElementById('closeReview').addEventListener('click', ()=>{
 });
 
 function renderReviewList(){
-  const entries = Object.entries(mistakeCounts);
+  const mistakeEntries = Object.entries(mistakeCounts);
+  // words that are correct so far but still under the lighter
+  // one-time "did they really learn it" spaced check
+  const confirmEntries = Object.keys(srsSchedule).filter(en => srsSchedule[en].firstTry && !mistakeCounts[en]);
   reviewList.innerHTML = '';
-  if(entries.length === 0){
+  if(mistakeEntries.length === 0 && confirmEntries.length === 0){
     reviewEmpty.style.display = 'block';
     reviewStartBtn.style.display = 'none';
     return;
   }
   reviewEmpty.style.display = 'none';
   reviewStartBtn.style.display = 'block';
-  entries.forEach(([en,count])=>{
+  mistakeEntries.forEach(([en,count])=>{
     const v = VOCAB.find(x=>x.en===en);
     if(!v) return;
     const row = document.createElement('div');
@@ -6321,10 +6397,22 @@ function renderReviewList(){
     row.innerHTML = `<span class="w">${v.en}<small>${v.ja}</small></span><span class="n">${count}かい まちがえた</span>`;
     reviewList.appendChild(row);
   });
+  confirmEntries.forEach(en=>{
+    const v = VOCAB.find(x=>x.en===en);
+    if(!v) return;
+    const row = document.createElement('div');
+    row.className = 'review-item';
+    row.innerHTML = `<span class="w">${v.en}<small>${v.ja}</small></span><span class="n" style="color:var(--mint-deep);">✓ かくにん中</span>`;
+    reviewList.appendChild(row);
+  });
 }
 
 reviewStartBtn.addEventListener('click', ()=>{
-  const items = Object.keys(mistakeCounts).map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const mistakeItems = Object.keys(mistakeCounts).map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const confirmItems = Object.keys(srsSchedule)
+    .filter(en => srsSchedule[en].firstTry && !mistakeCounts[en])
+    .map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const items = [...mistakeItems, ...confirmItems];
   if(items.length === 0) return;
   reviewOverlay.classList.remove('show');
 
@@ -7192,6 +7280,246 @@ function mgShowEnd(){
     mgNextRound();
   };
   document.getElementById('mgExitBtn').onclick = mgClose;
+}
+
+/* =========================================================
+   MINIGAME: ねずみインベーダー (Mouse Invaders)
+   A simple, no-vocab arcade shooter — pure arcade fun as a change
+   of pace from the word-learning games. The cat auto-fires; the
+   player only needs to slide left/right, which keeps it approachable
+   for younger players.
+========================================================= */
+const INVADER_WAVES = 3;
+const INVADER_ROWS = 3;
+const INVADER_COLS = 5;
+const INVADER_LIVES = 3;
+const INVADER_FIRE_INTERVAL = 650; // ms between auto-shots
+const INVADER_BULLET_SPEED = 480; // px/sec
+let invaderState = null;
+let ivPointerHandler = null;
+
+function ivOpen(){
+  document.getElementById('invaderOverlay').classList.add('show');
+  document.getElementById('ivEndPanel').classList.remove('show');
+  invaderState = {
+    wave: 1, coins: 0, lives: INVADER_LIVES,
+    mice: [], bullets: [],
+    dir: 1, speed: 26, // px/sec horizontal drift
+    playerX: 50, // percentage across field width
+    running: true,
+    lastTime: null,
+    lastShot: 0,
+  };
+  ivSetupWave();
+  ivBindControls();
+  ivUpdateHUD();
+  requestAnimationFrame(ivLoop);
+}
+
+function ivClose(){
+  document.getElementById('invaderOverlay').classList.remove('show');
+  if(invaderState) invaderState.running = false;
+  invaderState = null;
+  ivUnbindControls();
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+}
+document.getElementById('invaderCard').addEventListener('click', ivOpen);
+document.getElementById('ivCloseBtn').addEventListener('click', ivClose);
+
+function ivSetupWave(){
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+  invaderState.mice = [];
+  invaderState.bullets = [];
+  invaderState.dir = 1;
+  invaderState.speed = 22 + (invaderState.wave-1)*10;
+
+  const rect = field.getBoundingClientRect();
+  const marginX = 34;
+  const usableWidth = Math.max(rect.width - marginX*2, 40);
+  const spacingX = INVADER_COLS > 1 ? usableWidth / (INVADER_COLS - 1) : 0;
+  const spacingY = 42;
+  const startY = 30;
+
+  for(let r=0;r<INVADER_ROWS;r++){
+    for(let c=0;c<INVADER_COLS;c++){
+      const el = document.createElement('div');
+      el.className = 'iv-mouse';
+      el.textContent = '🐭';
+      field.appendChild(el);
+      const mouse = {
+        el,
+        x: marginX + c*spacingX,
+        y: startY + r*spacingY,
+        alive: true,
+      };
+      invaderState.mice.push(mouse);
+      el.style.left = mouse.x + 'px';
+      el.style.top = mouse.y + 'px';
+    }
+  }
+}
+
+function ivUpdateHUD(){
+  document.getElementById('ivScore').textContent = `🪙 ${invaderState.coins}　${'❤️'.repeat(Math.max(invaderState.lives,0))}`;
+  document.getElementById('ivWaveLabel').textContent = `ウェーブ ${invaderState.wave}/${INVADER_WAVES}`;
+}
+
+function ivBindControls(){
+  const field = document.getElementById('ivField');
+  ivPointerHandler = (e)=>{
+    if(!invaderState) return;
+    const rect = field.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+    invaderState.playerX = pct;
+  };
+  field.addEventListener('pointerdown', ivPointerHandler);
+  field.addEventListener('pointermove', ivPointerHandler);
+}
+function ivUnbindControls(){
+  const field = document.getElementById('ivField');
+  if(ivPointerHandler){
+    field.removeEventListener('pointerdown', ivPointerHandler);
+    field.removeEventListener('pointermove', ivPointerHandler);
+  }
+  ivPointerHandler = null;
+}
+
+function ivLoop(timestamp){
+  if(!invaderState || !invaderState.running) return;
+  if(invaderState.lastTime == null) invaderState.lastTime = timestamp;
+  const dt = Math.min((timestamp - invaderState.lastTime) / 1000, 0.05);
+  invaderState.lastTime = timestamp;
+
+  const field = document.getElementById('ivField');
+  const rect = field.getBoundingClientRect();
+
+  // move player
+  const player = document.getElementById('ivPlayer');
+  player.style.left = (invaderState.playerX/100*rect.width) + 'px';
+  player.style.bottom = '8px';
+
+  // move mice as a group, dropping down at the edges
+  let hitEdge = false;
+  const aliveMice = invaderState.mice.filter(m=>m.alive);
+  aliveMice.forEach(m=>{ m.x += invaderState.dir * invaderState.speed * dt; });
+  aliveMice.forEach(m=>{
+    if(m.x < 20 || m.x > rect.width - 20) hitEdge = true;
+  });
+  if(hitEdge){
+    invaderState.dir *= -1;
+    aliveMice.forEach(m=>{ m.y += 22; });
+  }
+  aliveMice.forEach(m=>{
+    m.el.style.left = m.x + 'px';
+    m.el.style.top = m.y + 'px';
+  });
+
+  // check if mice reached the player's row -> lose a life and reset wave
+  const dangerY = rect.height - 60;
+  if(aliveMice.some(m=> m.y >= dangerY)){
+    ivLoseLife();
+    return;
+  }
+
+  // auto-fire
+  invaderState.lastShot += dt*1000;
+  if(invaderState.lastShot >= INVADER_FIRE_INTERVAL){
+    invaderState.lastShot = 0;
+    const bulletEl = document.createElement('div');
+    bulletEl.className = 'iv-bullet';
+    field.appendChild(bulletEl);
+    invaderState.bullets.push({
+      el: bulletEl,
+      x: invaderState.playerX/100*rect.width,
+      y: rect.height - 34,
+    });
+  }
+
+  // move bullets, check collisions
+  invaderState.bullets.forEach(b=>{ b.y -= INVADER_BULLET_SPEED * dt; });
+  invaderState.bullets.forEach(b=>{
+    if(!b.hit){
+      for(const m of aliveMice){
+        if(!m.alive) continue;
+        const dx = Math.abs(b.x - m.x), dy = Math.abs(b.y - m.y);
+        if(dx < 18 && dy < 18){
+          m.alive = false;
+          b.hit = true;
+          m.el.classList.add('pop');
+          setTimeout(()=> m.el.remove(), 300);
+          invaderState.coins += 1;
+          coins += 1;
+          updateCoinHUD();
+          saveProgress();
+          ivUpdateHUD();
+          break;
+        }
+      }
+    }
+  });
+  invaderState.bullets = invaderState.bullets.filter(b=>{
+    const dead = b.hit || b.y < -20;
+    if(dead) b.el.remove();
+    return !dead;
+  });
+  invaderState.bullets.forEach(b=>{
+    b.el.style.left = b.x + 'px';
+    b.el.style.top = b.y + 'px';
+  });
+
+  // wave clear check
+  if(invaderState.mice.every(m=>!m.alive)){
+    invaderState.wave++;
+    if(invaderState.wave > INVADER_WAVES){
+      ivShowEnd(true);
+      return;
+    }
+    ivSetupWave();
+    ivUpdateHUD();
+  }
+
+  requestAnimationFrame(ivLoop);
+}
+
+function ivLoseLife(){
+  invaderState.lives--;
+  playWrongSound();
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+  if(invaderState.lives <= 0){
+    ivUpdateHUD();
+    ivShowEnd(false);
+    return;
+  }
+  invaderState.lastTime = null;
+  ivSetupWave();
+  ivUpdateHUD();
+  requestAnimationFrame(ivLoop);
+}
+
+function ivShowEnd(cleared){
+  invaderState.running = false;
+  ivUnbindControls();
+  const panel = document.getElementById('ivEndPanel');
+  const finalCoins = invaderState.coins;
+  panel.innerHTML = `
+    <div class="lr-endcard">
+      <div class="emoji">${cleared ? '🏆' : '🐭'}</div>
+      <h3>${cleared ? 'ぜんめつクリア！' : 'おしまい！'}</h3>
+      <p>${finalCoins}びき たいじした！</p>
+      <button id="ivRetryBtn">もういちど</button>
+      <button class="secondary" id="ivExitBtn">とじる</button>
+    </div>
+  `;
+  panel.classList.add('show');
+  document.getElementById('ivRetryBtn').onclick = ()=>{
+    panel.classList.remove('show');
+    ivOpen();
+  };
+  document.getElementById('ivExitBtn').onclick = ivClose;
 }
 
 /* =========================================================
@@ -8983,6 +9311,16 @@ function markMastered(item){
     masteredWords.add(item.en);
     addOrb(); // awards +3 coins for a brand-new word
     refreshAllNpcCounts();
+    // A word that was correct on the very first try (never missed) hasn't
+    // been "battle tested" the way a word that was later corrected has —
+    // it might have been answered by looking it up rather than from
+    // memory. Give it one lighter spaced-review check (skipping the
+    // shortest interval) before treating it as fully learned; a miss
+    // during that check routes it into the normal mistake-review flow.
+    if(!srsSchedule[item.en]){
+      srsSchedule[item.en] = { stage: 1, dueAt: totalAnswered + SRS_INTERVALS[1], firstTry: true };
+      saveProgress();
+    }
   } else {
     addCoins(1); // smaller reward for correctly reviewing an already-known word
   }
