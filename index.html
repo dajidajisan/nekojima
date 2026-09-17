@@ -345,13 +345,26 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
       <button id="islandBadge">🌳 はじまりの島</button>
     </div>
     <div class="settings-row">
+      <span class="settings-row-label">よみあげの声</span>
+      <button id="voiceSettingBtn">🔊 えらぶ</button>
+    </div>
+    <div class="settings-row">
       <span class="settings-row-label">セーブコード</span>
       <button id="myCodeBtn">🔑 マイコードを見る</button>
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.3.2</span>
+      <span class="settings-row-value" id="versionLabel">v1.4.0</span>
     </div>
+  </div>
+</div>
+
+<div id="voiceOverlay">
+  <div class="npc-create-card" style="max-width:360px;">
+    <button class="close-x" id="closeVoiceOverlay">✕</button>
+    <h2>🔊 よみあげの声</h2>
+    <p class="review-empty" id="voiceEmpty" style="display:none;">この端末では えいごの声が みつからなかったよ。</p>
+    <div id="voiceList"></div>
   </div>
 </div>
 
@@ -446,6 +459,26 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
 .settings-row:last-child{ border-bottom:none; }
 .settings-row-label{ font-size:13px; font-weight:800; color:var(--plum-soft); }
 .settings-row-value{ font-size:12.5px; font-weight:800; color:var(--plum); font-family:'Fredoka',sans-serif; }
+#voiceOverlay{
+  position:fixed; inset:0; z-index:84; display:none;
+  align-items:center; justify-content:center;
+  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
+}
+#voiceOverlay.show{ display:flex; }
+.voice-item{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:12px; padding:10px 14px; margin-top:8px;
+  cursor:pointer;
+}
+.voice-item.active{ background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-color:var(--sunshine-deep); }
+.voice-item .voice-name{ font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; color:var(--plum); font-size:13px; }
+.voice-item .voice-lang{ display:block; font-weight:700; color:var(--plum-soft); font-size:11px; margin-top:1px; }
+.voice-item .voice-play{
+  background:var(--mint-deep); color:#fff; border:none; border-radius:50%;
+  width:30px; height:30px; font-size:13px; cursor:pointer; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.voice-item .voice-check{ color:var(--sunshine-deep); font-size:16px; font-weight:800; flex-shrink:0; width:18px; text-align:center; }
 #islandOverlay{
   position:fixed; inset:0; z-index:86; display:none;
   align-items:center; justify-content:center;
@@ -1075,6 +1108,7 @@ document.getElementById('myCodeBtn').addEventListener('click', ()=>{
 
 document.getElementById('settingsBtn').addEventListener('click', ()=>{
   document.getElementById('settingsOverlay').classList.add('show');
+  updateVoiceSettingLabel();
 });
 document.getElementById('closeSettings').addEventListener('click', ()=>{
   document.getElementById('settingsOverlay').classList.remove('show');
@@ -2991,7 +3025,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.3.2';
+const GAME_VERSION = 'v1.4.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9328,20 +9362,33 @@ function markMastered(item){
   saveProgress();
 }
 
-/* ---------- voice selection: use Samantha (US English) on Safari/iOS ---------- */
+/* ---------- voice selection: user's saved choice > Noelle (US English) > any en-US ---------- */
+const VOICE_STORAGE_KEY = 'neko_voice_name'; // per-device choice — browsers/OSes offer different
+                                              // voices, so this is never part of the cloud save
 let preferredVoice = null;
 function pickPreferredVoice(){
   if(!('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   if(!voices.length) return null;
-  return voices.find(v => v.name === 'Samantha')
-      || voices.find(v => v.name.includes('Samantha'))
+  const savedName = localStorage.getItem(VOICE_STORAGE_KEY);
+  if(savedName){
+    const saved = voices.find(v => v.name === savedName);
+    if(saved) return saved;
+  }
+  return voices.find(v => v.name === 'Noelle')
+      || voices.find(v => v.name.includes('Noelle'))
       || voices.find(v => v.lang === 'en-US')
       || voices[0];
 }
 if('speechSynthesis' in window){
   preferredVoice = pickPreferredVoice();
-  window.speechSynthesis.onvoiceschanged = ()=>{ preferredVoice = pickPreferredVoice(); };
+  window.speechSynthesis.onvoiceschanged = ()=>{ preferredVoice = pickPreferredVoice(); updateVoiceSettingLabel(); };
+}
+
+function updateVoiceSettingLabel(){
+  const btn = document.getElementById('voiceSettingBtn');
+  if(!btn) return;
+  btn.textContent = preferredVoice && preferredVoice.name ? `🔊 ${preferredVoice.name}` : '🔊 えらぶ';
 }
 
 function speakEnglish(text){
@@ -9353,6 +9400,75 @@ function speakEnglish(text){
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
+
+/* ---------- voice picker UI (Settings > よみあげの声) ---------- */
+const voiceOverlay = document.getElementById('voiceOverlay');
+const voiceListEl = document.getElementById('voiceList');
+const voiceEmptyEl = document.getElementById('voiceEmpty');
+
+function getEnglishVoiceList(){
+  if(!('speechSynthesis' in window)) return [];
+  return window.speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+}
+
+function renderVoiceList(){
+  let voices = getEnglishVoiceList();
+  // some browsers report voices asynchronously — if the list is empty,
+  // nudge speechSynthesis and try again shortly before giving up
+  if(voices.length === 0 && 'speechSynthesis' in window){
+    window.speechSynthesis.getVoices();
+    setTimeout(()=>{
+      if(voiceOverlay.classList.contains('show')) renderVoiceList();
+    }, 300);
+  }
+  voiceListEl.innerHTML = '';
+  if(voices.length === 0){
+    voiceEmptyEl.style.display = 'block';
+    return;
+  }
+  voiceEmptyEl.style.display = 'none';
+  const savedName = localStorage.getItem(VOICE_STORAGE_KEY);
+  const currentName = preferredVoice ? preferredVoice.name : null;
+  voices.forEach(v=>{
+    const row = document.createElement('div');
+    const isActive = savedName ? v.name === savedName : v.name === currentName;
+    row.className = 'voice-item' + (isActive ? ' active' : '');
+    row.innerHTML = `
+      <span class="voice-check">${isActive ? '✓' : ''}</span>
+      <span style="flex:1;">
+        <span class="voice-name">${v.name}</span>
+        <span class="voice-lang">${v.lang}</span>
+      </span>
+      <button class="voice-play" aria-label="ためしに聞く">▶</button>
+    `;
+    row.querySelector('.voice-play').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if('speechSynthesis' in window){
+        const u = new SpeechSynthesisUtterance('Hello! Nice to meet you.');
+        u.voice = v; u.lang = v.lang; u.rate = 0.85;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      }
+    });
+    row.addEventListener('click', ()=>{
+      localStorage.setItem(VOICE_STORAGE_KEY, v.name);
+      preferredVoice = v;
+      renderVoiceList();
+      updateVoiceSettingLabel();
+    });
+    voiceListEl.appendChild(row);
+  });
+}
+
+document.getElementById('voiceSettingBtn').addEventListener('click', ()=>{
+  renderVoiceList();
+  voiceOverlay.classList.add('show');
+});
+document.getElementById('closeVoiceOverlay').addEventListener('click', ()=>{
+  voiceOverlay.classList.remove('show');
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+});
+
 
 const ORB_POSITIONS = [[24,48],[32,48],[40,48],[22,42],[30,42],[38,42],[42,42],[24,36],[32,36],[40,36],[28,30],[36,30]];
 const ORB_COLORS = ['#FF8FA3','#FFD873','#6FE0C2','#B9A6E8'];
