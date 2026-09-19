@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.6.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.6.1</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.6.0';
+const GAME_VERSION = 'v1.6.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6113,11 +6113,16 @@ function unlockAudio(){
     unlockAudioEl.play().catch(e=>{
       if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生に失敗（ミュートスイッチ対策が効かない可能性）: ' + e.message);
     });
-    // If iOS ever pauses this loop on its own (e.g. after the device
-    // sleeps or the tab is backgrounded), the mute-switch workaround
-    // stops working silently — surface that instead of guessing later.
+    // If iOS ever pauses this loop on its own — most likely because
+    // speechSynthesis playback briefly takes over the audio session —
+    // the mute-switch workaround silently stops protecting the game's
+    // sound effects. Both log it AND try to resume it immediately, so
+    // footsteps don't stay silent for the rest of the session.
     unlockAudioEl.addEventListener('pause', ()=>{
-      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生が とまった（ミュートスイッチ対策が切れた可能性）');
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生が とまった → 再開をこころみる');
+      unlockAudioEl.play().catch(e=>{
+        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループの再開に失敗: ' + e.message);
+      });
     });
   }
 
@@ -9510,6 +9515,7 @@ function updateVoiceSettingLabel(){
 }
 
 let speakRequestSeq = 0;
+const SPEAK_MAX_RETRIES = 2; // total attempts = 1 initial + this many retries
 
 function speakEnglish(text){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
@@ -9521,7 +9527,7 @@ function speakEnglish(text){
   speakRequestSeq++;
   const myRequestId = speakRequestSeq;
 
-  function attemptSpeak(isRetry){
+  function attemptSpeak(retryCount){
     const ss = window.speechSynthesis;
     const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
     let activationInfo = '';
@@ -9537,7 +9543,7 @@ function speakEnglish(text){
     if(preferredVoice) u.voice = preferredVoice;
     const voiceLabel = preferredVoice ? preferredVoice.name : '(未選択・システム既定)';
 
-    logVoiceDebug('info', `${isRetry ? '↻ もう一度ためす' : '▶ 再生しよう'}: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
+    logVoiceDebug('info', `${retryCount > 0 ? `↻ もう一度ためす(${retryCount}回目)` : '▶ 再生しよう'}: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
 
     let started = false;
     let settled = false;
@@ -9548,6 +9554,13 @@ function speakEnglish(text){
     u.onend = ()=>{
       settled = true;
       logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
+      // Speech playback appears to silently pause our background
+      // silent-loop workaround for the iOS mute switch (see the 'pause'
+      // listener on unlockAudioEl) — double-check it's still going now
+      // that this utterance has finished, as a second line of defense.
+      if(unlockAudioEl && unlockAudioEl.paused){
+        unlockAudioEl.play().catch(()=>{});
+      }
     };
     u.onerror = (ev)=>{
       settled = true;
@@ -9556,23 +9569,30 @@ function speakEnglish(text){
     // If neither "start" nor "error" fires within a second, the browser
     // is silently swallowing the call — this is the failure mode we
     // can't otherwise see (looks identical to "nothing happened").
-    // Retry exactly once; skip the retry if a newer speakEnglish() call
-    // has since taken over, so we don't talk over more recent dialogue.
+    // Retry a couple of times; skip the retry if a newer speakEnglish()
+    // call has since taken over, so we don't talk over newer dialogue.
     setTimeout(()=>{
       if(started || settled) return;
       if(myRequestId !== speakRequestSeq){
-        logVoiceDebug('warn', `⚠ 1秒たっても反応なし（このリクエストは古いので再試行しない）: [${preview}]`);
+        logVoiceDebug('warn', `⚠ 反応なし（このリクエストは古いので再試行しない）: [${preview}]`);
         return;
       }
       logVoiceDebug('warn', `⚠ 1秒たっても反応なし（無視された可能性）: [${preview}]`);
-      if(!isRetry) attemptSpeak(true);
+      if(retryCount < SPEAK_MAX_RETRIES) attemptSpeak(retryCount + 1);
     }, 1000);
 
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    // Only cancel an in-flight utterance. Calling cancel() when nothing
+    // is speaking/pending appears to be what makes iOS silently drop the
+    // very next speak() call — this matches the "first utterance never
+    // fires" failure mode seen in real device logs, where cancel() was
+    // always called unconditionally right before every speak().
+    if(ss.speaking || ss.pending){
+      ss.cancel();
+    }
+    ss.speak(u);
   }
 
-  attemptSpeak(false);
+  attemptSpeak(0);
 }
 
 /* ---------- voice picker UI (Settings > よみあげの声) ---------- */
