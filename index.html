@@ -349,13 +349,32 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
       <button id="voiceSettingBtn">🔊 えらぶ</button>
     </div>
     <div class="settings-row">
+      <span class="settings-row-label">音声のログ<span id="voiceDebugBadge" style="display:none; margin-left:4px; background:#F06A82; color:#fff; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px;"></span></span>
+      <button id="voiceDebugBtn">🔧 かくにん</button>
+    </div>
+    <div class="settings-row">
       <span class="settings-row-label">セーブコード</span>
       <button id="myCodeBtn">🔑 マイコードを見る</button>
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.4.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.5.0</span>
     </div>
+  </div>
+</div>
+
+<div id="voiceDebugOverlay">
+  <div class="npc-create-card" style="max-width:420px;">
+    <button class="close-x" id="closeVoiceDebugOverlay">✕</button>
+    <h2>🔧 音声のログ</h2>
+    <p class="review-empty" style="margin:0 0 4px; text-align:left; font-size:11.5px;">キャラクターの声が出ない時に、ここに理由が記録されます。うまく再生できなかったら、この画面のスクリーンショットを送ってください。</p>
+    <div style="display:flex; gap:8px; margin:6px 0 4px;">
+      <button id="voiceDebugTestBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:var(--mint-deep); color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">🔊 ためす</button>
+      <button id="voiceDebugClearBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:#DCD8E8; color:var(--plum); font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">クリア</button>
+      <button id="voiceDebugCopyBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:#DCD8E8; color:var(--plum); font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">コピー</button>
+    </div>
+    <p class="review-empty" id="voiceDebugEmpty">まだログが ないよ。「ためす」を押すか、キャラクターと話してみてね。</p>
+    <div id="voiceDebugList" style="max-height:50vh; overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -479,6 +498,21 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   display:flex; align-items:center; justify-content:center;
 }
 .voice-item .voice-check{ color:var(--sunshine-deep); font-size:16px; font-weight:800; flex-shrink:0; width:18px; text-align:center; }
+#voiceDebugOverlay{
+  position:fixed; inset:0; z-index:85; display:none;
+  align-items:center; justify-content:center;
+  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
+}
+#voiceDebugOverlay.show{ display:flex; }
+.voice-debug-item{
+  background:#FBF9FF; border-left:4px solid #B9AEDD; border-radius:8px;
+  padding:8px 10px; margin-top:6px; font-family:monospace; font-size:11px; color:var(--plum);
+  line-height:1.5; white-space:pre-wrap; word-break:break-word;
+}
+.voice-debug-item.ok{ border-left-color:var(--mint-deep); }
+.voice-debug-item.warn{ border-left-color:var(--sunshine-deep); }
+.voice-debug-item.error{ border-left-color:#F06A82; }
+.voice-debug-item .vd-time{ color:var(--plum-soft); font-weight:700; }
 #islandOverlay{
   position:fixed; inset:0; z-index:86; display:none;
   align-items:center; justify-content:center;
@@ -3025,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.4.0';
+const GAME_VERSION = 'v1.5.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9362,6 +9396,39 @@ function markMastered(item){
   saveProgress();
 }
 
+/* =========================================================
+   VOICE DEBUG LOG — records what actually happens each time we try
+   to speak, so we can see on a real device (e.g. an iPad where speech
+   is unreliable) whether calls are blocked, error out, or simply never
+   fire their "start" event. Never sent anywhere — purely on-screen so
+   the person can screenshot or copy it.
+   Defined before voice selection below, since that code logs during
+   its own module-level initialization.
+========================================================= */
+const VOICE_DEBUG_MAX = 40;
+let voiceDebugLog = [];
+let voiceDebugSeq = 0;
+
+function voiceDebugTimestamp(){
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function logVoiceDebug(level, message){
+  voiceDebugSeq++;
+  voiceDebugLog.push({ id: voiceDebugSeq, level, message, time: voiceDebugTimestamp() });
+  if(voiceDebugLog.length > VOICE_DEBUG_MAX) voiceDebugLog.shift();
+  const badge = document.getElementById('voiceDebugBadge');
+  if(badge && (level === 'warn' || level === 'error')){
+    badge.style.display = 'inline-block';
+    badge.textContent = '!';
+  }
+  // referenced by element id (not a module-level const) so this stays
+  // safe to call from the very top of the script
+  const overlayEl = document.getElementById('voiceDebugOverlay');
+  if(overlayEl && overlayEl.classList.contains('show') && typeof renderVoiceDebugList === 'function') renderVoiceDebugList();
+}
+
 /* ---------- voice selection: user's saved choice > Noelle (US English) > any en-US ---------- */
 const VOICE_STORAGE_KEY = 'neko_voice_name'; // per-device choice — browsers/OSes offer different
                                               // voices, so this is never part of the cloud save
@@ -9382,7 +9449,14 @@ function pickPreferredVoice(){
 }
 if('speechSynthesis' in window){
   preferredVoice = pickPreferredVoice();
-  window.speechSynthesis.onvoiceschanged = ()=>{ preferredVoice = pickPreferredVoice(); updateVoiceSettingLabel(); };
+  logVoiceDebug('info', `起動時の声リスト: ${window.speechSynthesis.getVoices().length}件 / えらばれた声=${preferredVoice ? preferredVoice.name : 'なし'}`);
+  window.speechSynthesis.onvoiceschanged = ()=>{
+    preferredVoice = pickPreferredVoice();
+    logVoiceDebug('info', `声リストが更新された: ${window.speechSynthesis.getVoices().length}件 / えらばれた声=${preferredVoice ? preferredVoice.name : 'なし'}`);
+    updateVoiceSettingLabel();
+  };
+} else {
+  logVoiceDebug('error', 'このブラウザは speechSynthesis に対応していません');
 }
 
 function updateVoiceSettingLabel(){
@@ -9392,11 +9466,51 @@ function updateVoiceSettingLabel(){
 }
 
 function speakEnglish(text){
-  if(!('speechSynthesis' in window)) return;
+  const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
+  if(!('speechSynthesis' in window)){
+    logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
+    return;
+  }
+  const ss = window.speechSynthesis;
+  const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
+  let activationInfo = '';
+  try{
+    if(navigator.userActivation){
+      activationInfo = ` / userActivation isActive=${navigator.userActivation.isActive} hasBeenActive=${navigator.userActivation.hasBeenActive}`;
+    }
+  } catch(e){ /* not supported on this browser — fine, just omit */ }
+
   const u = new SpeechSynthesisUtterance(text);
   u.lang='en-US'; u.rate=0.85;
   if(!preferredVoice) preferredVoice = pickPreferredVoice();
   if(preferredVoice) u.voice = preferredVoice;
+  const voiceLabel = preferredVoice ? preferredVoice.name : '(未選択・システム既定)';
+
+  logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
+
+  let started = false;
+  let settled = false;
+  u.onstart = ()=>{
+    started = true;
+    logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
+  };
+  u.onend = ()=>{
+    settled = true;
+    logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
+  };
+  u.onerror = (ev)=>{
+    settled = true;
+    logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+  };
+  // If neither "start" nor "error" fires within a second, the browser
+  // is silently swallowing the call — this is the failure mode we
+  // can't otherwise see (looks identical to "nothing happened").
+  setTimeout(()=>{
+    if(!started && !settled){
+      logVoiceDebug('warn', `⚠ 1秒たっても反応なし（無視された可能性）: [${preview}]`);
+    }
+  }, 1000);
+
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
@@ -9468,6 +9582,64 @@ document.getElementById('closeVoiceOverlay').addEventListener('click', ()=>{
   voiceOverlay.classList.remove('show');
   if('speechSynthesis' in window) window.speechSynthesis.cancel();
 });
+
+/* ---------- voice debug log UI (Settings > 音声のログ) ---------- */
+const voiceDebugOverlay = document.getElementById('voiceDebugOverlay');
+const voiceDebugListEl = document.getElementById('voiceDebugList');
+const voiceDebugEmptyEl = document.getElementById('voiceDebugEmpty');
+
+function renderVoiceDebugList(){
+  if(voiceDebugLog.length === 0){
+    voiceDebugEmptyEl.style.display = 'block';
+    voiceDebugListEl.innerHTML = '';
+    return;
+  }
+  voiceDebugEmptyEl.style.display = 'none';
+  // newest first, so the most relevant entry is visible without scrolling
+  const rows = voiceDebugLog.slice().reverse().map(entry=>{
+    const cls = entry.level === 'ok' ? 'ok' : entry.level === 'warn' ? 'warn' : entry.level === 'error' ? 'error' : '';
+    const escaped = entry.message.replace(/</g,'&lt;');
+    return `<div class="voice-debug-item ${cls}"><span class="vd-time">${entry.time}</span>  ${escaped}</div>`;
+  }).join('');
+  voiceDebugListEl.innerHTML = rows;
+}
+
+function voiceDebugLogToText(){
+  return voiceDebugLog.map(e => `[${e.time}] ${e.message}`).join('\n');
+}
+
+document.getElementById('voiceDebugBtn').addEventListener('click', ()=>{
+  const badge = document.getElementById('voiceDebugBadge');
+  if(badge){ badge.style.display = 'none'; }
+  renderVoiceDebugList();
+  voiceDebugOverlay.classList.add('show');
+});
+document.getElementById('closeVoiceDebugOverlay').addEventListener('click', ()=>{
+  voiceDebugOverlay.classList.remove('show');
+});
+document.getElementById('voiceDebugTestBtn').addEventListener('click', ()=>{
+  speakEnglish('Hello! Can you hear me? This is a test.');
+});
+document.getElementById('voiceDebugClearBtn').addEventListener('click', ()=>{
+  voiceDebugLog = [];
+  renderVoiceDebugList();
+});
+document.getElementById('voiceDebugCopyBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('voiceDebugCopyBtn');
+  const text = voiceDebugLogToText() || '(ログはまだ ありません)';
+  try{
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = 'コピーした！';
+    setTimeout(()=>{ btn.textContent = original; }, 1500);
+  } catch(e){
+    // clipboard API may be unavailable — select the text as a fallback
+    // by putting it in the empty-state paragraph briefly
+    voiceDebugListEl.innerHTML = `<div class="voice-debug-item">${text.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+    voiceDebugEmptyEl.style.display = 'none';
+  }
+});
+
 
 
 const ORB_POSITIONS = [[24,48],[32,48],[40,48],[22,42],[30,42],[38,42],[42,42],[24,36],[32,36],[40,36],[28,30],[36,30]];
