@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.5.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.6.0</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.5.0';
+const GAME_VERSION = 'v1.6.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6052,13 +6052,30 @@ function getAudioCtx(){
     audioCtx = new Ctx();
     audioCtx.addEventListener('statechange', ()=> updateAudioDebug());
   }
-  if(audioCtx.state === 'suspended') audioCtx.resume();
+  if(audioCtx.state === 'suspended'){
+    audioCtx.resume().then(()=> updateAudioDebug('resume ok')).catch(e=>{
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 効果音(AudioContext)のresumeに失敗: ' + e.message);
+    });
+  }
   updateAudioDebug();
   return audioCtx;
 }
 
-// (debug indicator removed now that sound is confirmed working)
-function updateAudioDebug(){ /* no-op */ }
+// Logs into the same on-screen debug log as speech (Settings > 音声のログ),
+// but only when the state actually changes — playFootstepSound() alone can
+// call this many times a second while walking, so logging every call would
+// flood the log with noise instead of surfacing the moment sound effects
+// actually stop working (e.g. iOS suspending the context in the background).
+let lastAudioDebugState = null;
+function updateAudioDebug(note){
+  const state = audioCtx ? audioCtx.state : 'no-context';
+  if(state === lastAudioDebugState) return;
+  const prev = lastAudioDebugState;
+  lastAudioDebugState = state;
+  if(typeof logVoiceDebug !== 'function') return; // logging not loaded yet — shouldn't happen, but stay safe
+  const level = (state === 'suspended' || state === 'no-context') ? 'warn' : 'ok';
+  logVoiceDebug(level, `🔈 効果音の状態がかわった: ${prev === null ? '(起動)' : prev} → ${state}${note ? ' ['+note+']' : ''}`);
+}
 
 // unlock audio on the very first touch anywhere on the page. iOS Safari
 // can require more than just creating/resuming the context — actually
@@ -6093,7 +6110,34 @@ function unlockAudio(){
     unlockAudioEl.loop = true;
     unlockAudioEl.volume = 0.01;
     unlockAudioEl.src = SILENT_WAV_DATA_URI;
-    unlockAudioEl.play().catch(()=>{});
+    unlockAudioEl.play().catch(e=>{
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生に失敗（ミュートスイッチ対策が効かない可能性）: ' + e.message);
+    });
+    // If iOS ever pauses this loop on its own (e.g. after the device
+    // sleeps or the tab is backgrounded), the mute-switch workaround
+    // stops working silently — surface that instead of guessing later.
+    unlockAudioEl.addEventListener('pause', ()=>{
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生が とまった（ミュートスイッチ対策が切れた可能性）');
+    });
+  }
+
+  // Warm up speechSynthesis on this same first tap too. On some iOS
+  // devices, whichever speak() call happens to be the very first one on
+  // the page gets silently dropped because the speech engine isn't
+  // ready yet — everything after that first call works fine. Firing one
+  // near-silent utterance here (well before the player reaches an NPC
+  // conversation) absorbs that failure where nobody notices it.
+  if('speechSynthesis' in window){
+    try{
+      const warm = new SpeechSynthesisUtterance(' ');
+      warm.volume = 0.01;
+      warm.rate = 10;
+      if(typeof preferredVoice !== 'undefined' && preferredVoice) warm.voice = preferredVoice;
+      window.speechSynthesis.speak(warm);
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('info', '🔥 speechSynthesisを ウォームアップした');
+    } catch(e){
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', 'ウォームアップに失敗: ' + e.message);
+    }
   }
 
   updateAudioDebug('unlock tried, ctx=' + (ctx ? ctx.state : 'none'));
@@ -9465,54 +9509,70 @@ function updateVoiceSettingLabel(){
   btn.textContent = preferredVoice && preferredVoice.name ? `🔊 ${preferredVoice.name}` : '🔊 えらぶ';
 }
 
+let speakRequestSeq = 0;
+
 function speakEnglish(text){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
     logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
     return;
   }
-  const ss = window.speechSynthesis;
-  const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
-  let activationInfo = '';
-  try{
-    if(navigator.userActivation){
-      activationInfo = ` / userActivation isActive=${navigator.userActivation.isActive} hasBeenActive=${navigator.userActivation.hasBeenActive}`;
-    }
-  } catch(e){ /* not supported on this browser — fine, just omit */ }
 
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang='en-US'; u.rate=0.85;
-  if(!preferredVoice) preferredVoice = pickPreferredVoice();
-  if(preferredVoice) u.voice = preferredVoice;
-  const voiceLabel = preferredVoice ? preferredVoice.name : '(未選択・システム既定)';
+  speakRequestSeq++;
+  const myRequestId = speakRequestSeq;
 
-  logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
+  function attemptSpeak(isRetry){
+    const ss = window.speechSynthesis;
+    const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
+    let activationInfo = '';
+    try{
+      if(navigator.userActivation){
+        activationInfo = ` / userActivation isActive=${navigator.userActivation.isActive} hasBeenActive=${navigator.userActivation.hasBeenActive}`;
+      }
+    } catch(e){ /* not supported on this browser — fine, just omit */ }
 
-  let started = false;
-  let settled = false;
-  u.onstart = ()=>{
-    started = true;
-    logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
-  };
-  u.onend = ()=>{
-    settled = true;
-    logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
-  };
-  u.onerror = (ev)=>{
-    settled = true;
-    logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
-  };
-  // If neither "start" nor "error" fires within a second, the browser
-  // is silently swallowing the call — this is the failure mode we
-  // can't otherwise see (looks identical to "nothing happened").
-  setTimeout(()=>{
-    if(!started && !settled){
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang='en-US'; u.rate=0.85;
+    if(!preferredVoice) preferredVoice = pickPreferredVoice();
+    if(preferredVoice) u.voice = preferredVoice;
+    const voiceLabel = preferredVoice ? preferredVoice.name : '(未選択・システム既定)';
+
+    logVoiceDebug('info', `${isRetry ? '↻ もう一度ためす' : '▶ 再生しよう'}: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
+
+    let started = false;
+    let settled = false;
+    u.onstart = ()=>{
+      started = true;
+      logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
+    };
+    u.onend = ()=>{
+      settled = true;
+      logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
+    };
+    u.onerror = (ev)=>{
+      settled = true;
+      logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+    };
+    // If neither "start" nor "error" fires within a second, the browser
+    // is silently swallowing the call — this is the failure mode we
+    // can't otherwise see (looks identical to "nothing happened").
+    // Retry exactly once; skip the retry if a newer speakEnglish() call
+    // has since taken over, so we don't talk over more recent dialogue.
+    setTimeout(()=>{
+      if(started || settled) return;
+      if(myRequestId !== speakRequestSeq){
+        logVoiceDebug('warn', `⚠ 1秒たっても反応なし（このリクエストは古いので再試行しない）: [${preview}]`);
+        return;
+      }
       logVoiceDebug('warn', `⚠ 1秒たっても反応なし（無視された可能性）: [${preview}]`);
-    }
-  }, 1000);
+      if(!isRetry) attemptSpeak(true);
+    }, 1000);
 
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  }
+
+  attemptSpeak(false);
 }
 
 /* ---------- voice picker UI (Settings > よみあげの声) ---------- */
