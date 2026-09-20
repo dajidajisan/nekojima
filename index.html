@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.7.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.7.1</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.7.0';
+const GAME_VERSION = 'v1.7.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6142,6 +6142,8 @@ function unlockAudio(){
 
 const SPEECH_KEEPALIVE_INTERVAL_MS = 4000;
 let speechKeepAliveTimer = null;
+let speechKeepAliveOkCount = 0;
+let speechKeepAliveFailCount = 0;
 function startSpeechKeepAlive(){
   if(!('speechSynthesis' in window)) return;
   if(speechKeepAliveTimer) return; // already running
@@ -6156,9 +6158,48 @@ function startSpeechKeepAlive(){
       keepAlive.volume = 0.01;
       keepAlive.rate = 10;
       if(typeof preferredVoice !== 'undefined' && preferredVoice) keepAlive.voice = preferredVoice;
+      let settled = false;
+      keepAlive.onstart = ()=>{
+        settled = true;
+        speechKeepAliveOkCount++;
+      };
+      keepAlive.onerror = ()=>{
+        settled = true;
+        speechKeepAliveFailCount++;
+        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', `🔥 keep-alive失敗(えらー) 累計 成功${speechKeepAliveOkCount}/失敗${speechKeepAliveFailCount}`);
+      };
+      // We only log a running tally (not one line per tick) so this
+      // doesn't flood the log — but a failure here would confirm the
+      // keep-alive pings are themselves being silently dropped, same
+      // as the real dialogue lines.
+      setTimeout(()=>{
+        if(settled) return;
+        speechKeepAliveFailCount++;
+        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', `🔥 keep-aliveが反応なし（無視された可能性） 累計 成功${speechKeepAliveOkCount}/失敗${speechKeepAliveFailCount}`);
+      }, 800);
       ss.speak(keepAlive);
     } catch(e){ /* ignore — this is a best-effort background nudge */ }
   }, SPEECH_KEEPALIVE_INTERVAL_MS);
+}
+
+// A one-off nudge meant to be called synchronously from inside a tap
+// handler — e.g. right when the player taps an NPC or landmark, before
+// any AI-generation network request runs. Cheap insurance alongside the
+// interval-based keep-alive above: if the interval nudges are for some
+// reason not enough, this gives the speech engine one more recent
+// wake-up call as close as possible to the moment real dialogue will
+// need to play.
+function nudgeSpeechSynthesisNow(){
+  if(!('speechSynthesis' in window)) return;
+  const ss = window.speechSynthesis;
+  if(ss.speaking || ss.pending) return; // don't step on anything already playing
+  try{
+    const nudge = new SpeechSynthesisUtterance(' ');
+    nudge.volume = 0.01;
+    nudge.rate = 10;
+    if(typeof preferredVoice !== 'undefined' && preferredVoice) nudge.voice = preferredVoice;
+    ss.speak(nudge);
+  } catch(e){ /* ignore — best-effort */ }
 }
 
 let toneCallCount = 0;
@@ -7748,6 +7789,7 @@ function renderSmallTalkTurn(turns, turnIndex, onDone){
 }
 
 async function renderSmallTalk(npc, onDone){
+  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `<div class="npc-done-panel">
     <div class="emoji thinking-emoji">💭</div>
     <p>ちょっと待ってね<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
@@ -7760,6 +7802,7 @@ async function renderSmallTalk(npc, onDone){
 }
 
 function openQuiz(npc){
+  nudgeSpeechSynthesisNow();
   activeNPC = npc;
   quizOpen = true;
   conversationContext = '';
@@ -7852,6 +7895,7 @@ const PRAISES = [
 ];
 
 function openLandmark(landmark){
+  nudgeSpeechSynthesisNow();
   activeNPC = null;
   quizOpen = true;
   quizOverlay.classList.add('show');
@@ -7895,6 +7939,7 @@ async function generateCafeMenu(){
   }
 }
 async function renderRobotCafe(landmark){
+  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `<div class="npc-done-panel">
     <div class="emoji thinking-emoji">☕</div>
     <p>メニューを考え中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
@@ -8361,6 +8406,7 @@ function rpsWinner(playerKey, robotKey){
 }
 
 function renderCatRobot(landmark){
+  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `
     <span class="exercise-tag" style="background:#9B6BFF;">🤖 ねこロボと じゃんけん</span>
     <div class="dialogue-bubble"><span class="en">Let's play rock-paper-scissors!</span><span class="ja">じゃんけんしよう！</span></div>
