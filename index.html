@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.12.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.13.0</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.12.0';
+const GAME_VERSION = 'v1.13.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9530,17 +9530,33 @@ function speakEnglish(text){
 
   const u = new SpeechSynthesisUtterance(text);
   u.lang='en-US'; u.rate=0.85;
-  // Deliberately NOT assigning u.voice to a specific SpeechSynthesisVoice
-  // object here. Explicitly grabbing a voice from an earlier getVoices()
-  // call and holding onto that object could itself be part of what's
-  // going wrong on iOS — if the engine resets internally (backgrounding,
-  // OS quirks, etc.), that object may become a stale reference even
-  // though it still looks valid from the page's side. Leaving voice
-  // unset lets the browser pick its own current default for the
-  // language, same as any other site using speechSynthesis normally.
-  const voiceLabel = '(未指定・システム既定の en-US 音声)';
+  // Explicitly assigning a specific SpeechSynthesisVoice object here.
+  // Tried leaving this unset (letting the browser pick its own default)
+  // as an experiment, but real device testing showed that made things
+  // WORSE, not better — fewer utterances fired at all. So an explicitly
+  // chosen voice is kept, even though its reliability is still
+  // imperfect.
+  const voice = pickPreferredVoice();
+  if(voice){ preferredVoice = voice; u.voice = voice; }
+  const voiceLabel = voice ? voice.name : '(未選択・システム既定)';
 
   logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
+
+  // Device logs consistently show the footstep AudioContext getting
+  // suspended (and our mute-switch silent loop getting paused) right
+  // around when an NPC line plays — iOS appears to be fighting over the
+  // audio session between speechSynthesis and Web Audio internally.
+  // Rather than leave that fight to the OS, hand the footstep audio
+  // over explicitly for the duration of this one utterance, then take
+  // it back the moment the utterance ends (or errors out).
+  if(typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'running'){
+    audioCtx.suspend().then(()=> updateAudioDebug('suspended for speech')).catch(()=>{});
+  }
+  function resumeAudioAfterSpeech(){
+    if(typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended'){
+      audioCtx.resume().then(()=> updateAudioDebug('resumed after speech')).catch(()=>{});
+    }
+  }
 
   u.onstart = ()=>{
     logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
@@ -9554,9 +9570,11 @@ function speakEnglish(text){
     if(unlockAudioEl && unlockAudioEl.paused){
       unlockAudioEl.play().catch(()=>{});
     }
+    resumeAudioAfterSpeech();
   };
   u.onerror = (ev)=>{
     logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+    resumeAudioAfterSpeech();
   };
 
   if(ss.speaking || ss.pending){
