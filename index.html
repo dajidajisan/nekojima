@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.10.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.11.0</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.10.0';
+const GAME_VERSION = 'v1.11.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6126,17 +6126,6 @@ function unlockAudio(){
     });
   }
 
-  // Warm up speechSynthesis, then keep nudging it periodically for the
-  // rest of the session. On some iOS devices, a speak() call fails
-  // silently whenever it comes more than a few seconds after the
-  // previous one — real device logs show every NPC/joke line that
-  // followed ~8+ seconds of silence get dropped (even retried 3x),
-  // while a line spoken <1s after another succeeds instantly. A single
-  // warm-up on the first tap wasn't enough; sending a near-silent,
-  // near-instant utterance every few seconds keeps the engine "awake"
-  // so the utterances the player actually needs to hear go through.
-  startSpeechKeepAlive();
-
   updateAudioDebug('unlock tried, ctx=' + (ctx ? ctx.state : 'none'));
 }
 
@@ -6161,95 +6150,7 @@ document.addEventListener('visibilitychange', ()=>{
   if(unlockAudioEl && unlockAudioEl.paused){
     unlockAudioEl.play().catch(()=>{});
   }
-
-  // Re-warm speechSynthesis with a real, audible line — same treatment
-  // as the very first tap of a brand-new game.
-  if('speechSynthesis' in window && typeof speakEnglish === 'function'){
-    speakEnglish('Meow!');
-  }
-
-  // Restart the keep-alive interval cleanly, in case iOS's background
-  // timer throttling left it in a stalled state.
-  if(speechKeepAliveTimer){
-    clearInterval(speechKeepAliveTimer);
-    speechKeepAliveTimer = null;
-  }
-  startSpeechKeepAlive();
 });
-
-const SPEECH_KEEPALIVE_INTERVAL_MS = 4000;
-let speechKeepAliveTimer = null;
-let speechKeepAliveOkCount = 0;
-let speechKeepAliveFailCount = 0;
-function startSpeechKeepAlive(){
-  if(!('speechSynthesis' in window)) return;
-  if(speechKeepAliveTimer) return; // already running
-  if(typeof logVoiceDebug === 'function') logVoiceDebug('info', '🔥 speechSynthesisの keep-aliveを かいし');
-  speechKeepAliveTimer = setInterval(()=>{
-    const ss = window.speechSynthesis;
-    // Never interfere with an utterance that's genuinely in progress or
-    // queued — this is purely to stop the engine going idle between them.
-    if(ss.speaking || ss.pending) return;
-    try{
-      const keepAlive = new SpeechSynthesisUtterance(' ');
-      keepAlive.volume = 0.01;
-      keepAlive.rate = 10;
-      if(typeof pickPreferredVoice === 'function'){
-        const freshVoice = pickPreferredVoice();
-        if(freshVoice) keepAlive.voice = freshVoice;
-      }
-      let settled = false;
-      keepAlive.onstart = ()=>{
-        settled = true;
-        speechKeepAliveOkCount++;
-      };
-      keepAlive.onerror = ()=>{
-        settled = true;
-        speechKeepAliveFailCount++;
-        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', `🔥 keep-alive失敗(えらー) 累計 成功${speechKeepAliveOkCount}/失敗${speechKeepAliveFailCount}`);
-      };
-      // We only log a running tally (not one line per tick) so this
-      // doesn't flood the log — but a failure here would confirm the
-      // keep-alive pings are themselves being silently dropped, same
-      // as the real dialogue lines.
-      setTimeout(()=>{
-        if(settled) return;
-        speechKeepAliveFailCount++;
-        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', `🔥 keep-aliveが反応なし（無視された可能性） 累計 成功${speechKeepAliveOkCount}/失敗${speechKeepAliveFailCount}`);
-      }, 800);
-      ss.speak(keepAlive);
-      // Same pause()/resume() "kick" used for real dialogue — a
-      // long-documented workaround for iOS Safari where speak() queues
-      // an utterance but the engine doesn't start processing it on its
-      // own.
-      try{ ss.pause(); ss.resume(); } catch(e){ /* ignore */ }
-    } catch(e){ /* ignore — this is a best-effort background nudge */ }
-  }, SPEECH_KEEPALIVE_INTERVAL_MS);
-}
-
-// A one-off nudge meant to be called synchronously from inside a tap
-// handler — e.g. right when the player taps an NPC or landmark, before
-// any AI-generation network request runs. Cheap insurance alongside the
-// interval-based keep-alive above: if the interval nudges are for some
-// reason not enough, this gives the speech engine one more recent
-// wake-up call as close as possible to the moment real dialogue will
-// need to play.
-function nudgeSpeechSynthesisNow(){
-  if(!('speechSynthesis' in window)) return;
-  const ss = window.speechSynthesis;
-  if(ss.speaking || ss.pending) return; // don't step on anything already playing
-  try{
-    const nudge = new SpeechSynthesisUtterance(' ');
-    nudge.volume = 0.01;
-    nudge.rate = 10;
-    if(typeof pickPreferredVoice === 'function'){
-      const freshVoice = pickPreferredVoice();
-      if(freshVoice) nudge.voice = freshVoice;
-    }
-    ss.speak(nudge);
-    try{ ss.pause(); ss.resume(); } catch(e2){ /* ignore */ }
-  } catch(e){ /* ignore — best-effort */ }
-}
 
 let toneCallCount = 0;
 function playTone(freq, duration, startTime, gain, type){
@@ -7838,7 +7739,6 @@ function renderSmallTalkTurn(turns, turnIndex, onDone){
 }
 
 async function renderSmallTalk(npc, onDone){
-  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `<div class="npc-done-panel">
     <div class="emoji thinking-emoji">💭</div>
     <p>ちょっと待ってね<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
@@ -7851,7 +7751,6 @@ async function renderSmallTalk(npc, onDone){
 }
 
 function openQuiz(npc){
-  nudgeSpeechSynthesisNow();
   activeNPC = npc;
   quizOpen = true;
   conversationContext = '';
@@ -7944,7 +7843,6 @@ const PRAISES = [
 ];
 
 function openLandmark(landmark){
-  nudgeSpeechSynthesisNow();
   activeNPC = null;
   quizOpen = true;
   quizOverlay.classList.add('show');
@@ -7988,7 +7886,6 @@ async function generateCafeMenu(){
   }
 }
 async function renderRobotCafe(landmark){
-  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `<div class="npc-done-panel">
     <div class="emoji thinking-emoji">☕</div>
     <p>メニューを考え中<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span></p>
@@ -8455,7 +8352,6 @@ function rpsWinner(playerKey, robotKey){
 }
 
 function renderCatRobot(landmark){
-  nudgeSpeechSynthesisNow();
   quizBody.innerHTML = `
     <span class="exercise-tag" style="background:#9B6BFF;">🤖 ねこロボと じゃんけん</span>
     <div class="dialogue-bubble"><span class="en">Let's play rock-paper-scissors!</span><span class="ja">じゃんけんしよう！</span></div>
@@ -9622,9 +9518,6 @@ function updateVoiceSettingLabel(){
   btn.textContent = preferredVoice && preferredVoice.name ? `🔊 ${preferredVoice.name}` : '🔊 えらぶ';
 }
 
-let speakRequestSeq = 0;
-const SPEAK_MAX_RETRIES = 2; // total attempts = 1 initial + this many retries
-
 function speakEnglish(text){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
@@ -9632,94 +9525,38 @@ function speakEnglish(text){
     return;
   }
 
-  speakRequestSeq++;
-  const myRequestId = speakRequestSeq;
+  const ss = window.speechSynthesis;
+  const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
 
-  function attemptSpeak(retryCount){
-    const ss = window.speechSynthesis;
-    const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
-    let activationInfo = '';
-    try{
-      if(navigator.userActivation){
-        activationInfo = ` / userActivation isActive=${navigator.userActivation.isActive} hasBeenActive=${navigator.userActivation.hasBeenActive}`;
-      }
-    } catch(e){ /* not supported on this browser — fine, just omit */ }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang='en-US'; u.rate=0.85;
+  const voice = pickPreferredVoice();
+  if(voice){ preferredVoice = voice; u.voice = voice; }
+  const voiceLabel = voice ? voice.name : '(未選択・システム既定)';
 
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang='en-US'; u.rate=0.85;
-    // Fetch a fresh voice object on every attempt rather than reusing a
-    // long-cached reference. On iOS, after the speech engine has been
-    // suspended/reset (backgrounding, sleep, etc.), a previously-grabbed
-    // SpeechSynthesisVoice object can become a stale reference that
-    // silently fails to speak, even though getVoices() still lists an
-    // apparently-identical voice by name.
-    const freshVoice = pickPreferredVoice();
-    if(freshVoice){ preferredVoice = freshVoice; u.voice = freshVoice; }
-    const voiceLabel = freshVoice ? freshVoice.name : '(未選択・システム既定)';
+  logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
 
-    logVoiceDebug('info', `${retryCount > 0 ? `↻ もう一度ためす(${retryCount}回目)` : '▶ 再生しよう'}: [${preview}]\n声=${voiceLabel} / ${beforeState}${activationInfo}`);
-
-    let started = false;
-    let settled = false;
-    u.onstart = ()=>{
-      started = true;
-      logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
-    };
-    u.onend = ()=>{
-      settled = true;
-      logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
-      // Speech playback appears to silently pause our background
-      // silent-loop workaround for the iOS mute switch (see the 'pause'
-      // listener on unlockAudioEl) — double-check it's still going now
-      // that this utterance has finished, as a second line of defense.
-      if(unlockAudioEl && unlockAudioEl.paused){
-        unlockAudioEl.play().catch(()=>{});
-      }
-    };
-    u.onerror = (ev)=>{
-      settled = true;
-      logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
-    };
-    // If neither "start" nor "error" fires within half a second, the
-    // browser is silently swallowing the call — this is the failure mode
-    // we can't otherwise see (looks identical to "nothing happened").
-    // Retry a couple of times; skip the retry if a newer speakEnglish()
-    // call has since taken over, so we don't talk over newer dialogue.
-    // Kept short (rather than a full second) so a retry has a real chance
-    // to land before the player taps "next" and moves the conversation on.
-    setTimeout(()=>{
-      if(started || settled) return;
-      if(myRequestId !== speakRequestSeq){
-        logVoiceDebug('warn', `⚠ 反応なし（このリクエストは古いので再試行しない）: [${preview}]`);
-        return;
-      }
-      logVoiceDebug('warn', `⚠ 反応なし（無視された可能性）: [${preview}]`);
-      if(retryCount < SPEAK_MAX_RETRIES) attemptSpeak(retryCount + 1);
-    }, 500);
-
-    function doSpeak(){
-      ss.speak(u);
-      // Classic iOS Safari workaround: even after speak() successfully
-      // queues an utterance, the engine sometimes needs a pause()/resume()
-      // "kick" to actually start processing its queue. Harmless no-op if
-      // it was already running fine.
-      try{ ss.pause(); ss.resume(); } catch(e){ /* ignore */ }
+  u.onstart = ()=>{
+    logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
+  };
+  u.onend = ()=>{
+    logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
+    // Speech playback appears to silently pause our background
+    // silent-loop workaround for the iOS mute switch (see the 'pause'
+    // listener on unlockAudioEl) — double-check it's still going now
+    // that this utterance has finished, as a second line of defense.
+    if(unlockAudioEl && unlockAudioEl.paused){
+      unlockAudioEl.play().catch(()=>{});
     }
+  };
+  u.onerror = (ev)=>{
+    logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+  };
 
-    // Only cancel an in-flight utterance. When we do, wait a beat before
-    // the following speak() — Safari 27's release notes confirm a WebKit
-    // bug (fixed there, but not necessarily on every device/OS version)
-    // where calling speak() synchronously right after cancel() could
-    // silently drop the NEW utterance too, not just cancel the old one.
-    if(ss.speaking || ss.pending){
-      ss.cancel();
-      setTimeout(doSpeak, 30);
-    } else {
-      doSpeak();
-    }
+  if(ss.speaking || ss.pending){
+    ss.cancel();
   }
-
-  attemptSpeak(0);
+  ss.speak(u);
 }
 
 /* ---------- voice picker UI (Settings > よみあげの声) ---------- */
