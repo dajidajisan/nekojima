@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.15.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.15.1</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.15.0';
+const GAME_VERSION = 'v1.15.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9539,11 +9539,21 @@ function updateVoiceSettingLabel(){
 // utterance in this array holds a live reference until it's done.
 window.__pendingUtterances = window.__pendingUtterances || [];
 
-function speakEnglish(text, onDone){
+// Tracks which speak request is the "current" one. Any new call to
+// speakEnglish() (whether standalone or as part of a sequence) bumps
+// this — so if an older, still-settling utterance's onend/onerror
+// fires later, it can tell it's been superseded and must NOT continue
+// a chained sequence (see speakEnglishSequence). Without this, two
+// sequences could end up running in parallel and fighting over
+// cancel(), which is what caused the "Hi... Do you like..." interleaved
+// mess seen in real device logs.
+let activeSpeechToken = 0;
+
+function speakEnglish(text, onDone, token){
+  const myToken = (typeof token === 'number') ? token : (++activeSpeechToken);
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
     logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
-    if(typeof onDone === 'function') onDone();
     return;
   }
 
@@ -9569,13 +9579,13 @@ function speakEnglish(text, onDone){
   function releaseUtterance(){
     const idx = window.__pendingUtterances.indexOf(u);
     if(idx !== -1) window.__pendingUtterances.splice(idx, 1);
-    // onDone fires exactly once, on whichever of onend/onerror lands
-    // first — used to chain multi-sentence dialogue (see
-    // speakEnglishSequence) so the next sentence starts right after
-    // this one settles, success or not, rather than waiting forever.
     if(!doneFired){
       doneFired = true;
-      if(typeof onDone === 'function') onDone();
+      // Only continue a chained sequence if nothing newer has taken
+      // over since this utterance started. Otherwise a leftover
+      // sentence from a conversation turn the player has already
+      // moved past could get spoken now, on top of the new one.
+      if(myToken === activeSpeechToken && typeof onDone === 'function') onDone();
     }
   }
 
@@ -9611,15 +9621,20 @@ function speakEnglish(text, onDone){
 // logs show longer/multi-sentence utterances are more prone to cutting
 // out partway through on iOS than short ones. Splitting them out also
 // means a mid-conversation failure only loses one sentence instead of
-// the whole line.
+// the whole line. All sentences in one call share a single token (see
+// activeSpeechToken above), so if a newer speak request starts before
+// this sequence finishes, the sequence stops cleanly instead of
+// continuing to speak stale sentences alongside the new one.
 function speakEnglishSequence(texts){
+  const myToken = ++activeSpeechToken;
   const list = (texts || []).filter(t => t && t.trim());
   let i = 0;
   function next(){
+    if(myToken !== activeSpeechToken) return; // superseded — stop here
     if(i >= list.length) return;
     const text = list[i];
     i++;
-    speakEnglish(text, next);
+    speakEnglish(text, next, myToken);
   }
   next();
 }
