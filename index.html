@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.13.1</span>
+      <span class="settings-row-value" id="versionLabel">v1.14.0</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.13.1';
+const GAME_VERSION = 'v1.14.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9518,6 +9518,17 @@ function updateVoiceSettingLabel(){
   btn.textContent = preferredVoice && preferredVoice.name ? `🔊 ${preferredVoice.name}` : '🔊 えらぶ';
 }
 
+// Long-documented browser quirk: a SpeechSynthesisUtterance object only
+// reliably stays connected to the native speech engine for as long as
+// JavaScript keeps a strong reference to it. Utterance objects created
+// as a plain local variable (as this one used to be) can become eligible
+// for garbage collection the moment the creating function returns, even
+// though the engine hasn't finished (or even started) speaking it yet —
+// on some devices/OS versions this silently kills the utterance midway
+// through, or before onstart even fires. Keeping every in-flight
+// utterance in this array holds a live reference until it's done.
+window.__pendingUtterances = window.__pendingUtterances || [];
+
 function speakEnglish(text){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
@@ -9542,6 +9553,12 @@ function speakEnglish(text){
 
   logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
 
+  window.__pendingUtterances.push(u);
+  function releaseUtterance(){
+    const idx = window.__pendingUtterances.indexOf(u);
+    if(idx !== -1) window.__pendingUtterances.splice(idx, 1);
+  }
+
   u.onstart = ()=>{
     logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
   };
@@ -9554,9 +9571,11 @@ function speakEnglish(text){
     if(unlockAudioEl && unlockAudioEl.paused){
       unlockAudioEl.play().catch(()=>{});
     }
+    releaseUtterance();
   };
   u.onerror = (ev)=>{
     logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+    releaseUtterance();
   };
 
   if(ss.speaking || ss.pending){
