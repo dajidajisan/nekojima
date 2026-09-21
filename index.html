@@ -122,6 +122,25 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .speak-btn svg{width:20px; height:20px;}
 
+/* Used where hearing a line is required before the player can move on
+   (first NPC turn, quiz feedback) — a plain round icon button wasn't
+   communicating "you need to tap this to continue" clearly enough, so
+   this is wider, carries its own label, and pulses gently to draw the
+   eye. */
+.listen-required-btn{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none;
+  border-radius:999px; padding:13px 26px; font-weight:800; font-size:14.5px; cursor:pointer;
+  box-shadow:0 6px 16px rgba(63,199,166,0.4); font-family:'M PLUS Rounded 1c',sans-serif;
+  animation: listenPulse 1.7s ease-in-out infinite;
+}
+.listen-required-btn svg{ width:19px; height:19px; flex-shrink:0; }
+.listen-required-btn:disabled{ animation:none; opacity:0.55; box-shadow:none; cursor:default; }
+@keyframes listenPulse{
+  0%,100%{ transform:scale(1); box-shadow:0 6px 16px rgba(63,199,166,0.4); }
+  50%{ transform:scale(1.04); box-shadow:0 8px 20px rgba(63,199,166,0.55); }
+}
+
 .order-controls{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 .undo-btn{
   background:#FBF9FF; border:2px solid #ECE5FA; border-radius:999px; padding:9px 16px;
@@ -359,7 +378,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.17.1</span>
+      <span class="settings-row-value" id="versionLabel">v1.18.0</span>
     </div>
   </div>
 </div>
@@ -3060,7 +3079,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.17.1';
+const GAME_VERSION = 'v1.18.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6091,6 +6110,12 @@ function updateAudioDebug(note){
 // with the switch in silent mode.
 const SILENT_WAV_DATA_URI = 'data:audio/wav;base64,UklGRoQJAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWAJAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA=';
 let unlockAudioEl = null;
+// When speakEnglish() deliberately pauses the silent loop for the
+// duration of an utterance (see below), this is set true so the
+// 'pause' listener doesn't immediately fight to resume it — that
+// scramble-to-resume itself seems to be what was cutting into the
+// utterance's volume, fading it out shortly after it started.
+let unlockAudioIntentionalPause = false;
 
 document.addEventListener('pointerdown', unlockAudio, { once:true, capture:true });
 function unlockAudio(){
@@ -6120,6 +6145,7 @@ function unlockAudio(){
     // sound effects. Both log it AND try to resume it immediately, so
     // footsteps don't stay silent for the rest of the session.
     unlockAudioEl.addEventListener('pause', ()=>{
+      if(unlockAudioIntentionalPause) return; // we paused this ourselves — see speakEnglish
       if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生が とまった → 再開をこころみる');
       unlockAudioEl.play().catch(e=>{
         if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループの再開に失敗: ' + e.message);
@@ -7741,8 +7767,9 @@ function renderSmallTalkTurn(turns, turnIndex, onDone){
   quizBody.innerHTML = `
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
     <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
-    ${isFirstTurn ? `<button class="speak-btn" id="firstTurnListenBtn" style="align-self:center; margin-top:6px;" aria-label="きく">
+    ${isFirstTurn ? `<button class="listen-required-btn" id="firstTurnListenBtn" style="align-self:center; margin-top:8px;">
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      <span id="firstTurnListenBtnLabel">はつおんを きいて すすもう</span>
     </button>` : ''}
   `;
   nextBtn.textContent = 'つぎへ →';
@@ -7763,12 +7790,19 @@ function renderSmallTalkTurn(turns, turnIndex, onDone){
     // which real device testing shows is far more reliable than an
     // automatic call ever was. "つぎへ" stays disabled until the line
     // has actually been heard (or definitively failed), so the player
-    // can't skip past dialogue that was never spoken.
+    // can't skip past dialogue that was never spoken. The button's own
+    // label (rather than a bare icon) and its gentle pulse are there to
+    // make "tap this first" obvious rather than optional-looking.
     nextBtn.disabled = true;
     const listenBtn = document.getElementById('firstTurnListenBtn');
+    const listenBtnLabel = document.getElementById('firstTurnListenBtnLabel');
     listenBtn.onclick = ()=>{
       listenBtn.disabled = true;
-      speakEnglish(fullText, ()=>{ nextBtn.disabled = false; });
+      listenBtnLabel.textContent = 'さいせいちゅう…';
+      speakEnglish(fullText, ()=>{
+        nextBtn.disabled = false;
+        listenBtnLabel.textContent = 'きけたよ！ ↓ つぎへ すすもう';
+      });
     };
   } else {
     // Later turns are triggered by the player's own "つぎへ" tap — a
@@ -9592,6 +9626,13 @@ function updateVoiceSettingLabel(){
 // utterance in this array holds a live reference until it's done.
 window.__pendingUtterances = window.__pendingUtterances || [];
 
+// How long to wait for an utterance to settle (onstart/onend/onerror)
+// before giving up and letting the player continue anyway — see the
+// safety-net setTimeout inside speakEnglish(). Was 4000ms; raised after
+// feedback that 4s cut off some longer, legitimately-still-playing
+// lines (multi-sentence quiz feedback especially) before they finished.
+const SPEECH_SETTLE_TIMEOUT_MS = 8000;
+
 function speakEnglish(text, onSettled){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
@@ -9639,6 +9680,14 @@ function speakEnglish(text, onSettled){
     // run in parallel and talk over each other.
     if(!settledFired){
       settledFired = true;
+      // Resume the silent background loop now that this utterance has
+      // settled — paired with the deliberate pause() right before
+      // speak() below. Clear the "intentional" flag first so the
+      // 'pause' listener goes back to doing its normal job afterwards.
+      if(unlockAudioEl){
+        unlockAudioIntentionalPause = false;
+        if(unlockAudioEl.paused) unlockAudioEl.play().catch(()=>{});
+      }
       if(typeof onSettled === 'function') onSettled();
     }
   }
@@ -9648,13 +9697,6 @@ function speakEnglish(text, onSettled){
   };
   u.onend = ()=>{
     logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
-    // Speech playback appears to silently pause our background
-    // silent-loop workaround for the iOS mute switch (see the 'pause'
-    // listener on unlockAudioEl) — double-check it's still going now
-    // that this utterance has finished, as a second line of defense.
-    if(unlockAudioEl && unlockAudioEl.paused){
-      unlockAudioEl.play().catch(()=>{});
-    }
     releaseUtterance();
   };
   u.onerror = (ev)=>{
@@ -9667,18 +9709,38 @@ function speakEnglish(text, onSettled){
   // no onerror, ever. Without this, a "つぎへ" button waiting on
   // onSettled would stay disabled forever and the player would be
   // stuck. Forcing onSettled after a few seconds guarantees they can
-  // always continue, even in that worst case.
+  // always continue, even in that worst case. Kept generous (rather
+  // than a snappy couple of seconds) since some lines here run several
+  // sentences together and can legitimately take a while to finish.
   if(typeof onSettled === 'function'){
     setTimeout(()=>{
       if(!settledFired){
         settledFired = true;
+        if(unlockAudioEl){
+          unlockAudioIntentionalPause = false;
+          if(unlockAudioEl.paused) unlockAudioEl.play().catch(()=>{});
+        }
         onSettled();
       }
-    }, 4000);
+    }, SPEECH_SETTLE_TIMEOUT_MS);
   }
 
   if(ss.speaking || ss.pending){
     ss.cancel();
+  }
+
+  // Deliberately pause the silent background loop right before
+  // speaking. Real device logs consistently show it getting paused
+  // anyway right as speech starts — most likely iOS audio-ducking /
+  // session-priority behavior kicking in — and our own scramble to
+  // resume it (the 'pause' listener above, in its normal mode) seems to
+  // be exactly what was fading the speech out shortly after it started.
+  // Pausing it ourselves, on our own terms, and flagging it as
+  // intentional so that listener stays quiet during this one
+  // utterance, should remove that tug-of-war over the audio session.
+  if(unlockAudioEl){
+    unlockAudioIntentionalPause = true;
+    unlockAudioEl.pause();
   }
   ss.speak(u);
 }
