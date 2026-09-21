@@ -227,7 +227,6 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   opacity:0; transform:translateY(8px); pointer-events:none; transition:all .25s ease;
 }
 .quiz-footer-btn.show{opacity:1; transform:translateY(0); pointer-events:auto;}
-.quiz-footer-btn.show:disabled{ background:#DCD8E8; color:#9088A8; box-shadow:none; cursor:default; pointer-events:none; }
 .close-x{position:absolute; top:16px; right:18px; background:none; border:none; font-size:26px; color:var(--plum-soft); cursor:pointer; padding:6px; line-height:1;}
 
 .npc-done-panel{display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 0;}
@@ -359,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.17.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.16.0</span>
     </div>
   </div>
 </div>
@@ -3060,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.17.0';
+const GAME_VERSION = 'v1.16.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -6127,16 +6126,17 @@ function unlockAudio(){
     });
   }
 
-  // NOTE: previously tried speaking a short audible line right here, on
-  // the page's very first tap anywhere (not just the "New Game"
-  // button), to give a resumed session (which skips that button
-  // entirely) the same treatment. Real device testing showed this made
-  // things WORSE — this handler runs in the capture phase, ahead of
-  // whatever button the player actually tapped, so it isn't reliably
-  // "inside" that button's own click handler the way speechSynthesis
-  // seems to require. Removed; audible speech now only ever happens
-  // from an actual button's own click handler (はなしかける, つぎへ,
-  // こたえる, きく, etc.) — see speakEnglish() call sites.
+  // Speak something short and genuinely audible on this very first tap
+  // anywhere on the page — not just when the "New Game" button happens
+  // to be pressed. Resuming with an existing save code skips that
+  // button entirely (ensurePlayerCode resolves immediately from
+  // localStorage), so a resumed session never got this treatment
+  // before. Real device testing also showed a near-silent nudge
+  // doesn't reliably wake the speech engine the way an audible
+  // utterance does — silent attempts kept failing outright.
+  if('speechSynthesis' in window && typeof speakEnglish === 'function'){
+    speakEnglish('Meow!');
+  }
 
   updateAudioDebug('unlock tried, ctx=' + (ctx ? ctx.state : 'none'));
 }
@@ -7736,48 +7736,17 @@ async function generateSmallTalk(npc){
 
 function renderSmallTalkTurn(turns, turnIndex, onDone){
   const chat = turns[turnIndex];
-  const isFirstTurn = turnIndex === 0;
-  const fullText = chat.opener + ' ' + chat.reply;
   quizBody.innerHTML = `
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
     <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
-    ${isFirstTurn ? `<button class="speak-btn" id="firstTurnListenBtn" style="align-self:center; margin-top:6px;" aria-label="きく">
-      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-    </button>` : ''}
   `;
+  speakEnglish(chat.opener + ' ' + chat.reply);
   nextBtn.textContent = 'つぎへ →';
   nextBtn.classList.add('show');
   if(turnIndex + 1 < turns.length){
     nextBtn.onclick = () => renderSmallTalkTurn(turns, turnIndex + 1, onDone);
   } else {
     nextBtn.onclick = onDone;
-  }
-
-  if(isFirstTurn){
-    // The very first line of a brand-new conversation is the one most
-    // likely to go silent on iOS when fired automatically right after
-    // the AI-generation network wait — device logs consistently show
-    // it's the single biggest source of "no sound" reports, even after
-    // many other fixes. Requiring an actual tap to trigger it means the
-    // speak() call always traces directly back to a real user gesture,
-    // which real device testing shows is far more reliable than an
-    // automatic call ever was. "つぎへ" stays disabled until the line
-    // has actually been heard (or definitively failed), so the player
-    // can't skip past dialogue that was never spoken.
-    nextBtn.disabled = true;
-    const listenBtn = document.getElementById('firstTurnListenBtn');
-    listenBtn.onclick = ()=>{
-      listenBtn.disabled = true;
-      speakEnglish(fullText, ()=>{ nextBtn.disabled = false; });
-    };
-  } else {
-    // Later turns are triggered by the player's own "つぎへ" tap — a
-    // real user gesture, the same pattern that's been reliable
-    // throughout testing — so this can still fire automatically. Still
-    // block "つぎへ" until the line settles, so the player hears it
-    // rather than skipping past it.
-    nextBtn.disabled = true;
-    speakEnglish(fullText, ()=>{ nextBtn.disabled = false; });
   }
 }
 
@@ -9317,8 +9286,6 @@ function handleBlankAnswer(input, typedValue, item){
   const correct = acceptable.includes(typed);
   recordDailyProgress(); // counts toward today's 15-question goal regardless of right/wrong
 
-  nextBtn.classList.add('show');
-
   if(correct){
     input.classList.add('correct');
     if(slot) slot.classList.add('filled-correct');
@@ -9326,11 +9293,7 @@ function handleBlankAnswer(input, typedValue, item){
     markMastered(item);
     burstSparkles(input);
     playCorrectSound();
-    // Block "つぎへ" until the correct-answer line has actually been
-    // heard (or the safety-net timeout inside speakEnglish gives up),
-    // so the player can't skip past dialogue that was never spoken.
-    nextBtn.disabled = true;
-    speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '), ()=>{ nextBtn.disabled = false; });
+    speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     document.getElementById('feedbackSlot').innerHTML =
       `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>`;
     if(item.reaction){
@@ -9349,6 +9312,7 @@ function handleBlankAnswer(input, typedValue, item){
       `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.usedPhrase || item.en}</span></div>`;
     recordMistake(item.en);
   }
+  nextBtn.classList.add('show');
 }
 
 /* ---------- exercise 2: build the English sentence (word order / 英作文) ---------- */
@@ -9436,12 +9400,6 @@ function renderOrderExercise(item){
     buildChips.forEach(c=> c.classList.add('locked'));
     recordDailyProgress(); // counts toward today's 15-question goal regardless of right/wrong
 
-    nextBtn.classList.add('show');
-    // Block "つぎへ" until the feedback line has actually been heard
-    // (or the safety-net timeout inside speakEnglish gives up), on both
-    // the correct and wrong paths below — both speak a line.
-    nextBtn.disabled = true;
-
     if(correct){
       buildChips.forEach(c=> c.classList.add('correct'));
       quizCard.classList.add('flash-good');
@@ -9457,7 +9415,7 @@ function renderOrderExercise(item){
       recordMistakeResolved(item.en);
       conversationContext = formatExchange(item);
       prefetchUpcoming();
-      speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '), ()=>{ nextBtn.disabled = false; });
+      speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
       quizCard.classList.add('flash-bad');
@@ -9469,8 +9427,9 @@ function renderOrderExercise(item){
       ans.textContent = 'せいかい: ' + item.sentence;
       quizBody.appendChild(ans);
       recordMistake(item.en);
-      speakEnglish(item.sentence, ()=>{ nextBtn.disabled = false; });
+      speakEnglish(item.sentence);
     }
+    nextBtn.classList.add('show');
   }
 
   document.getElementById('decisionBtn').onclick = ()=> checkOrder();
@@ -9592,11 +9551,10 @@ function updateVoiceSettingLabel(){
 // utterance in this array holds a live reference until it's done.
 window.__pendingUtterances = window.__pendingUtterances || [];
 
-function speakEnglish(text, onSettled){
+function speakEnglish(text){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
     logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
-    if(typeof onSettled === 'function') onSettled();
     return;
   }
 
@@ -9618,21 +9576,9 @@ function speakEnglish(text, onSettled){
   logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
 
   window.__pendingUtterances.push(u);
-  let settledFired = false;
   function releaseUtterance(){
     const idx = window.__pendingUtterances.indexOf(u);
     if(idx !== -1) window.__pendingUtterances.splice(idx, 1);
-    // onSettled fires exactly once, whether the utterance finished
-    // normally or errored out — used to re-enable a "つぎへ" button
-    // that was disabled while this line was meant to be playing, so
-    // the player can't skip past dialogue before it's actually spoken.
-    // Deliberately NOT chained into further speak() calls (unlike an
-    // earlier attempt at this) — that caused two independent chains to
-    // run in parallel and talk over each other.
-    if(!settledFired){
-      settledFired = true;
-      if(typeof onSettled === 'function') onSettled();
-    }
   }
 
   u.onstart = ()=>{
@@ -9653,21 +9599,6 @@ function speakEnglish(text, onSettled){
     logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
     releaseUtterance();
   };
-
-  // Safety net: real device logs show speechSynthesis can occasionally
-  // swallow a speak() call completely silently — no onstart, no onend,
-  // no onerror, ever. Without this, a "つぎへ" button waiting on
-  // onSettled would stay disabled forever and the player would be
-  // stuck. Forcing onSettled after a few seconds guarantees they can
-  // always continue, even in that worst case.
-  if(typeof onSettled === 'function'){
-    setTimeout(()=>{
-      if(!settledFired){
-        settledFired = true;
-        onSettled();
-      }
-    }, 4000);
-  }
 
   if(ss.speaking || ss.pending){
     ss.cancel();
