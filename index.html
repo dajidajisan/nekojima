@@ -358,7 +358,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.14.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.15.0</span>
     </div>
   </div>
 </div>
@@ -3059,7 +3059,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.14.0';
+const GAME_VERSION = 'v1.15.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -7728,7 +7728,7 @@ function renderSmallTalkTurn(turns, turnIndex, onDone){
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
     <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
   `;
-  speakEnglish(chat.opener + ' ' + chat.reply);
+  speakEnglishSequence([chat.opener, chat.reply]);
   nextBtn.textContent = 'つぎへ →';
   nextBtn.classList.add('show');
   if(turnIndex + 1 < turns.length){
@@ -7922,7 +7922,7 @@ function orderFromCafe(item, landmark){
     <div class="feedback-banner correct">✅ Order placed! +1🪙</div>
     <div class="reaction-bubble"><span class="en">Sure! Here you go.</span><span class="ja">はい、どうぞ！</span></div>
   `;
-  speakEnglish(`${orderEn} Sure! Here you go.`);
+  speakEnglishSequence([orderEn, 'Sure! Here you go.']);
   burstSparkles(document.querySelector('.feedback-banner'));
   nextBtn.textContent = 'もう一回 ☕';
   nextBtn.classList.add('show');
@@ -8405,7 +8405,7 @@ function playRPS(playerKey, landmark){
     ${banner}
     <div class="ja-hint">${resultJa}</div>
   `;
-  speakEnglish(`I chose ${robotC.en}. You chose ${playerC.en}. ${resultEn}`);
+  speakEnglishSequence([`I chose ${robotC.en}.`, `You chose ${playerC.en}.`, resultEn]);
   if(result === 'player') burstSparkles(document.querySelector('.feedback-banner'));
   nextBtn.textContent = 'もう一回 🤖';
   nextBtn.classList.add('show');
@@ -9281,7 +9281,7 @@ function handleBlankAnswer(input, typedValue, item){
     markMastered(item);
     burstSparkles(input);
     playCorrectSound();
-    speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
+    speakEnglishSequence([item.opener, item.sentence, item.reaction]);
     document.getElementById('feedbackSlot').innerHTML =
       `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>`;
     if(item.reaction){
@@ -9403,7 +9403,7 @@ function renderOrderExercise(item){
       recordMistakeResolved(item.en);
       conversationContext = formatExchange(item);
       prefetchUpcoming();
-      speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
+      speakEnglishSequence([item.opener, item.sentence, item.reaction]);
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
       quizCard.classList.add('flash-bad');
@@ -9495,9 +9495,19 @@ function pickPreferredVoice(){
     const saved = voices.find(v => v.name === savedName);
     if(saved) return saved;
   }
-  return voices.find(v => v.name === 'Noelle')
+  // Prefer voices marked localService (bundled on the device) over
+  // network-dependent ones. A network voice needs a round-trip to
+  // Apple's servers before it can start speaking, which is a
+  // plausible contributor to the delays/silent failures seen on iOS —
+  // an on-device voice has no such dependency.
+  const enUS = voices.filter(v => v.lang === 'en-US');
+  return voices.find(v => v.name === 'Noelle' && v.localService)
+      || voices.find(v => v.name === 'Noelle')
+      || voices.find(v => v.name.includes('Noelle') && v.localService)
       || voices.find(v => v.name.includes('Noelle'))
-      || voices.find(v => v.lang === 'en-US')
+      || enUS.find(v => v.localService)
+      || enUS[0]
+      || voices.find(v => v.localService)
       || voices[0];
 }
 if('speechSynthesis' in window){
@@ -9529,10 +9539,11 @@ function updateVoiceSettingLabel(){
 // utterance in this array holds a live reference until it's done.
 window.__pendingUtterances = window.__pendingUtterances || [];
 
-function speakEnglish(text){
+function speakEnglish(text, onDone){
   const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
   if(!('speechSynthesis' in window)){
     logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
+    if(typeof onDone === 'function') onDone();
     return;
   }
 
@@ -9549,14 +9560,23 @@ function speakEnglish(text){
   // imperfect.
   const voice = pickPreferredVoice();
   if(voice){ preferredVoice = voice; u.voice = voice; }
-  const voiceLabel = voice ? voice.name : '(未選択・システム既定)';
+  const voiceLabel = voice ? `${voice.name}${voice.localService ? '・内蔵' : '・ネットワーク'}` : '(未選択・システム既定)';
 
   logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
 
   window.__pendingUtterances.push(u);
+  let doneFired = false;
   function releaseUtterance(){
     const idx = window.__pendingUtterances.indexOf(u);
     if(idx !== -1) window.__pendingUtterances.splice(idx, 1);
+    // onDone fires exactly once, on whichever of onend/onerror lands
+    // first — used to chain multi-sentence dialogue (see
+    // speakEnglishSequence) so the next sentence starts right after
+    // this one settles, success or not, rather than waiting forever.
+    if(!doneFired){
+      doneFired = true;
+      if(typeof onDone === 'function') onDone();
+    }
   }
 
   u.onstart = ()=>{
@@ -9582,6 +9602,26 @@ function speakEnglish(text){
     ss.cancel();
   }
   ss.speak(u);
+}
+
+// Speaks a list of short sentences one at a time, waiting for each to
+// settle (success or failure) before starting the next — rather than
+// concatenating them into one long utterance. NPC dialogue lines were
+// previously joined with speakEnglish(opener + ' ' + reply), and device
+// logs show longer/multi-sentence utterances are more prone to cutting
+// out partway through on iOS than short ones. Splitting them out also
+// means a mid-conversation failure only loses one sentence instead of
+// the whole line.
+function speakEnglishSequence(texts){
+  const list = (texts || []).filter(t => t && t.trim());
+  let i = 0;
+  function next(){
+    if(i >= list.length) return;
+    const text = list[i];
+    i++;
+    speakEnglish(text, next);
+  }
+  next();
 }
 
 /* ---------- voice picker UI (Settings > よみあげの声) ---------- */
