@@ -359,7 +359,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.17.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.17.1</span>
     </div>
   </div>
 </div>
@@ -3060,7 +3060,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.17.0';
+const GAME_VERSION = 'v1.17.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -9604,7 +9604,15 @@ function speakEnglish(text, onSettled){
   const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
 
   const u = new SpeechSynthesisUtterance(text);
-  u.lang='en-US'; u.rate=0.85;
+  // Rate was previously 0.85 (slightly slower, for easier listening).
+  // Real device reports show playback physically cutting out partway
+  // through a line (e.g. "Hi..." then silence) even though onstart
+  // fired normally — a failure mode the API's own events can't detect.
+  // A slower rate means more total playback time per line, which
+  // enlarges the window for whatever is causing that cutoff. Back to
+  // the standard rate to shrink that window; not a guaranteed fix, but
+  // an untested, low-risk one.
+  u.lang='en-US'; u.rate=1.0;
   // Explicitly assigning a specific SpeechSynthesisVoice object here.
   // Tried leaving this unset (letting the browser pick its own default)
   // as an experiment, but real device testing showed that made things
@@ -9719,7 +9727,7 @@ function renderVoiceList(){
       e.stopPropagation();
       if('speechSynthesis' in window){
         const u = new SpeechSynthesisUtterance('Hello! Nice to meet you.');
-        u.voice = v; u.lang = v.lang; u.rate = 0.85;
+        u.voice = v; u.lang = v.lang; u.rate = 1.0;
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(u);
       }
