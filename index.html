@@ -2740,11 +2740,12 @@ const IMPORTED_VOCAB = [
 
 const VOCAB = [...CURATED_VOCAB, ...IMPORTED_VOCAB];
 
-const WORLD_IDS = ['meadow','city','themepark'];
+const WORLD_IDS = ['meadow','city','themepark','sakura'];
 const NPCS_PER_WORLD = 10;
 const NPC_NAME_POOL = ['ここちゃん','くうた','ふくろう先生','もこ','みけ','そら','つき','まる','ぽん','りん',
   'はな','くる','とと','ちゃこ','ふく','なな','ここあ','きなこ','もも','あんず',
-  'さくら','ゆず','みつき','こむぎ','あずき','まろん','ぴのこ','たると','しろ','くろ'];
+  'さくら','ゆず','みつき','こむぎ','あずき','まろん','ぴのこ','たると','しろ','くろ',
+  'こはる','かりん','ちとせ','みやび','しずく','ことは','ひなた','あかり','うらら','はるな'];
 const NPC_TYPE_POOL = ['cat'];
 const NPC_PERSONALITY_POOL = ['げんき','のんびり','クール','やさしい'];
 const NPC_COLOR_POOL = [
@@ -2752,7 +2753,7 @@ const NPC_COLOR_POOL = [
   [0x8FC7FF,0x5FA3E8],[0xFFB870,0xF2965B],[0xC9A96E,0x9A7C4A],[0xFFFFFF,0xE5DDF5],
   [0xFFB3D9,0xFF7FB8],
 ];
-const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク' };
+const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク', sakura:'さくら和風ねこ島' };
 const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
 const NPC_BREED_POOL = ['三毛猫','黒猫','白猫','キジトラ','茶トラ','サビ猫','ハチワレ','グレー猫','ポインテッド柄','しま猫'];
 const NPC_LIKES_POOL = ['ひなたぼっこ','魚','マタタビ','段ボール箱','毛糸玉','おひるね','ちゅ〜る','高いところ','くしゃくしゃの紙','あたたかい毛布'];
@@ -3045,6 +3046,7 @@ function applyDayNight(){
   sunBadge.visible = !isNight;
   moonBadge.visible = isNight;
   document.getElementById('dayNightBtn').textContent = isNight ? '☀️ ひる' : '🌙 よる';
+  updateFireworksPad();
 }
 
 document.getElementById('dayNightBtn').addEventListener('click', ()=>{
@@ -3076,16 +3078,21 @@ const ISLANDS = [
     theme:{ groundDay:0xFFD9EC, groundNight:0x5C3A55, path:0xFFEB99, wall:0xFFFFFF, roofs:[0xFF6B9D,0x6BCBFF,0xFFD93D], buildingScaleY:1.3, natureVisible:false },
     landmarkPos:{ comedy:[10,-8], fortune:[-10,10], praise:[-11.6,-5.3], future:[6,15], robot:[17.2,-16], essay:[7,5] },
   },
+  {
+    id:'sakura', name:'さくら和風ねこ島', emoji:'🌸', unlockAt:850, status:'ready',
+    theme:{ groundDay:0xEFE6D2, groundNight:0x3B3A4F, path:0xB9B2A6, wall:0xFFF8EE, roofs:[0x4A5568,0x5B4A4A,0x3E4C5C], buildingScaleY:1, natureVisible:false },
+    landmarkPos:{ comedy:[-14,6], fortune:[12,-10], praise:[-4,-6], future:[11,13], robot:[-12,15], essay:[6,4] },
+  },
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.19.0';
+const GAME_VERSION = 'v1.23.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
 // unlockStatusFor (used for the displayed "◯語ひつよう" text) is untouched.
 // Set back to false before shipping to real players.
-const TESTING_UNLOCK_ALL_ISLANDS = false;
+const TESTING_UNLOCK_ALL_ISLANDS = true;
 
 // unlockAt is a mastered-word-count threshold (not a level number), so it
 // stays stable even if WORDS_PER_LEVEL is tuned later.
@@ -3102,6 +3109,8 @@ function canActuallyTravel(island){
 function travelToIsland(id){
   const island = ISLANDS.find(i=>i.id===id);
   if(!island || !canActuallyTravel(island)) return;
+  cancelBoatRide();
+  cancelRickshaw();
   currentIslandId = id;
   inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
@@ -3123,9 +3132,11 @@ function travelToIsland(id){
   cityGroup.visible = (id === 'city');
   mazeGateLandmark.group.visible = (id === 'themepark');
   themeparkDecorGroup.visible = (id === 'themepark');
+  sakuraDecorGroup.visible = (id === 'sakura');
   landmarks.forEach(l=>{
     if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'city');
     if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'themepark');
+    if(SAKURA_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'sakura');
     if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (id !== 'meadow');
   });
 
@@ -4833,6 +4844,1450 @@ function makeMagicPostbox(x,z){
 }
 
 /* =========================================================
+   SAKURA ISLAND DECORATIONS (さくら和風ねこ島) — purely visual:
+   cherry trees, torii gate, stone lanterns, red chochin lanterns,
+   and drifting petals. Shown only on the sakura island.
+========================================================= */
+const sakuraDecorGroup = new THREE.Group();
+sakuraDecorGroup.visible = false;
+scene.add(sakuraDecorGroup);
+
+function makeSakuraTree(x,z,scale=1){
+  const g = new THREE.Group();
+  const trunkMat = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.3,1.8,8), trunkMat);
+  trunk.position.y = 0.9;
+  const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.15,1.1,6), trunkMat);
+  limb.position.set(0.35,1.9,0);
+  limb.rotation.z = -0.7;
+  g.add(trunk, limb);
+  const pinks = [0xFFB7C9,0xFFC9D6,0xFFA3BA];
+  [[0,2.7,0,1.25],[-0.85,2.35,0.3,0.9],[0.9,2.5,-0.2,0.95],[0.1,3.3,0.1,0.8]].forEach(([px,py,pz,r],i)=>{
+    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(r,1), new THREE.MeshLambertMaterial({color:pinks[i%3]}));
+    blob.position.set(px,py,pz);
+    g.add(blob);
+  });
+  // fallen petals under the tree
+  for(let i=0;i<9;i++){
+    const a = Math.random()*Math.PI*2, r = 0.8+Math.random()*1.6;
+    const petal = new THREE.Mesh(new THREE.CircleGeometry(0.1+Math.random()*0.06,6), new THREE.MeshBasicMaterial({color:0xFFC9D6}));
+    petal.rotation.x = -Math.PI/2;
+    petal.position.set(Math.cos(a)*r,0.03,Math.sin(a)*r);
+    g.add(petal);
+  }
+  g.add(makeBlobShadow(1.6));
+  g.position.set(x,0,z);
+  g.rotation.y = Math.random()*Math.PI*2;
+  g.scale.setScalar(scale);
+  return g;
+}
+[[-8,2,1.1],[9,-4,1],[-6,-10,1.05],[13,3,0.95],[-13,-4,1.1],[4,17,1],[-5,19,0.95],[15,9,1],
+ [-17,12,1.05],[18,-12,1],[-20,-2,1.1],[21,4,0.95],[-9,10,1],[7,-14,1],[0,-16,1.1],[-14,19,1]]
+  .forEach(([x,z,s]) => sakuraDecorGroup.add(makeSakuraTree(x,z,s)));
+
+// 鳥居 — red torii gate across the path ahead of the spawn point
+function makeTorii(x,z){
+  const g = new THREE.Group();
+  const red = new THREE.MeshPhongMaterial({color:0xD9453D, shininess:40});
+  const black = new THREE.MeshLambertMaterial({color:0x2A2A2A});
+  [-1.6,1.6].forEach(px=>{
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.24,4.2,10), red);
+    pillar.position.set(px,2.1,0);
+    g.add(pillar);
+  });
+  const nuki = new THREE.Mesh(new THREE.BoxGeometry(3.7,0.22,0.24), red);
+  nuki.position.y = 3.2;
+  const kasagi = new THREE.Mesh(new THREE.BoxGeometry(4.8,0.3,0.4), black);
+  kasagi.position.y = 4.35;
+  const shimaki = new THREE.Mesh(new THREE.BoxGeometry(4.1,0.22,0.36), red);
+  shimaki.position.y = 4.1;
+  g.add(nuki, shimaki, kasagi, makeBlobShadow(2.2));
+  g.position.set(x,0,z);
+  return g;
+}
+sakuraDecorGroup.add(makeTorii(0,11));
+
+// 石灯籠 — stone lanterns that glow softly (always lit, so they read at night too)
+function makeStoneLantern(x,z){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({color:0xA9A39A});
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.4,0.25,8), stone);
+  base.position.y = 0.12;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.17,0.9,8), stone);
+  post.position.y = 0.7;
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.5,0.55), new THREE.MeshBasicMaterial({color:0xFFE9A8}));
+  lamp.position.y = 1.4;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.55,0.4,4), stone);
+  cap.position.y = 1.85;
+  cap.rotation.y = Math.PI/4;
+  g.add(base, post, lamp, cap, makeBlobShadow(0.55));
+  g.position.set(x,0,z);
+  return g;
+}
+[[-2.8,9],[2.8,9],[-2.8,6.5],[2.8,6.5],[-6,-2],[8,-8],[-12,0],[12,6]]
+  .forEach(([x,z]) => sakuraDecorGroup.add(makeStoneLantern(x,z)));
+
+// 提灯 — red paper lanterns on poles
+function makeChochin(x,z){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,2.4,6), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+  pole.position.y = 1.2;
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.06,0.06), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+  arm.position.set(0.3,2.35,0);
+  const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.28,12,10), new THREE.MeshBasicMaterial({color:0xFF5A4F}));
+  lantern.scale.set(1,1.25,1);
+  lantern.position.set(0.6,2.0,0);
+  g.add(pole, arm, lantern, makeBlobShadow(0.4));
+  g.position.set(x,0,z);
+  return g;
+}
+[[-7,6],[7,8],[-10,-8],[10,-2],[-3,14],[3,-12]]
+  .forEach(([x,z]) => sakuraDecorGroup.add(makeChochin(x,z)));
+
+// 桜吹雪 — drifting petals (one Points cloud, recycled when they hit the ground)
+const SAKURA_PETAL_COUNT = 160;
+let sakuraPetals = null;
+let sakuraPetalPhase = [];
+(function(){
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const cx = c.getContext('2d');
+  cx.fillStyle = '#FFC9D6';
+  cx.beginPath();
+  cx.ellipse(16,16,10,6,Math.PI/5,0,Math.PI*2);
+  cx.fill();
+  const tex = new THREE.CanvasTexture(c);
+  const pos = new Float32Array(SAKURA_PETAL_COUNT*3);
+  for(let i=0;i<SAKURA_PETAL_COUNT;i++){
+    pos[i*3]   = (Math.random()-0.5)*56;
+    pos[i*3+1] = Math.random()*10;
+    pos[i*3+2] = (Math.random()-0.5)*56;
+    sakuraPetalPhase.push(Math.random()*Math.PI*2);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({ map:tex, size:0.45, transparent:true, depthWrite:false, sizeAttenuation:true });
+  sakuraPetals = new THREE.Points(geo, mat);
+  sakuraPetals.frustumCulled = false;
+  sakuraDecorGroup.add(sakuraPetals);
+})();
+function updateSakuraPetals(dt,t){
+  if(!sakuraDecorGroup.visible || !sakuraPetals) return;
+  const arr = sakuraPetals.geometry.attributes.position.array;
+  for(let i=0;i<SAKURA_PETAL_COUNT;i++){
+    arr[i*3]   += Math.sin(t*0.8 + sakuraPetalPhase[i]) * 0.5 * dt + 0.25*dt;
+    arr[i*3+1] -= (0.55 + 0.25*Math.sin(sakuraPetalPhase[i])) * dt;
+    arr[i*3+2] += Math.cos(t*0.6 + sakuraPetalPhase[i]) * 0.4 * dt;
+    if(arr[i*3+1] < 0.05){
+      arr[i*3]   = (Math.random()-0.5)*56;
+      arr[i*3+1] = 9 + Math.random()*2;
+      arr[i*3+2] = (Math.random()-0.5)*56;
+    }
+  }
+  sakuraPetals.geometry.attributes.position.needsUpdate = true;
+}
+
+/* =========================================================
+   こいの池の舟下り (koi pond boat ride) — sakura island only.
+   Same mechanism as the sky pod / coaster rides (the player is moved
+   along a scripted path, the camera just follows), plus three
+   "gates": the boat stops before each one and the player picks the
+   right English word for a Japanese meaning. Wrong answers never
+   block the ride — the boat just carries on after showing the answer.
+========================================================= */
+const BOAT_CENTER = { x:1, z:-24.5 };      // pond centre
+const POND_RX = 6, POND_RZ = 4.4;          // water ellipse radii
+const BOAT_RX = 3.6, BOAT_RZ = 2.5;        // sailing loop radii
+const BOAT_IDLE_POS = { x:1, z:-20.8 };    // where the boat waits at the dock
+const BOAT_LANDING_POS = { x:1, z:-18.5 }; // where the player steps off
+const BOAT_GATE_FRACS = [0.25, 0.5, 0.75]; // gate positions along the loop (0..1)
+const BOAT_STOP_BEFORE = 0.04;             // stop this far (fraction) before a gate
+const BOAT_LOOP_SECONDS = 14;
+const BOAT_BASE_Y = 0.05;
+const BOAT_DECK_Y = 0.3;
+
+function boatPathPoint(u){
+  const th = Math.PI/2 - Math.PI*2*u;
+  return { x: BOAT_CENTER.x + BOAT_RX*Math.cos(th), z: BOAT_CENTER.z + BOAT_RZ*Math.sin(th), th };
+}
+function boatPathHeading(u){
+  const th = Math.PI/2 - Math.PI*2*u;
+  return Math.atan2(BOAT_RX*Math.sin(th), -BOAT_RZ*Math.cos(th));
+}
+
+// --- pond (water, stones, lily pads, koi) ---
+{
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(1,48),
+    new THREE.MeshPhongMaterial({ color:0x7FC8D8, transparent:true, opacity:0.88, shininess:90, specular:0xffffff })
+  );
+  water.rotation.x = -Math.PI/2;
+  water.scale.set(POND_RX, POND_RZ, 1);
+  water.position.set(BOAT_CENTER.x, 0.05, BOAT_CENTER.z);
+  sakuraDecorGroup.add(water);
+
+  const stoneMats = [0xA9A39A, 0x8E887F].map(c => new THREE.MeshLambertMaterial({color:c}));
+  for(let i=0;i<20;i++){
+    const a = (i/20)*Math.PI*2;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28+((i*7)%5)*0.05,0), stoneMats[i%2]);
+    rock.position.set(BOAT_CENTER.x + (POND_RX+0.15)*Math.cos(a), 0.12, BOAT_CENTER.z + (POND_RZ+0.15)*Math.sin(a));
+    rock.rotation.set(i,i*2,i*3);
+    sakuraDecorGroup.add(rock);
+  }
+
+  const padMat = new THREE.MeshLambertMaterial({color:0x7BC47F, side:THREE.DoubleSide});
+  [[-4.6,1.2],[4.4,1.8],[-3.4,-2.6],[3.4,-2.8],[5.2,-0.8],[-5,-1.4],[0.5,3.5],[-1.2,-3.3]].forEach(([dx,dz],i)=>{
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.34,10), padMat);
+    pad.rotation.x = -Math.PI/2;
+    pad.position.set(BOAT_CENTER.x+dx, 0.07, BOAT_CENTER.z+dz);
+    sakuraDecorGroup.add(pad);
+    if(i%3===0){
+      const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11,8,6), new THREE.MeshLambertMaterial({color:0xFFB7C9}));
+      lotus.scale.set(1,0.8,1);
+      lotus.position.set(BOAT_CENTER.x+dx, 0.14, BOAT_CENTER.z+dz);
+      sakuraDecorGroup.add(lotus);
+    }
+  });
+}
+
+const koiFish = [];
+[
+  { color:0xFF8A3D, rx:4.7, rz:3.4, speed: 0.45, a:0.0 },
+  { color:0xFFFFFF, rx:5.2, rz:3.8, speed:-0.38, a:2.0 },
+  { color:0xFF5A4F, rx:4.2, rz:3.0, speed: 0.32, a:4.0 },
+  { color:0xFFD873, rx:3.0, rz:1.9, speed:-0.5,  a:1.0 },
+  { color:0xFFF3E0, rx:5.0, rz:3.6, speed: 0.4,  a:5.2 },
+].forEach(f=>{
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8), new THREE.MeshLambertMaterial({color:f.color}));
+  body.scale.set(0.55,0.4,1.4);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.18,0.4,4), new THREE.MeshLambertMaterial({color:f.color}));
+  tail.rotation.x = -Math.PI/2;
+  tail.scale.set(1,1,0.4);
+  tail.position.z = -0.5;
+  g.add(body, tail);
+  g.position.y = 0.02;
+  sakuraDecorGroup.add(g);
+  koiFish.push({ mesh:g, tail, ...f });
+});
+function updateSakuraPond(dt,t){
+  if(!sakuraDecorGroup.visible) return;
+  koiFish.forEach(f=>{
+    f.a += f.speed*dt;
+    const sgn = Math.sign(f.speed);
+    f.mesh.position.x = BOAT_CENTER.x + f.rx*Math.cos(f.a);
+    f.mesh.position.z = BOAT_CENTER.z + f.rz*Math.sin(f.a);
+    f.mesh.rotation.y = Math.atan2(-f.rx*Math.sin(f.a)*sgn, f.rz*Math.cos(f.a)*sgn);
+    f.tail.rotation.y = Math.sin(t*7 + f.a*3)*0.5;
+  });
+}
+
+// --- the boat itself (waits at the dock when not in use) ---
+const boatMesh = new THREE.Group();
+{
+  const wood = new THREE.MeshLambertMaterial({color:0xB5835A});
+  const dark = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(0.95,0.3,1.5), wood);
+  hull.position.y = 0.15;
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(0.475,0.6,4), wood);
+  bow.rotation.x = Math.PI/2;
+  bow.scale.z = 0.5;
+  bow.position.set(0,0.15,1.05);
+  const stern = new THREE.Mesh(new THREE.ConeGeometry(0.475,0.45,4), wood);
+  stern.rotation.x = -Math.PI/2;
+  stern.scale.z = 0.5;
+  stern.position.set(0,0.15,-0.97);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(1.0,0.06,1.55), dark);
+  rim.position.y = 0.3;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1.1,6), dark);
+  pole.position.set(0,0.85,-0.75);
+  const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.14,10,8), new THREE.MeshBasicMaterial({color:0xFF5A4F}));
+  lantern.scale.set(1,1.25,1);
+  lantern.position.set(0,1.3,-0.75);
+  boatMesh.add(hull, bow, stern, rim, pole, lantern);
+}
+boatMesh.position.set(BOAT_IDLE_POS.x, BOAT_BASE_Y, BOAT_IDLE_POS.z);
+boatMesh.rotation.y = Math.PI;
+sakuraDecorGroup.add(boatMesh);
+
+// --- three water gates standing on the loop ---
+function makeWaterGate(x,z,rotY){
+  const g = new THREE.Group();
+  const post = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const red = new THREE.MeshPhongMaterial({color:0xD9453D, shininess:40});
+  [-1.3,1.3].forEach(px=>{
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.8,8), post);
+    m.position.set(px,0.9,0);
+    g.add(m);
+  });
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.12,0.14), red);
+  beam.position.y = 1.55;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.1,0.22), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+  top.position.y = 1.72;
+  g.add(beam, top);
+  g.position.set(x,0.05,z);
+  g.rotation.y = rotY;
+  return g;
+}
+BOAT_GATE_FRACS.forEach(f=>{
+  const p = boatPathPoint(f);
+  sakuraDecorGroup.add(makeWaterGate(p.x, p.z, -p.th));
+});
+
+// --- boarding dock (the interactable landmark) ---
+function makeBoatDock(x,z){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({color:0xB5835A});
+  const dark = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.14,1.4), wood);
+  deck.position.y = 0.07;
+  g.add(deck);
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,0.8,8), dark);
+    post.position.set(side*1.1,0.4,0.55);
+    g.add(post);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.13,10,8), new THREE.MeshBasicMaterial({color:0xFF5A4F}));
+    lamp.scale.set(1,1.25,1);
+    lamp.position.set(side*1.1,0.95,0.55);
+    g.add(lamp);
+  });
+  const marker = makeFloatingMarker('🛶', 2.4);
+  g.add(marker);
+  g.add(makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// --- ride state + gate questions ---
+const boatRide = { active:false, phase:'idle', u:0, t:0, gateIdx:0, correct:0, answered:false, q:null, shake:0 };
+
+function pickBoatQuestion(){
+  const pool = VOCAB.filter(v => v.en.length <= 16);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  let other = target, guard = 0;
+  while((other.en === target.en || other.ja === target.ja) && guard++ < 200){
+    other = pool[Math.floor(Math.random()*pool.length)];
+  }
+  const options = Math.random() < 0.5 ? [target, other] : [other, target];
+  return { target, options };
+}
+
+function getBoatHud(){
+  let el = document.getElementById('boatHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'boatHud';
+  el.style.cssText = 'position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:520; width:min(92vw,440px); background:rgba(255,250,244,0.97); border-radius:22px; padding:14px 14px 16px; box-shadow:0 12px 34px rgba(0,0,0,0.28); text-align:center; display:none; color:#4A3B5C;';
+  const btnCss = 'flex:1; min-height:58px; padding:12px 8px; font-size:19px; font-weight:800; border:0; border-radius:16px; background:#FFE1EC; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+  el.innerHTML =
+    '<div id="boatHudHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+    '<div id="boatHudJa" style="font-weight:800; margin:6px 0 12px; line-height:1.4;"></div>' +
+    '<div style="display:flex; gap:10px;">' +
+      '<button id="boatOpt0" style="'+btnCss+'"></button>' +
+      '<button id="boatOpt1" style="'+btnCss+'"></button>' +
+    '</div>' +
+    '<div id="boatHudMsg" style="min-height:18px; margin-top:10px; font-size:13px; font-weight:800;"></div>';
+  document.body.appendChild(el);
+  [0,1].forEach(i=> el.querySelector('#boatOpt'+i).addEventListener('click', ()=> answerBoatGate(i)));
+  return el;
+}
+function hideBoatHud(){
+  const el = document.getElementById('boatHud');
+  if(el) el.style.display = 'none';
+}
+
+function askBoatQuestion(){
+  const b = boatRide;
+  b.q = pickBoatQuestion();
+  b.answered = false;
+  const el = getBoatHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  el.querySelector('#boatHudHead').textContent = `🏮 もん ${b.gateIdx+1}/${BOAT_GATE_FRACS.length}　えいごを えらんでくぐろう！`;
+  const ja = el.querySelector('#boatHudJa');
+  ja.textContent = `「${b.q.target.ja}」は どっち？`;
+  ja.style.fontSize = b.q.target.ja.length > 18 ? '15px' : '18px';
+  [0,1].forEach(i=>{
+    const btn = el.querySelector('#boatOpt'+i);
+    btn.textContent = b.q.options[i].en;
+    btn.style.background = '#FFE1EC';
+    btn.disabled = false;
+  });
+  el.querySelector('#boatHudMsg').textContent = '';
+  el.style.display = 'block';
+}
+
+function answerBoatGate(i){
+  const b = boatRide;
+  if(!b.active || b.phase !== 'ask' || b.answered) return;
+  b.answered = true;
+  const el = getBoatHud();
+  const ok = b.q.options[i].en === b.q.target.en;
+  [0,1].forEach(k=>{
+    const btn = el.querySelector('#boatOpt'+k);
+    btn.disabled = true;
+    if(b.q.options[k].en === b.q.target.en) btn.style.background = '#B8F0C8';
+    else if(k === i) btn.style.background = '#FFC1C1';
+  });
+  const msg = el.querySelector('#boatHudMsg');
+  if(ok){
+    b.correct++;
+    addCoins(1);
+    playCorrectSound();
+    msg.textContent = `⭕ せいかい！ ${b.q.target.en} ＝ ${b.q.target.ja}`;
+    try{ speakEnglish(b.q.target.en); }catch(e){}
+  } else {
+    playWrongSound();
+    b.shake = 0.6;
+    msg.textContent = `❌ ざんねん… こたえは「${b.q.target.en}」`;
+  }
+  b.phase = 'feedback';
+  b.t = 0;
+}
+
+function boardBoatRide(landmark){
+  if(rideActive) return;
+  const b = boatRide;
+  rideActive = true;
+  Object.assign(b, { active:true, phase:'depart', u:0, t:0, gateIdx:0, correct:0, answered:false, q:null, shake:0 });
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  rideCaption('<span style="font-size:14px;">All aboard! Let\'s sail on the koi pond.</span><br><span style="font-size:12px; opacity:.85;">しゅっぱつ！こいの池をすすもう。</span>');
+}
+
+function cancelBoatRide(){
+  const b = boatRide;
+  if(!b.active) return;
+  b.active = false;
+  b.phase = 'idle';
+  rideActive = false;
+  boatMesh.position.set(BOAT_IDLE_POS.x, BOAT_BASE_Y, BOAT_IDLE_POS.z);
+  boatMesh.rotation.set(0, Math.PI, 0);
+  player.rotation.z = 0;
+  player.position.y = 0;
+  hideBoatHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+}
+
+function finishBoatRide(){
+  const b = boatRide;
+  const total = BOAT_GATE_FRACS.length;
+  const bonus = (b.correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  b.active = false;
+  b.phase = 'idle';
+  rideActive = false;
+  boatMesh.position.set(BOAT_IDLE_POS.x, BOAT_BASE_Y, BOAT_IDLE_POS.z);
+  boatMesh.rotation.set(0, Math.PI, 0);
+  player.position.set(BOAT_LANDING_POS.x, 0, BOAT_LANDING_POS.z);
+  player.rotation.set(0, 0, 0);
+  hideBoatHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  saveProgress();
+  showToast(`🛶 舟下り、おつかれさま！ ${total}もん中${b.correct}もん せいかい　+${b.correct + bonus}🪙${bonus ? '（ぜんぶ正解ボーナス！）' : ''}`);
+}
+
+function updateBoatRide(dt){
+  const b = boatRide;
+  if(!b.active) return;
+  b.t += dt;
+  let x, z, heading;
+
+  if(b.phase === 'depart'){
+    const p1 = boatPathPoint(0);
+    const k = Math.min(1, b.t/1.4);
+    x = BOAT_IDLE_POS.x + (p1.x - BOAT_IDLE_POS.x)*k;
+    z = BOAT_IDLE_POS.z + (p1.z - BOAT_IDLE_POS.z)*k;
+    heading = Math.atan2(p1.x - BOAT_IDLE_POS.x, p1.z - BOAT_IDLE_POS.z);
+    if(k >= 1){ b.phase = 'sail'; b.t = 0; }
+  } else if(b.phase === 'return'){
+    const p0 = boatPathPoint(1);
+    const k = Math.min(1, b.t/1.4);
+    x = p0.x + (BOAT_IDLE_POS.x - p0.x)*k;
+    z = p0.z + (BOAT_IDLE_POS.z - p0.z)*k;
+    heading = Math.atan2(BOAT_IDLE_POS.x - p0.x, BOAT_IDLE_POS.z - p0.z);
+    if(k >= 1){ finishBoatRide(); return; }
+  } else {
+    if(b.phase === 'sail'){
+      b.u += dt / BOAT_LOOP_SECONDS;
+      const gf = BOAT_GATE_FRACS[b.gateIdx];
+      if(gf !== undefined && b.u >= gf - BOAT_STOP_BEFORE){
+        b.u = gf - BOAT_STOP_BEFORE;
+        b.phase = 'ask';
+        b.t = 0;
+        askBoatQuestion();
+      } else if(gf === undefined && b.u >= 1){
+        b.u = 1;
+        b.phase = 'return';
+        b.t = 0;
+        rideCaption('<span style="font-size:14px;">We\'re back at the dock!</span><br><span style="font-size:12px; opacity:.85;">もうすぐ とうちゃく！</span>');
+      }
+    } else if(b.phase === 'feedback' && b.t >= 1.8){
+      b.gateIdx++;
+      b.phase = 'sail';
+      b.t = 0;
+      hideBoatHud();
+    }
+    const p = boatPathPoint(b.u);
+    x = p.x; z = p.z;
+    heading = boatPathHeading(b.u);
+  }
+
+  const bob = Math.sin(performance.now()/1000*2.4)*0.04;
+  let roll = Math.sin(performance.now()/1000*1.3)*0.04;
+  if(b.shake > 0){
+    b.shake = Math.max(0, b.shake - dt);
+    roll += Math.sin(b.shake*40)*0.12*(b.shake/0.6);
+  }
+  boatMesh.position.set(x, BOAT_BASE_Y + bob, z);
+  boatMesh.rotation.set(0, heading, roll);
+  player.position.set(x, BOAT_BASE_Y + BOAT_DECK_Y + bob, z);
+  player.rotation.y = heading;
+  player.rotation.z = roll;
+}
+
+
+/* =========================================================
+   縁日の屋台 (festival stalls) — 金魚すくい + 射的, sakura island only.
+   Both open a self-contained full-screen overlay (built from JS, no
+   dependency on the existing CSS) and draw words from the same VOCAB
+   bank as everything else. Like the whac-a-mole game they pay +1 coin
+   per correct answer and don't touch mastery/mistake tracking.
+========================================================= */
+function makeSignTexture(text, bg){
+  const c = document.createElement('canvas');
+  c.width = 320; c.height = 110;
+  const cx = c.getContext('2d');
+  cx.fillStyle = bg;
+  cx.fillRect(0,0,320,110);
+  cx.fillStyle = '#FFFFFF';
+  cx.font = '800 54px sans-serif';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(text, 160, 58);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeFestivalStall(x,z,rotY,kind){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({color:0xB5835A});
+  const dark = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const counter = new THREE.Mesh(new THREE.BoxGeometry(2.4,0.9,0.9), wood);
+  counter.position.set(0,0.45,0.3);
+  g.add(counter);
+  [[-1.15,-0.3],[1.15,-0.3],[-1.15,0.9],[1.15,0.9]].forEach(([px,pz])=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.07,2.2,8), dark);
+    post.position.set(px,1.1,pz);
+    g.add(post);
+  });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.4,0.06), new THREE.MeshLambertMaterial({color:0xFFF3E0}));
+  back.position.set(0,1.5,-0.3);
+  g.add(back);
+  // striped awning + front valance
+  const redM = new THREE.MeshLambertMaterial({color:0xD9453D});
+  const whiteM = new THREE.MeshLambertMaterial({color:0xFFF8EE});
+  for(let i=0;i<6;i++){
+    const m = (i%2===0) ? redM : whiteM;
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.07,1.6), m);
+    top.position.set(-1.0+i*0.4, 2.25, 0.3);
+    top.rotation.x = 0.1;
+    g.add(top);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.22,0.05), m);
+    flap.position.set(-1.0+i*0.4, 2.1, 1.1);
+    g.add(flap);
+  }
+  // signboard
+  const isFish = (kind === 'goldfish');
+  const signTex = makeSignTexture(isFish ? '金魚すくい' : '射的', isFish ? '#2F8FBF' : '#B5483C');
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.62), new THREE.MeshBasicMaterial({map:signTex}));
+  sign.position.set(0,2.7,0.5);
+  sign.rotation.x = -0.15;
+  g.add(sign);
+  // props on the counter
+  if(isFish){
+    const tub = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.5,0.22,18), new THREE.MeshLambertMaterial({color:0xDDEAF2}));
+    tub.position.set(0,1.0,0.4);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.47,18), new THREE.MeshBasicMaterial({color:0x7FC8D8}));
+    water.rotation.x = -Math.PI/2;
+    water.position.set(0,1.12,0.4);
+    g.add(tub, water);
+    [[-0.2,0.1],[0.15,-0.1],[0.05,0.22],[-0.05,-0.2]].forEach(([dx,dz])=>{
+      const fish = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,6), new THREE.MeshBasicMaterial({color:0xFF8A3D}));
+      fish.scale.set(1.4,0.8,1);
+      fish.position.set(dx,1.14,0.4+dz);
+      g.add(fish);
+    });
+  } else {
+    [[-0.7,0xFFB7C9],[-0.25,0xFFD873],[0.2,0x8FC7FF],[0.65,0xB9A6E8]].forEach(([dx,c])=>{
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.34,0.34), new THREE.MeshLambertMaterial({color:c}));
+      box.position.set(dx,1.07,0.2);
+      g.add(box);
+    });
+    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.5,8), dark);
+    gun.rotation.z = Math.PI/2;
+    gun.position.set(0.5,1.0,0.7);
+    g.add(gun);
+  }
+  const marker = makeFloatingMarker(isFish ? '🐟' : '🎯', 3.5);
+  g.add(marker);
+  g.add(makeBlobShadow(1.8));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return { group:g, marker };
+}
+
+// --- shared helpers for the two games ---
+function festivalPickRound(n, okFn){
+  const pool = VOCAB.filter(okFn);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  const picked = [target];
+  let guard = 0;
+  while(picked.length < n && guard++ < 400){
+    const c = pool[Math.floor(Math.random()*pool.length)];
+    if(picked.some(p => p.en === c.en || p.ja === c.ja)) continue;
+    picked.push(c);
+  }
+  for(let i=picked.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [picked[i],picked[j]] = [picked[j],picked[i]];
+  }
+  return { target, options:picked };
+}
+
+function festivalShake(el){
+  try{
+    el.animate(
+      [{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(-5px)'},{transform:'translateX(0)'}],
+      {duration:320}
+    );
+  }catch(e){}
+}
+
+function makeFestivalOverlay(titleText, onClose){
+  if(document.getElementById('festivalOverlay')) return null;
+  const root = document.createElement('div');
+  root.id = 'festivalOverlay';
+  root.style.cssText = 'position:fixed; inset:0; z-index:600; background:linear-gradient(#FFE3EC,#FFF8EE); display:flex; flex-direction:column; align-items:center; color:#4A3B5C; font-weight:800; overflow:hidden; touch-action:manipulation; -webkit-user-select:none; user-select:none;';
+  const bar = document.createElement('div');
+  bar.style.cssText = 'width:min(94vw,560px); display:flex; align-items:center; justify-content:space-between; padding:14px 2px 6px; box-sizing:border-box; gap:8px;';
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:18px;';
+  titleEl.textContent = titleText;
+  const statusEl = document.createElement('div');
+  statusEl.style.cssText = 'font-size:13px; flex:1; text-align:right;';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕';
+  closeBtn.style.cssText = 'width:44px; height:44px; border:0; border-radius:22px; background:#fff; color:#4A3B5C; font-size:20px; font-weight:800; box-shadow:0 2px 8px rgba(0,0,0,.18); cursor:pointer;';
+  bar.append(titleEl, statusEl, closeBtn);
+  const body = document.createElement('div');
+  body.style.cssText = 'width:min(94vw,560px); flex:1; display:flex; flex-direction:column; gap:12px; padding-bottom:18px; box-sizing:border-box; min-height:0;';
+  root.append(bar, body);
+  document.body.appendChild(root);
+  const api = {
+    root, body, statusEl,
+    close(){ if(onClose) onClose(); root.remove(); },
+  };
+  closeBtn.addEventListener('click', ()=> api.close());
+  return api;
+}
+
+function festivalEndPanel(ui, emoji, line, onRetry){
+  const panel = document.createElement('div');
+  panel.style.cssText = 'margin:auto; width:min(86vw,340px); background:#fff; border-radius:24px; padding:26px 20px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.22); display:flex; flex-direction:column; gap:12px; align-items:center;';
+  panel.innerHTML = '<div style="font-size:52px;">'+emoji+'</div><div style="font-size:20px;">おつかれさま！</div><div style="font-size:15px; line-height:1.5;">'+line+'</div>';
+  const btnCss = 'width:100%; min-height:50px; border:0; border-radius:16px; font-size:16px; font-weight:800; cursor:pointer;';
+  const retry = document.createElement('button');
+  retry.textContent = 'もういちど';
+  retry.style.cssText = btnCss + 'background:#FF8FB6; color:#fff;';
+  const exit = document.createElement('button');
+  exit.textContent = 'とじる';
+  exit.style.cssText = btnCss + 'background:#EFE7F5; color:#4A3B5C;';
+  retry.addEventListener('click', onRetry);
+  exit.addEventListener('click', ()=> ui.close());
+  panel.append(retry, exit);
+  ui.body.innerHTML = '';
+  ui.body.appendChild(panel);
+}
+
+// ---------------------------------------------------------
+// 🐟 金魚すくい — the bowl shows a Japanese meaning; tap the goldfish
+// carrying the matching English word. A wrong fish tears the poi.
+// ---------------------------------------------------------
+const FISH_ROUNDS = 8, FISH_LIVES = 3;
+function openGoldfish(){
+  let stopped = false, raf = 0, lastTs = 0;
+  let round = 0, lives = FISH_LIVES, score = 0, answered = false, target = null, fishes = [];
+  const ui = makeFestivalOverlay('🐟 金魚すくい', ()=>{ stopped = true; cancelAnimationFrame(raf); });
+  if(!ui) return;
+
+  const prompt = document.createElement('div');
+  prompt.style.cssText = 'background:#fff; border-radius:20px; padding:12px 14px; text-align:center; font-size:19px; line-height:1.4; box-shadow:0 4px 14px rgba(0,0,0,.12);';
+  const pond = document.createElement('div');
+  pond.style.cssText = 'position:relative; width:100%; height:min(52vh,360px); border-radius:26px; background:radial-gradient(circle at 30% 25%,#B8E6F2,#7FC8D8 70%); border:5px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,.16); overflow:hidden;';
+  const msg = document.createElement('div');
+  msg.style.cssText = 'min-height:24px; text-align:center; font-size:15px;';
+
+  function refreshStatus(){
+    ui.statusEl.textContent = 'ラウンド ' + Math.min(round,FISH_ROUNDS) + '/' + FISH_ROUNDS + '　ポイ ' + '❤'.repeat(lives) + '🤍'.repeat(FISH_LIVES-lives);
+  }
+
+  function newFish(opt){
+    const el = document.createElement('div');
+    el.style.cssText = 'position:absolute; left:0; top:0; display:flex; flex-direction:column; align-items:center; cursor:pointer; will-change:transform; touch-action:manipulation;';
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:42px; line-height:1;';
+    body.textContent = '🐠';
+    const tag = document.createElement('div');
+    tag.style.cssText = 'background:#fff; border-radius:12px; padding:2px 9px; font-size:15px; font-weight:800; color:#4A3B5C; box-shadow:0 2px 6px rgba(0,0,0,.2); white-space:nowrap;';
+    tag.textContent = opt.en;
+    el.append(body, tag);
+    pond.appendChild(el);
+    const f = { opt, el, body, w: el.offsetWidth || 80, h: el.offsetHeight || 70, x:0, y:0, vx:0, vy:0, turn:0, gone:false, dead:false };
+    const W = pond.clientWidth || 300, H = pond.clientHeight || 280;
+    f.x = Math.random()*Math.max(1, W-f.w);
+    f.y = Math.random()*Math.max(1, H-f.h);
+    pickVelocity(f);
+    el.addEventListener('pointerdown', (e)=>{ e.preventDefault(); onFish(f); });
+    return f;
+  }
+  function pickVelocity(f){
+    const sp = 35 + Math.random()*40;
+    const a = Math.random()*Math.PI*2;
+    f.vx = Math.cos(a)*sp;
+    f.vy = Math.sin(a)*sp*0.6;
+    f.turn = 1 + Math.random()*2;
+    f.body.style.transform = f.vx > 0 ? 'scaleX(-1)' : 'scaleX(1)';
+  }
+
+  function nextRound(){
+    if(stopped) return;
+    round++;
+    if(round > FISH_ROUNDS){ endGame(); return; }
+    answered = false;
+    msg.textContent = '';
+    const r = festivalPickRound(4, v => v.en.length <= 14);
+    target = r.target;
+    prompt.textContent = 'おわんの ことば：「' + target.ja + '」';
+    prompt.style.fontSize = target.ja.length > 16 ? '15px' : '19px';
+    pond.innerHTML = '';
+    fishes = r.options.map(newFish);
+    refreshStatus();
+  }
+
+  function onFish(f){
+    if(stopped || answered || f.gone || f.dead) return;
+    if(f.opt.en === target.en){
+      answered = true;
+      score++;
+      addCoins(1);
+      playCorrectSound();
+      try{ speakEnglish(target.en); }catch(e){}
+      f.gone = true;
+      f.el.style.transition = 'transform .5s ease-out, opacity .5s';
+      f.el.style.transform = 'translate(' + f.x + 'px,' + (f.y-40) + 'px) scale(1.6)';
+      f.el.style.opacity = '0';
+      msg.textContent = '⭕ すくえた！ ' + target.en + ' ＝ ' + target.ja;
+      setTimeout(nextRound, 1200);
+    } else {
+      lives--;
+      f.dead = true;
+      playWrongSound();
+      festivalShake(f.el);
+      f.el.style.opacity = '0.35';
+      msg.textContent = '❌ ポイが やぶれた…';
+      refreshStatus();
+      if(lives <= 0){
+        answered = true;
+        fishes.forEach(o=>{ if(o.opt.en === target.en) o.el.style.outline = '4px solid #6BD48A'; });
+        msg.textContent = '❌ ポイが ぜんぶ やぶれた… こたえは「' + target.en + '」';
+        setTimeout(endGame, 1800);
+      }
+    }
+  }
+
+  function tick(ts){
+    if(stopped) return;
+    const dt = Math.min(0.05, ((ts - lastTs)/1000) || 0.016);
+    lastTs = ts;
+    const W = pond.clientWidth, H = pond.clientHeight;
+    fishes.forEach(f=>{
+      if(f.gone) return;
+      f.turn -= dt;
+      if(f.turn <= 0) pickVelocity(f);
+      f.x += f.vx*dt; f.y += f.vy*dt;
+      if(f.x < 0){ f.x = 0; f.vx = Math.abs(f.vx); f.body.style.transform = 'scaleX(-1)'; }
+      if(f.x > W-f.w){ f.x = W-f.w; f.vx = -Math.abs(f.vx); f.body.style.transform = 'scaleX(1)'; }
+      if(f.y < 0){ f.y = 0; f.vy = Math.abs(f.vy); }
+      if(f.y > H-f.h){ f.y = H-f.h; f.vy = -Math.abs(f.vy); }
+      f.el.style.transform = 'translate(' + f.x + 'px,' + f.y + 'px)';
+    });
+    raf = requestAnimationFrame(tick);
+  }
+
+  function endGame(){
+    if(stopped) return;
+    cancelAnimationFrame(raf);
+    festivalEndPanel(ui, lives > 0 ? '🏆' : '🥲', FISH_ROUNDS + 'もん中 ' + score + 'もん すくえたよ！', startGame);
+  }
+
+  function startGame(){
+    round = 0; lives = FISH_LIVES; score = 0; answered = false;
+    ui.body.innerHTML = '';
+    ui.body.append(prompt, pond, msg);
+    cancelAnimationFrame(raf);
+    lastTs = 0;
+    raf = requestAnimationFrame(tick);
+    nextRound();
+  }
+  startGame();
+}
+
+// ---------------------------------------------------------
+// 🎯 射的 — the game says (and shows) an English word; shoot the prize
+// that has the matching Japanese meaning. A sweeping sight makes you time
+// the shot. Two shots per word.
+// ---------------------------------------------------------
+const SHOOT_ROUNDS = 8, SHOOT_SHOTS = 2;
+function openShooting(){
+  let stopped = false, raf = 0, lastTs = 0;
+  let round = 0, score = 0, shots = SHOOT_SHOTS, busy = true, target = null, options = [], cells = [];
+  let sightPos = 0, sightDir = 1;
+  const ui = makeFestivalOverlay('🎯 射的', ()=>{ stopped = true; cancelAnimationFrame(raf); });
+  if(!ui) return;
+
+  const prompt = document.createElement('div');
+  prompt.style.cssText = 'background:#fff; border-radius:20px; padding:12px 14px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; gap:12px;';
+  const promptWord = document.createElement('div');
+  promptWord.style.cssText = 'font-size:24px;';
+  const soundBtn = document.createElement('button');
+  soundBtn.textContent = '🔊';
+  soundBtn.style.cssText = 'width:44px; height:44px; border:0; border-radius:22px; background:#FFE1EC; font-size:20px; cursor:pointer;';
+  soundBtn.addEventListener('click', ()=>{ try{ speakEnglish(target.en); }catch(e){} });
+  prompt.append(promptWord, soundBtn);
+
+  const shelf = document.createElement('div');
+  shelf.style.cssText = 'position:relative; width:100%; height:min(34vh,210px); border-radius:20px; background:linear-gradient(#F6E7D3,#E9D3B3); border:5px solid #B5835A; box-shadow:0 6px 18px rgba(0,0,0,.16); overflow:hidden;';
+  const plank = document.createElement('div');
+  plank.style.cssText = 'position:absolute; left:0; right:0; bottom:0; height:22px; background:#B5835A;';
+  const sight = document.createElement('div');
+  sight.style.cssText = 'position:absolute; top:0; bottom:0; width:8px; margin-left:-4px; background:rgba(255,60,60,0.8); border-radius:4px; z-index:3; pointer-events:none;';
+  const sightRing = document.createElement('div');
+  sightRing.style.cssText = 'position:absolute; top:50%; left:50%; width:44px; height:44px; margin:-22px 0 0 -22px; border:4px solid rgba(255,60,60,0.9); border-radius:50%; background:rgba(255,255,255,0.35);';
+  sight.appendChild(sightRing);
+  shelf.append(plank, sight);
+
+  const msg = document.createElement('div');
+  msg.style.cssText = 'min-height:24px; text-align:center; font-size:15px;';
+  const fireBtn = document.createElement('button');
+  fireBtn.textContent = '🔫 ポン！';
+  fireBtn.style.cssText = 'width:100%; min-height:68px; border:0; border-radius:20px; background:#FF8FB6; color:#fff; font-size:24px; font-weight:800; box-shadow:0 6px 0 #D96B93; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+  fireBtn.addEventListener('pointerdown', (e)=>{ e.preventDefault(); fire(); });
+
+  const PRIZE_COLORS = ['#FFB7C9','#FFD873','#8FC7FF','#C7B6F0'];
+  function refreshStatus(){
+    ui.statusEl.textContent = 'ラウンド ' + Math.min(round,SHOOT_ROUNDS) + '/' + SHOOT_ROUNDS + '　たま ' + '●'.repeat(shots) + '○'.repeat(SHOOT_SHOTS-shots);
+  }
+
+  function nextRound(){
+    if(stopped) return;
+    round++;
+    if(round > SHOOT_ROUNDS){ endGame(); return; }
+    shots = SHOOT_SHOTS;
+    busy = false;
+    msg.textContent = '';
+    const r = festivalPickRound(4, v => v.en.length <= 16 && v.ja.length <= 16);
+    target = r.target;
+    options = r.options;
+    promptWord.textContent = '「' + target.en + '」を うて！';
+    cells.forEach(c => c.remove());
+    cells = options.map((opt,i)=>{
+      const c = document.createElement('div');
+      c.style.cssText = 'position:absolute; bottom:22px; height:62%; width:22%; left:' + (2 + i*24.5) + '%; border-radius:12px; display:flex; align-items:center; justify-content:center; text-align:center; padding:4px; box-sizing:border-box; font-size:14px; line-height:1.25; font-weight:800; color:#4A3B5C; box-shadow:0 4px 10px rgba(0,0,0,.22); background:' + PRIZE_COLORS[i%4] + ';';
+      c.textContent = opt.ja;
+      shelf.appendChild(c);
+      return c;
+    });
+    refreshStatus();
+    try{ speakEnglish(target.en); }catch(e){}
+  }
+
+  function fire(){
+    if(stopped || busy) return;
+    busy = true;
+    shots--;
+    refreshStatus();
+    const sx = sight.getBoundingClientRect().left + sight.offsetWidth/2;
+    let hit = -1;
+    cells.forEach((c,i)=>{
+      const rc = c.getBoundingClientRect();
+      if(sx >= rc.left && sx <= rc.right) hit = i;
+    });
+    if(hit >= 0 && options[hit].en === target.en){
+      score++;
+      addCoins(1);
+      playCorrectSound();
+      cells[hit].style.transition = 'transform .6s ease-in, opacity .6s';
+      cells[hit].style.transform = 'translateY(120px) rotate(24deg)';
+      cells[hit].style.opacity = '0';
+      msg.textContent = '⭕ あたり！ ' + target.en + ' ＝ ' + target.ja;
+      setTimeout(nextRound, 1300);
+      return;
+    }
+    playWrongSound();
+    if(hit >= 0){
+      festivalShake(cells[hit]);
+      msg.textContent = '❌ ちがう けいひん！';
+    } else {
+      msg.textContent = '💨 はずれ！';
+    }
+    if(shots <= 0){
+      const ci = options.findIndex(o => o.en === target.en);
+      if(ci >= 0) cells[ci].style.outline = '4px solid #6BD48A';
+      msg.textContent += '　こたえは「' + target.ja + '」';
+      setTimeout(nextRound, 1700);
+    } else {
+      setTimeout(()=>{ busy = false; }, 450);
+    }
+  }
+
+  function tick(ts){
+    if(stopped) return;
+    const dt = Math.min(0.05, ((ts - lastTs)/1000) || 0.016);
+    lastTs = ts;
+    const W = shelf.clientWidth || 300;
+    const speed = W * (0.7 + round*0.04);
+    sightPos += sightDir * speed * dt;
+    if(sightPos > W){ sightPos = W; sightDir = -1; }
+    if(sightPos < 0){ sightPos = 0; sightDir = 1; }
+    sight.style.left = sightPos + 'px';
+    raf = requestAnimationFrame(tick);
+  }
+
+  function endGame(){
+    if(stopped) return;
+    cancelAnimationFrame(raf);
+    festivalEndPanel(ui, score >= SHOOT_ROUNDS*0.6 ? '🏆' : '🎯', SHOOT_ROUNDS + 'もん中 ' + score + 'もん あたったよ！', startGame);
+  }
+
+  function startGame(){
+    round = 0; score = 0; busy = true;
+    ui.body.innerHTML = '';
+    cells = [];
+    ui.body.append(prompt, shelf, msg, fireBtn);
+    cancelAnimationFrame(raf);
+    lastTs = 0;
+    sightPos = 0; sightDir = 1;
+    raf = requestAnimationFrame(tick);
+    nextRound();
+  }
+  startGame();
+}
+
+
+/* =========================================================
+   🛺 人力車ツアー (rickshaw tour) — sakura island only.
+   Same scripted-ride mechanism as the boat / sky pod: the player is moved
+   along a fixed route (computed offline so it skirts the trees, lanterns,
+   buildings, stalls and pond). At four sights the rickshaw stops, the
+   cat guide tells you about the place in English (with a Japanese
+   translation), then asks one easy 2-choice question about what she said.
+========================================================= */
+const RICK_ROUTE = [[-3.5, 1.25], [-0.25, 7.25], [0.0, 8.0], [1.25, 5.25], [4.5, 1.75], [6.25, 1.25], [7.75, 2.0], [10.5, 4.5], [10.25, 1.75], [12.25, -1.75], [14.5, -7.5], [19.75, -10.0], [20.75, -11.5], [20.5, -13.0], [19.5, -14.25], [6.0, -18.5], [9.25, -15.5], [9.75, -13.75], [9.0, -12.25], [7.5, -11.25], [3.75, -10.25], [2.5, -10.25], [-2.5, -14.0], [-1.25, -5.5], [-2.5, -3.0], [-3.5, 1.25]];
+const RICK_STATION = { x:RICK_ROUTE[0][0], z:RICK_ROUTE[0][1] };
+const RICK_LANDING = { x:-1.5, z:2.7 };
+const RICK_SPEED = 3.4;
+const RICK_TURN_RATE = 3.2;
+const RICK_PARK_HEADING = Math.atan2(RICK_ROUTE[1][0]-RICK_ROUTE[0][0], RICK_ROUTE[1][1]-RICK_ROUTE[0][1]);
+const RICK_CUM = (function(){
+  const c = [0];
+  for(let i=1;i<RICK_ROUTE.length;i++){
+    const a = RICK_ROUTE[i-1], b = RICK_ROUTE[i];
+    c.push(c[i-1] + Math.hypot(b[0]-a[0], b[1]-a[1]));
+  }
+  return c;
+})();
+const RICK_TOTAL = RICK_CUM[RICK_CUM.length-1];
+function rickPointAt(s){
+  s = Math.max(0, Math.min(RICK_TOTAL, s));
+  let i = 1;
+  while(i < RICK_CUM.length-1 && RICK_CUM[i] < s) i++;
+  const a = RICK_ROUTE[i-1], b = RICK_ROUTE[i];
+  const segLen = (RICK_CUM[i]-RICK_CUM[i-1]) || 1;
+  const k = (s-RICK_CUM[i-1]) / segLen;
+  return { x:a[0]+(b[0]-a[0])*k, z:a[1]+(b[1]-a[1])*k, heading:Math.atan2(b[0]-a[0], b[1]-a[1]) };
+}
+const RICK_STOPS = [
+  { d:7.61, name:'鳥居',
+    en:"This is a torii gate. It marks the entrance to a special place.",
+    ja:"これは鳥居です。特別な場所への入口のしるしです。",
+    q:{ en:"What does a torii gate mark?", good:"An entrance", bad:"A kitchen", ja:"鳥居は「入口」のしるしだよ。" } },
+  { d:22.62, name:'桜の木',
+    en:"These are cherry trees. In spring, they bloom with beautiful pink flowers.",
+    ja:"これは桜の木です。春にはきれいなピンクの花が咲きます。",
+    q:{ en:"What color are the flowers?", good:"Pink", bad:"Blue", ja:"桜の花はピンク色だよ。" } },
+  { d:35.59, name:'占いのテント',
+    en:"In this tent, a cat tells you your fortune for the day.",
+    ja:"このテントでは、猫がその日の運勢を教えてくれます。",
+    q:{ en:"What does the cat tell you?", good:"Your fortune", bad:"The time", ja:"猫は「運勢」を教えてくれるよ。" } },
+  { d:60.48, name:'こいの池',
+    en:"Colorful koi fish swim in this pond. You can also enjoy a boat ride here.",
+    ja:"この池ではカラフルな鯉が泳いでいます。舟下りも楽しめます。",
+    q:{ en:"What can you do here?", good:"Take a boat ride", bad:"Climb a mountain", ja:"ここでは舟に乗れるよ。" } },
+];
+
+const rickshawMesh = new THREE.Group();
+const rickWheels = [];
+{
+  const red = new THREE.MeshLambertMaterial({color:0xC23B3B});
+  const black = new THREE.MeshLambertMaterial({color:0x2A2A2A});
+  const wood = new THREE.MeshLambertMaterial({color:0xB5835A});
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.5,1.3), red);
+  seat.position.set(0,0.75,0);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1.5,1.1,0.14), red);
+  back.position.set(0,1.3,-0.6);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(1.7,0.1,1.6), black);
+  hood.position.set(0,2.75,-0.1);
+  hood.rotation.x = -0.18;
+  rickshawMesh.add(seat, back, hood);
+  [-1,1].forEach(side=>{
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.0,8), black);
+    post.position.set(side*0.72,1.7,0.55);
+    rickshawMesh.add(post);
+    const wheel = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.6,0.06,8,22), black);
+    rim.rotation.y = Math.PI/2;
+    wheel.add(rim);
+    for(let i=0;i<3;i++){
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.04,1.15,0.04), wood);
+      spoke.rotation.x = (i/3)*Math.PI;
+      wheel.add(spoke);
+    }
+    wheel.position.set(side*0.92,0.62,0);
+    rickshawMesh.add(wheel);
+    rickWheels.push(wheel);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,2.6,8), wood);
+    shaft.rotation.x = Math.PI/2;
+    shaft.position.set(side*0.5,0.7,1.6);
+    rickshawMesh.add(shaft);
+  });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.06,0.06), wood);
+  bar.position.set(0,0.7,2.9);
+  rickshawMesh.add(bar);
+  rickshawMesh.add(makeBlobShadow(1.5));
+}
+rickshawMesh.position.set(RICK_STATION.x, 0, RICK_STATION.z);
+rickshawMesh.rotation.y = RICK_PARK_HEADING;
+sakuraDecorGroup.add(rickshawMesh);
+
+function ensureRickPuller(){
+  if(rickshawMesh.userData.puller) return;
+  const c = makeCharacter({ bodyColor:0xFFF3E0, earColor:0xFFB7C9, earType:'cat' });
+  c.scale.setScalar(0.7);
+  c.position.set(0,0,2.4);
+  rickshawMesh.add(c);
+  rickshawMesh.userData.puller = c;
+}
+
+function makeRickshawStand(x,z){
+  const g = new THREE.Group();
+  const dark = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const mat = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,0.05,20), new THREE.MeshLambertMaterial({color:0xC23B3B}));
+  mat.position.y = 0.03;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.6,8), dark);
+  post.position.set(0,0.8,0);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.45,0.08), new THREE.MeshLambertMaterial({color:0xFFF3E0}));
+  board.position.set(0,1.55,0);
+  g.add(mat, post, board);
+  const marker = makeFloatingMarker('🛺', 2.5);
+  g.add(marker);
+  g.add(makeBlobShadow(1.0));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+const rick = { active:false, phase:'idle', s:0, stopIdx:0, correct:0, heading:RICK_PARK_HEADING, answered:false, spin:0 };
+
+function getRickHud(){
+  let el = document.getElementById('rickHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'rickHud';
+  el.style.cssText = 'position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,250,244,0.97); border-radius:22px; padding:14px 14px 16px; box-shadow:0 12px 34px rgba(0,0,0,0.28); text-align:center; display:none; color:#4A3B5C;';
+  document.body.appendChild(el);
+  return el;
+}
+function hideRickHud(){
+  const el = document.getElementById('rickHud');
+  if(el) el.style.display = 'none';
+}
+function rickBtn(text, bg, onClick){
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.style.cssText = 'flex:1; min-height:54px; padding:10px 8px; font-size:17px; font-weight:800; border:0; border-radius:16px; background:' + bg + '; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+  b.addEventListener('click', onClick);
+  return b;
+}
+function rickHeader(idx, stop){
+  const h = document.createElement('div');
+  h.style.cssText = 'font-size:12px; font-weight:800; opacity:.7;';
+  h.textContent = '🛺 ' + (idx+1) + '/' + RICK_STOPS.length + '　' + stop.name;
+  return h;
+}
+function showRickNarration(stop, idx){
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  const el = getRickHud();
+  el.innerHTML = '';
+  const en = document.createElement('div');
+  en.style.cssText = 'font-size:19px; font-weight:800; line-height:1.45; margin:8px 0 6px;';
+  en.textContent = stop.en;
+  const ja = document.createElement('div');
+  ja.style.cssText = 'font-size:13px; font-weight:700; opacity:.8; line-height:1.5; margin-bottom:12px;';
+  ja.textContent = stop.ja;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:10px;';
+  row.append(
+    rickBtn('🔊 きく', '#EFE7F5', ()=>{ try{ speakEnglish(stop.en); }catch(e){} }),
+    rickBtn('もんだいへ ▶', '#FFE1EC', ()=> showRickQuestion(stop, idx))
+  );
+  el.append(rickHeader(idx, stop), en, ja, row);
+  el.style.display = 'block';
+  try{ speakEnglish(stop.en); }catch(e){}
+}
+function showRickQuestion(stop, idx){
+  if(!rick.active || rick.phase !== 'narrate') return;
+  rick.phase = 'ask';
+  rick.answered = false;
+  const el = getRickHud();
+  el.innerHTML = '';
+  const q = document.createElement('div');
+  q.style.cssText = 'font-size:19px; font-weight:800; line-height:1.4; margin:8px 0 12px;';
+  q.textContent = stop.q.en;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:10px;';
+  const opts = [{t:stop.q.good, ok:true},{t:stop.q.bad, ok:false}];
+  if(Math.random() < 0.5) opts.reverse();
+  const msg = document.createElement('div');
+  msg.style.cssText = 'min-height:18px; margin-top:10px; font-size:13px; font-weight:800;';
+  const btns = opts.map(o=>{
+    const b = rickBtn(o.t, '#FFE1EC', ()=> answerRick(o.ok, b, btns, msg, stop));
+    row.appendChild(b);
+    return b;
+  });
+  el.append(rickHeader(idx, stop), q, row, msg);
+}
+function answerRick(ok, btn, btns, msg, stop){
+  if(!rick.active || rick.phase !== 'ask' || rick.answered) return;
+  rick.answered = true;
+  btns.forEach(b => b.disabled = true);
+  if(ok){
+    btn.style.background = '#B8F0C8';
+    rick.correct++;
+    addCoins(1);
+    playCorrectSound();
+    msg.textContent = '⭕ せいかい！ ' + stop.q.ja;
+  } else {
+    btn.style.background = '#FFC1C1';
+    playWrongSound();
+    msg.textContent = '❌ ざんねん… ' + stop.q.ja;
+  }
+  rick.phase = 'feedback';
+  setTimeout(()=>{
+    if(!rick.active || rick.phase !== 'feedback') return;
+    hideRickHud();
+    rick.stopIdx++;
+    rick.phase = 'move';
+  }, 2200);
+}
+
+function boardRickshaw(landmark){
+  if(rideActive) return;
+  ensureRickPuller();
+  rideActive = true;
+  Object.assign(rick, { active:true, phase:'move', s:0, stopIdx:0, correct:0, heading:RICK_PARK_HEADING, answered:false, spin:0 });
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  rideCaption('<span style="font-size:14px;">Hop in! Let\'s tour the island.</span><br><span style="font-size:12px; opacity:.85;">のってね！島を めぐろう。</span>');
+}
+
+function resetRickshawParked(){
+  rickshawMesh.position.set(RICK_STATION.x, 0, RICK_STATION.z);
+  rickshawMesh.rotation.set(0, RICK_PARK_HEADING, 0);
+}
+function cancelRickshaw(){
+  if(!rick.active) return;
+  rick.active = false;
+  rick.phase = 'idle';
+  rideActive = false;
+  resetRickshawParked();
+  player.rotation.z = 0;
+  player.position.y = 0;
+  hideRickHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+}
+function finishRickshaw(){
+  const total = RICK_STOPS.length;
+  const bonus = (rick.correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  rick.active = false;
+  rick.phase = 'idle';
+  rideActive = false;
+  resetRickshawParked();
+  player.position.set(RICK_LANDING.x, 0, RICK_LANDING.z);
+  player.rotation.set(0, 0, 0);
+  hideRickHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  saveProgress();
+  showToast('🛺 人力車ツアー、おつかれさま！ ' + total + 'もん中' + rick.correct + 'もん せいかい　+' + (rick.correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+
+function updateRickshaw(dt){
+  if(!rick.active) return;
+  const nowS = performance.now()/1000;
+  if(rick.phase === 'move'){
+    const p0 = rickPointAt(rick.s);
+    let diff = p0.heading - rick.heading;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    if(Math.abs(diff) > 0.9){
+      // sharp corner: turn on the spot first, then roll on
+      rick.heading += Math.sign(diff) * Math.min(Math.abs(diff), RICK_TURN_RATE*dt);
+    } else {
+      const prev = rick.s;
+      rick.s += RICK_SPEED*dt;
+      const next = RICK_STOPS[rick.stopIdx];
+      if(next && rick.s >= next.d){
+        rick.s = next.d;
+        rick.phase = 'narrate';
+        showRickNarration(next, rick.stopIdx);
+      } else if(rick.s >= RICK_TOTAL){
+        rick.s = RICK_TOTAL;
+        finishRickshaw();
+        return;
+      }
+      rick.spin += (rick.s - prev) / 0.6;
+      rick.heading += Math.sign(diff) * Math.min(Math.abs(diff), RICK_TURN_RATE*dt);
+    }
+  }
+  const p = rickPointAt(rick.s);
+  const bob = Math.sin(nowS*5)*(rick.phase === 'move' ? 0.03 : 0.01);
+  rickshawMesh.position.set(p.x, bob, p.z);
+  rickshawMesh.rotation.set(0, rick.heading, 0);
+  rickWheels.forEach(w => { w.rotation.x = rick.spin; });
+  player.position.set(p.x, 0.35 + bob, p.z);
+  player.rotation.set(0, rick.heading, 0);
+}
+
+/* =========================================================
+   🎆 打ち上げ花火 — night only. Tap the scrambled letters in order to
+   spell the word for the Japanese meaning; each completed word launches
+   a firework (2D canvas particles drawn over the dimmed night scene).
+========================================================= */
+var fireworksPadLandmark = null;
+function updateFireworksPad(){
+  if(!fireworksPadLandmark) return;
+  fireworksPadLandmark.group.visible = (currentIslandId === 'sakura' && isNight);
+}
+function makeFireworkPad(x,z){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.0,0.22,1.2), wood);
+  base.position.y = 0.11;
+  g.add(base);
+  [0xFF6B9D,0xFFD873,0x6BCBFF,0xB9A6E8,0x6FE0C2].forEach((c,i)=>{
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,1.0,10), new THREE.MeshLambertMaterial({color:c}));
+    tube.position.set(-0.8+i*0.4, 0.7, 0);
+    tube.rotation.z = (i-2)*0.08;
+    g.add(tube);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.07,8,6), new THREE.MeshBasicMaterial({color:0xFFE9A8}));
+    tip.position.set(-0.8+i*0.4 + (i-2)*0.04, 1.22, 0);
+    g.add(tip);
+  });
+  const marker = makeFloatingMarker('🎆', 2.5);
+  g.add(marker);
+  g.add(makeBlobShadow(1.3));
+  g.position.set(x,0,z);
+  g.rotation.y = 0.3;
+  return { group:g, marker };
+}
+
+const FW_ROUNDS = 5;
+function openFireworks(){
+  if(!isNight){ showToast('花火は よるだけ あげられるよ 🌙'); return; }
+  let stopped = false, raf = 0, lastTs = 0;
+  let round = 0, score = 0, word = null, pos = 0, wrong = 0, locked = false, tiles = [], slots = [];
+  const parts = [], rockets = [];
+  const ui = makeFestivalOverlay('🎆 花火', ()=>{ stopped = true; cancelAnimationFrame(raf); });
+  if(!ui) return;
+  ui.root.style.background = 'linear-gradient(rgba(6,8,36,0.62),rgba(6,8,36,0.28) 60%,rgba(6,8,36,0.12))';
+  ui.root.style.color = '#fff';
+  const cv = document.createElement('canvas');
+  cv.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0;';
+  ui.root.insertBefore(cv, ui.root.firstChild);
+  ui.root.children[1].style.position = 'relative'; ui.root.children[1].style.zIndex = '1';
+  ui.body.style.position = 'relative'; ui.body.style.zIndex = '1';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'margin-top:auto; background:rgba(255,255,255,0.96); color:#4A3B5C; border-radius:24px; padding:14px 14px 16px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,.3); text-align:center;';
+  const promptEl = document.createElement('div');
+  promptEl.style.cssText = 'font-size:18px; line-height:1.4;';
+  const slotsRow = document.createElement('div');
+  slotsRow.style.cssText = 'display:flex; justify-content:center; flex-wrap:wrap; gap:6px;';
+  const tilesRow = document.createElement('div');
+  tilesRow.style.cssText = 'display:flex; justify-content:center; flex-wrap:wrap; gap:8px;';
+  const msg = document.createElement('div');
+  msg.style.cssText = 'min-height:20px; font-size:14px;';
+  card.append(promptEl, slotsRow, tilesRow, msg);
+
+  function refreshStatus(){
+    ui.statusEl.textContent = 'ラウンド ' + Math.min(round,FW_ROUNDS) + '/' + FW_ROUNDS + '　' + '🎆'.repeat(score);
+  }
+
+  function nextRound(){
+    if(stopped) return;
+    round++;
+    if(round > FW_ROUNDS){ endGame(); return; }
+    const pool = VOCAB.filter(v => /^[a-z]{4,9}$/.test(v.en) && v.ja.length <= 16);
+    word = pool[Math.floor(Math.random()*pool.length)];
+    pos = 0; wrong = 0; locked = false;
+    msg.textContent = '';
+    promptEl.textContent = '「' + word.ja + '」の つづりを ならべよう';
+    promptEl.style.fontSize = word.ja.length > 14 ? '15px' : '18px';
+    slotsRow.innerHTML = '';
+    slots = word.en.split('').map(()=>{
+      const d = document.createElement('div');
+      d.style.cssText = 'width:38px; height:46px; border:3px dashed #C9B8E0; border-radius:10px; font-size:26px; line-height:40px; font-weight:800; box-sizing:border-box;';
+      slotsRow.appendChild(d);
+      return d;
+    });
+    let letters = word.en.split('');
+    for(let tries=0; tries<8; tries++){
+      for(let i=letters.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [letters[i],letters[j]] = [letters[j],letters[i]];
+      }
+      if(letters.join('') !== word.en) break;
+    }
+    tilesRow.innerHTML = '';
+    tiles = letters.map(ch=>{
+      const b = document.createElement('button');
+      b.textContent = ch;
+      b.dataset.ch = ch;
+      b.style.cssText = 'width:52px; height:52px; border:0; border-radius:14px; background:#FFE1EC; color:#4A3B5C; font-size:26px; font-weight:800; cursor:pointer; -webkit-tap-highlight-color:transparent; box-shadow:0 3px 0 #E8B5C8;';
+      b.addEventListener('click', ()=> onTile(b));
+      tilesRow.appendChild(b);
+      return b;
+    });
+    refreshStatus();
+  }
+
+  function onTile(b){
+    if(stopped || locked || b.disabled) return;
+    if(b.dataset.ch === word.en[pos]){
+      slots[pos].textContent = b.dataset.ch;
+      slots[pos].style.borderStyle = 'solid';
+      slots[pos].style.borderColor = '#FF8FB6';
+      b.disabled = true;
+      b.style.opacity = '0.25';
+      b.style.outline = 'none';
+      pos++;
+      if(pos >= word.en.length) complete();
+    } else {
+      wrong++;
+      playWrongSound();
+      festivalShake(b);
+      if(wrong >= 3){
+        const hint = tiles.find(t => !t.disabled && t.dataset.ch === word.en[pos]);
+        if(hint) hint.style.outline = '4px solid #6BD48A';
+      }
+    }
+  }
+
+  function complete(){
+    locked = true;
+    score++;
+    addCoins(1);
+    playCorrectSound();
+    try{ speakEnglish(word.en); }catch(e){}
+    msg.textContent = '🎆 ' + word.en + ' ＝ ' + word.ja;
+    refreshStatus();
+    launch(wrong === 0);
+    setTimeout(nextRound, 2600);
+  }
+
+  function launch(perfect){
+    const W = cv.width || 400, H = cv.height || 700;
+    const n = perfect ? 2 : 1;
+    for(let i=0;i<n;i++){
+      rockets.push({ x: W*(0.3 + Math.random()*0.4), y:H*0.62, ty:H*(0.1 + Math.random()*0.2), vy:-H*0.55, perfect });
+    }
+  }
+  const COLORS = ['#FF6B9D','#FFD873','#6BCBFF','#B9A6E8','#6FE0C2','#FFFFFF','#FF9F5A'];
+  function explode(r){
+    const count = r.perfect ? 110 : 70;
+    const c1 = COLORS[Math.floor(Math.random()*COLORS.length)], c2 = COLORS[Math.floor(Math.random()*COLORS.length)];
+    for(let i=0;i<count;i++){
+      const a = Math.random()*Math.PI*2, sp = 50 + Math.random()*(r.perfect ? 210 : 160);
+      parts.push({ x:r.x, y:r.y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:1.1+Math.random()*0.8, max:1.9, color:(i%2 ? c1 : c2), size:2+Math.random()*2 });
+    }
+  }
+
+  function tick(ts){
+    if(stopped) return;
+    const dt = Math.min(0.05, ((ts - lastTs)/1000) || 0.016);
+    lastTs = ts;
+    if(cv.clientWidth && (cv.width !== cv.clientWidth || cv.height !== cv.clientHeight)){
+      cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+    }
+    for(let i=rockets.length-1;i>=0;i--){
+      const r = rockets[i];
+      r.y += r.vy*dt;
+      if(r.y <= r.ty){ explode(r); rockets.splice(i,1); }
+    }
+    for(let i=parts.length-1;i>=0;i--){
+      const p = parts[i];
+      p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 90*dt; p.life -= dt;
+      if(p.life <= 0) parts.splice(i,1);
+    }
+    let ctx = null;
+    try{ ctx = cv.getContext('2d'); }catch(e){}
+    if(ctx){
+      ctx.clearRect(0,0,cv.width,cv.height);
+      ctx.fillStyle = '#FFE9A8';
+      rockets.forEach(r => ctx.fillRect(r.x-2, r.y, 4, 16));
+      parts.forEach(p=>{
+        ctx.globalAlpha = Math.max(0, p.life/p.max);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function endGame(){
+    if(stopped) return;
+    festivalEndPanel(ui, '🎆', FW_ROUNDS + 'もん中 ' + score + '本 打ち上げたよ！', startGame);
+  }
+  function startGame(){
+    round = 0; score = 0;
+    ui.body.innerHTML = '';
+    ui.body.appendChild(card);
+    cancelAnimationFrame(raf);
+    lastTs = 0;
+    raf = requestAnimationFrame(tick);
+    nextRound();
+  }
+  startGame();
+}
+
+/* =========================================================
    THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
    noted, all shown only in ゆめのくにテーマパーク
 ========================================================= */
@@ -5609,13 +7064,21 @@ const landmarks = [
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
   { ...makeSasukeTower(26,-7), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
+  { ...makeBoatDock(1,-19.2), id:'boatride', type:'boatride', title:'こいの池の舟下り', sub:'門の英単語を選んですすもう', emoji:'🛶', bg:'7FC8D8', label:'🛶 のりこむ' },
+  { ...makeFestivalStall(-5.5,11.5,Math.PI+0.25,'goldfish'), id:'goldfish', type:'goldfish', title:'金魚すくい', sub:'おわんの ことばに あう金魚をすくおう', emoji:'🐟', bg:'7FC8D8', label:'🐟 あそぶ' },
+  { ...makeFestivalStall(5.5,12.5,Math.PI-0.25,'shooting'), id:'shooting', type:'shooting', title:'射的', sub:'えいごに あう けいひんを うとう', emoji:'🎯', bg:'FF8FA3', label:'🎯 あそぶ' },
+  { ...makeRickshawStand(-1.5,1.25), id:'rickshaw', type:'rickshaw', title:'人力車ツアー', sub:'英語ガイドと島をめぐろう', emoji:'🛺', bg:'FFB7C9', label:'🛺 のりこむ' },
+  { ...makeFireworkPad(-9.5,-16), id:'fireworks', type:'fireworks', title:'花火台', sub:'つづりを ならべて 花火を打ち上げよう', emoji:'🎆', bg:'2A2F6B', label:'🎆 打ち上げる' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride','sasuketower']);
+const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw']); // koi pond boat dock
 const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
+fireworksPadLandmark = landmarks.find(l => l.id === 'fireworks') || null;
+updateFireworksPad();
 
 /* =========================================================
    MINIMAP (2D top-down view of the island, bottom-right corner)
@@ -6407,6 +7870,10 @@ function animate(){
   updateSkyPodRide(dt);
   updateCoasterRide(dt);
   updateSasukeTowerRide(dt);
+  updateSakuraPetals(dt,t);
+  updateSakuraPond(dt,t);
+  updateBoatRide(dt);
+  updateRickshaw(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -7223,6 +8690,7 @@ function lrDraw(){
 
 interactBtn.addEventListener('pointerdown', (e)=>{
   e.preventDefault();
+  if(rideActive) return; // no new interactions while a ride is running
   // recompute fresh right now, rather than trusting any per-frame
   // snapshot — this is the single source of truth for what a click
   // should act on, so there's no chance of routing to a stale leftover
@@ -7234,6 +8702,11 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   if(closestKind === 'npc') openQuiz(closest);
   else if(closest.type === 'mazegate') enterMaze();
   else if(closest.type === 'skypod') boardSkyPod(closest);
+  else if(closest.type === 'boatride') boardBoatRide(closest);
+  else if(closest.type === 'goldfish') openGoldfish();
+  else if(closest.type === 'shooting') openShooting();
+  else if(closest.type === 'rickshaw') boardRickshaw(closest);
+  else if(closest.type === 'fireworks') openFireworks();
   else if(closest.type === 'coasterride') boardCoasterRide(closest);
   else if(closest.type === 'sasuketower') boardSasukeTower(closest);
   else openLandmark(closest);
@@ -9976,9 +11449,11 @@ updateWordPercent();
 npcs.forEach(n=>{ n.mesh.visible = (n.def.world === currentIslandId); });
 mazeGateLandmark.group.visible = (currentIslandId === 'themepark');
 themeparkDecorGroup.visible = (currentIslandId === 'themepark');
+sakuraDecorGroup.visible = (currentIslandId === 'sakura');
 landmarks.forEach(l=>{
   if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'city');
   if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'themepark');
+  if(SAKURA_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'sakura');
   if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId !== 'meadow');
 });
 document.getElementById('versionLabel').textContent = GAME_VERSION;
