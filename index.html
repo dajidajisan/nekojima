@@ -3089,13 +3089,13 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.24.0';
+const GAME_VERSION = 'v1.24.1';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
 // unlockStatusFor (used for the displayed "◯語ひつよう" text) is untouched.
 // Set back to false before shipping to real players.
-const TESTING_UNLOCK_ALL_ISLANDS = true;
+const TESTING_UNLOCK_ALL_ISLANDS = false;
 
 // unlockAt is a mastered-word-count threshold (not a level number), so it
 // stays stable even if WORDS_PER_LEVEL is tuned later.
@@ -6632,7 +6632,7 @@ sakuraDecorGroup.add(makeStoneLantern(-3.6,22.6));
 sakuraDecorGroup.add(makeStoneLantern(3.6,22.6));
 
 // --- ride state, HUD, questions ---
-const dragon = { active:false, phase:'idle', s:0, t:0, gateIdx:0, asking:false, correct:0,
+const dragon = { active:false, phase:'idle', s:0, t:0, gateIdx:0, asking:false, correct:0, hideTimer:0,
   camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(0,0,-1) };
 
 function pickDragonQuestion(){
@@ -6676,6 +6676,7 @@ function hideDragonHud(){
   if(el) el.style.display = 'none';
 }
 function askDragonQuestion(g){
+  clearTimeout(dragon.hideTimer);   // the previous answer's "hide the buttons" timer must not hide this question
   g.q = pickDragonQuestion();
   const el = getDragonHud();
   const cap = document.getElementById('rideCaption');
@@ -6724,7 +6725,8 @@ function answerDragon(side){
     g.rings[side].torus.material.color.set(0x9A9AA8);
     msg.textContent = '❌ ざんねん… ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
   }
-  setTimeout(()=>{ if(dragon.active) hideDragonHud(); }, 2000);
+  clearTimeout(dragon.hideTimer);
+  dragon.hideTimer = setTimeout(()=>{ if(dragon.active && !dragon.asking) hideDragonHud(); }, 2000);
 }
 
 function resetDragonGates(){
@@ -6751,6 +6753,7 @@ function boardDragonRide(landmark){
   rideCaption('<span style="font-size:14px;">Hold on tight! Here we go!</span><br><span style="font-size:12px; opacity:.85;">しっかり つかまってね！しゅっぱつ！</span>');
 }
 function endDragonRide(){
+  clearTimeout(dragon.hideTimer);
   dragon.active = false;
   dragon.phase = 'idle';
   rideActive = false;
@@ -6801,6 +6804,8 @@ function updateDragonRide(dt){
       askDragonQuestion(g);
     }
     if(dragon.asking){
+      const hud = document.getElementById('dragonHud');
+      if(hud && hud.style.display === 'none') hud.style.display = 'block';
       if(dist > 2.4) v *= 0.3;      // slow-motion approach
       else { v = 0; hovering = true; } // hover in front of the rings until the player answers
     }
