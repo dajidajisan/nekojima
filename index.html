@@ -2776,7 +2776,10 @@ function buildNpcRoster(){
       const [color, earColor] = NPC_COLOR_POOL[idx % NPC_COLOR_POOL.length];
       const angle = (ni / NPCS_PER_WORLD) * Math.PI * 2;
       const radius = 18 + (ni % 3) * 5;
-      const pos = [Math.round(Math.cos(angle)*radius*10)/10, 0, Math.round(Math.sin(angle)*radius*10)/10];
+      let pos = [Math.round(Math.cos(angle)*radius*10)/10, 0, Math.round(Math.sin(angle)*radius*10)/10];
+      // the sakura island's big koi lake takes up two slots of the NPC ring, so those two cats live elsewhere
+      if(world === 'sakura' && ni === 7) pos = [-17, 0, -19];
+      if(world === 'sakura' && ni === 8) pos = [13.5, 0, -20.5];
       defs.push({
         id: 'npc_'+idx,
         name: NPC_NAME_POOL[idx % NPC_NAME_POOL.length],
@@ -3086,7 +3089,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.23.0';
+const GAME_VERSION = 'v1.24.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -3111,6 +3114,7 @@ function travelToIsland(id){
   if(!island || !canActuallyTravel(island)) return;
   cancelBoatRide();
   cancelRickshaw();
+  cancelDragonRide();
   currentIslandId = id;
   inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
@@ -4995,16 +4999,17 @@ function updateSakuraPetals(dt,t){
    right English word for a Japanese meaning. Wrong answers never
    block the ride — the boat just carries on after showing the answer.
 ========================================================= */
-const BOAT_CENTER = { x:1, z:-24.5 };      // pond centre
-const POND_RX = 6, POND_RZ = 4.4;          // water ellipse radii
-const BOAT_RX = 3.6, BOAT_RZ = 2.5;        // sailing loop radii
-const BOAT_IDLE_POS = { x:1, z:-20.8 };    // where the boat waits at the dock
-const BOAT_LANDING_POS = { x:1, z:-18.5 }; // where the player steps off
+const BOAT_CENTER = { x:1, z:-26 };       // pond centre (big lake on the south side of the island)
+const POND_RX = 12, POND_RZ = 7.5;         // water ellipse radii
+const BOAT_RX = 8.5, BOAT_RZ = 4.8;        // sailing loop radii (circles the little islet in the middle)
+const BOAT_IDLE_POS = { x:-3, z:-19.7 };   // where the boat waits at the dock
+const BOAT_LANDING_POS = { x:-3, z:-16.9 };// where the player steps off
 const BOAT_GATE_FRACS = [0.25, 0.5, 0.75]; // gate positions along the loop (0..1)
 const BOAT_STOP_BEFORE = 0.04;             // stop this far (fraction) before a gate
-const BOAT_LOOP_SECONDS = 14;
+const BOAT_LOOP_SECONDS = 22;
 const BOAT_BASE_Y = 0.05;
 const BOAT_DECK_Y = 0.3;
+const BOAT_DEPART_SEC = Math.max(1.6, Math.hypot(1 - (-3), (-26 + 4.8) - (-19.7)) / 2.4);
 
 function boatPathPoint(u){
   const th = Math.PI/2 - Math.PI*2*u;
@@ -5015,48 +5020,80 @@ function boatPathHeading(u){
   return Math.atan2(BOAT_RX*Math.sin(th), -BOAT_RZ*Math.cos(th));
 }
 
-// --- pond (water, stones, lily pads, koi) ---
+// --- pond (water, stones, lily pads, koi, islet) ---
 {
   const water = new THREE.Mesh(
-    new THREE.CircleGeometry(1,48),
-    new THREE.MeshPhongMaterial({ color:0x7FC8D8, transparent:true, opacity:0.88, shininess:90, specular:0xffffff })
+    new THREE.CircleGeometry(1,72),
+    new THREE.MeshPhongMaterial({ color:0x6FC3D6, transparent:true, opacity:0.9, shininess:90, specular:0xffffff })
   );
   water.rotation.x = -Math.PI/2;
   water.scale.set(POND_RX, POND_RZ, 1);
   water.position.set(BOAT_CENTER.x, 0.05, BOAT_CENTER.z);
   sakuraDecorGroup.add(water);
+  // a paler shallow band just inside the shore gives the lake some depth
+  const shallow = new THREE.Mesh(
+    new THREE.RingGeometry(0.86,1,72),
+    new THREE.MeshBasicMaterial({ color:0xB5E6EE, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false })
+  );
+  shallow.rotation.x = -Math.PI/2;
+  shallow.scale.set(POND_RX, POND_RZ, 1);
+  shallow.position.set(BOAT_CENTER.x, 0.07, BOAT_CENTER.z);
+  sakuraDecorGroup.add(shallow);
 
-  const stoneMats = [0xA9A39A, 0x8E887F].map(c => new THREE.MeshLambertMaterial({color:c}));
-  for(let i=0;i<20;i++){
-    const a = (i/20)*Math.PI*2;
-    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28+((i*7)%5)*0.05,0), stoneMats[i%2]);
-    rock.position.set(BOAT_CENTER.x + (POND_RX+0.15)*Math.cos(a), 0.12, BOAT_CENTER.z + (POND_RZ+0.15)*Math.sin(a));
+  const stoneMats = [0xA9A39A, 0x8E887F, 0xBDB7AD].map(c => new THREE.MeshLambertMaterial({color:c}));
+  for(let i=0;i<40;i++){
+    const a = (i/40)*Math.PI*2;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28+((i*7)%5)*0.06,0), stoneMats[i%3]);
+    rock.position.set(BOAT_CENTER.x + (POND_RX+0.12)*Math.cos(a), 0.12, BOAT_CENTER.z + (POND_RZ+0.12)*Math.sin(a));
     rock.rotation.set(i,i*2,i*3);
     sakuraDecorGroup.add(rock);
   }
 
   const padMat = new THREE.MeshLambertMaterial({color:0x7BC47F, side:THREE.DoubleSide});
-  [[-4.6,1.2],[4.4,1.8],[-3.4,-2.6],[3.4,-2.8],[5.2,-0.8],[-5,-1.4],[0.5,3.5],[-1.2,-3.3]].forEach(([dx,dz],i)=>{
-    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.34,10), padMat);
+  for(let k=0;k<16;k++){
+    const a = (k/16)*Math.PI*2 + 0.25;
+    const rn = 0.88 + ((k*5)%3)*0.03;
+    const px = BOAT_CENTER.x + POND_RX*rn*Math.cos(a), pz = BOAT_CENTER.z + POND_RZ*rn*Math.sin(a);
+    const pad = new THREE.Mesh(new THREE.CircleGeometry(0.4,10), padMat);
     pad.rotation.x = -Math.PI/2;
-    pad.position.set(BOAT_CENTER.x+dx, 0.07, BOAT_CENTER.z+dz);
+    pad.position.set(px, 0.08, pz);
     sakuraDecorGroup.add(pad);
-    if(i%3===0){
-      const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.11,8,6), new THREE.MeshLambertMaterial({color:0xFFB7C9}));
+    if(k%3===0){
+      const lotus = new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6), new THREE.MeshLambertMaterial({color:0xFFB7C9}));
       lotus.scale.set(1,0.8,1);
-      lotus.position.set(BOAT_CENTER.x+dx, 0.14, BOAT_CENTER.z+dz);
+      lotus.position.set(px, 0.16, pz);
       sakuraDecorGroup.add(lotus);
     }
-  });
+  }
+
+  // little islet in the middle of the lake: grass, rocks, a sakura tree and a stone lantern
+  const grass = new THREE.Mesh(new THREE.CircleGeometry(2.3,28), new THREE.MeshLambertMaterial({color:0x9ED89A}));
+  grass.rotation.x = -Math.PI/2;
+  grass.position.set(BOAT_CENTER.x, 0.1, BOAT_CENTER.z);
+  sakuraDecorGroup.add(grass);
+  for(let i=0;i<10;i++){
+    const a = (i/10)*Math.PI*2;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42+(i%3)*0.08,0), stoneMats[i%3]);
+    rock.position.set(BOAT_CENTER.x + 2.3*Math.cos(a), 0.2, BOAT_CENTER.z + 2.3*Math.sin(a));
+    rock.rotation.set(i,i*2,i);
+    sakuraDecorGroup.add(rock);
+  }
+  sakuraDecorGroup.add(makeSakuraTree(BOAT_CENTER.x - 0.3, BOAT_CENTER.z, 1.25));
+  sakuraDecorGroup.add(makeStoneLantern(BOAT_CENTER.x + 1.2, BOAT_CENTER.z + 0.9));
 }
 
 const koiFish = [];
 [
-  { color:0xFF8A3D, rx:4.7, rz:3.4, speed: 0.45, a:0.0 },
-  { color:0xFFFFFF, rx:5.2, rz:3.8, speed:-0.38, a:2.0 },
-  { color:0xFF5A4F, rx:4.2, rz:3.0, speed: 0.32, a:4.0 },
-  { color:0xFFD873, rx:3.0, rz:1.9, speed:-0.5,  a:1.0 },
-  { color:0xFFF3E0, rx:5.0, rz:3.6, speed: 0.4,  a:5.2 },
+  { color:0xFF8A3D, rx:9.5, rz:5.9, speed: 0.30, a:0.0 },
+  { color:0xFFFFFF, rx:10.2, rz:6.3, speed:-0.26, a:2.0 },
+  { color:0xFF5A4F, rx:8.8, rz:5.4, speed: 0.22, a:4.0 },
+  { color:0xFFD873, rx:6.2, rz:3.7, speed:-0.34, a:1.0 },
+  { color:0xFFF3E0, rx:9.9, rz:6.1, speed: 0.27, a:5.2 },
+  { color:0xFF8A3D, rx:7.4, rz:4.4, speed:-0.30, a:3.1 },
+  { color:0xFFFFFF, rx:5.6, rz:3.3, speed: 0.38, a:0.8 },
+  { color:0xFF5A4F, rx:10.6, rz:6.5, speed:-0.20, a:5.9 },
+  { color:0xFFD873, rx:8.2, rz:5.0, speed: 0.33, a:2.6 },
+  { color:0xFF8A3D, rx:6.8, rz:4.0, speed:-0.24, a:4.6 },
 ].forEach(f=>{
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.3,10,8), new THREE.MeshLambertMaterial({color:f.color}));
@@ -5066,6 +5103,7 @@ const koiFish = [];
   tail.scale.set(1,1,0.4);
   tail.position.z = -0.5;
   g.add(body, tail);
+  g.scale.setScalar(1.6);
   g.position.y = 0.02;
   sakuraDecorGroup.add(g);
   koiFish.push({ mesh:g, tail, ...f });
@@ -5115,15 +5153,15 @@ function makeWaterGate(x,z,rotY){
   const g = new THREE.Group();
   const post = new THREE.MeshLambertMaterial({color:0x7A5C4A});
   const red = new THREE.MeshPhongMaterial({color:0xD9453D, shininess:40});
-  [-1.3,1.3].forEach(px=>{
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.8,8), post);
-    m.position.set(px,0.9,0);
+  [-1.8,1.8].forEach(px=>{
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.14,3.1,8), post);
+    m.position.set(px,1.55,0);
     g.add(m);
   });
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.12,0.14), red);
-  beam.position.y = 1.55;
-  const top = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.1,0.22), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
-  top.position.y = 1.72;
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(4.0,0.16,0.18), red);
+  beam.position.y = 2.75;
+  const top = new THREE.Mesh(new THREE.BoxGeometry(4.5,0.13,0.28), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+  top.position.y = 2.98;
   g.add(beam, top);
   g.position.set(x,0.05,z);
   g.rotation.y = rotY;
@@ -5298,14 +5336,14 @@ function updateBoatRide(dt){
 
   if(b.phase === 'depart'){
     const p1 = boatPathPoint(0);
-    const k = Math.min(1, b.t/1.4);
+    const k = Math.min(1, b.t/BOAT_DEPART_SEC);
     x = BOAT_IDLE_POS.x + (p1.x - BOAT_IDLE_POS.x)*k;
     z = BOAT_IDLE_POS.z + (p1.z - BOAT_IDLE_POS.z)*k;
     heading = Math.atan2(p1.x - BOAT_IDLE_POS.x, p1.z - BOAT_IDLE_POS.z);
     if(k >= 1){ b.phase = 'sail'; b.t = 0; }
   } else if(b.phase === 'return'){
     const p0 = boatPathPoint(1);
-    const k = Math.min(1, b.t/1.4);
+    const k = Math.min(1, b.t/BOAT_DEPART_SEC);
     x = p0.x + (BOAT_IDLE_POS.x - p0.x)*k;
     z = p0.z + (BOAT_IDLE_POS.z - p0.z)*k;
     heading = Math.atan2(BOAT_IDLE_POS.x - p0.x, BOAT_IDLE_POS.z - p0.z);
@@ -6287,6 +6325,521 @@ function openFireworks(){
   startGame();
 }
 
+
+/* =========================================================
+   🐉 空とぶ龍コースター (sky dragon coaster) — sakura island only.
+   The player rides a long, cute dragon along a looping 3D track: a lift
+   over the torii, a big dive, a skim across the koi lake, a vertical
+   loop and a glide home. Four times the dragon slows down in front of a
+   pair of glowing rings: it says an English word (and shows it), the two
+   rings carry Japanese meanings, and the player picks left or right.
+   The dragon steers through the chosen ring. Same scripted-ride idea as
+   the sky pod / boat / rickshaw, but in full 3D with banking and loops.
+========================================================= */
+const DRAGON_GATE_LAT = 3.4;       // how far left/right of the track the two rings sit
+const DRAGON_RING_R = 2.2;
+const DRAGON_STEP = 0.25;          // track sampling step (m)
+const DRAGON_SEG_COUNT = 12;       // body segments behind the head
+const DRAGON_SEG_SPACING = 0.95;
+const DRAGON_RIDER_BACK = 2.0;     // the rider sits this far behind the head
+const DRAGON_ASK_DIST = 15;        // start slowing / asking this far before a ring pair
+const DRAGON_LANDING = { x:0, z:21.6 };
+
+function dragonSstep(x){ x = Math.max(0, Math.min(1, x)); return x*x*(3-2*x); }
+
+const DRAGON_PATH = (function(){
+  const pts = [];
+  const add = (x,y,z) => pts.push(new THREE.Vector3(x,y,z));
+  add(0,0.95,24.5);                          // shrine pad, behind the torii
+  add(0,1.6,20.5); add(0,5.5,14.5);          // glide out and start climbing
+  add(0,11.5,7); add(0.5,19,-1.5);           // lift hill over the torii and the island
+  add(6,19.5,-8); add(14,13,-13);            // crest, then the big dive to the east
+  add(18,6.5,-19); add(13,3,-25);            // swoop down to the lake
+  add(5,2.2,-31); add(-5,2.4,-30);           // skim along the south shore
+  add(-13,5,-24); add(-19,9,-16);            // climb out over the west bank
+  add(-22.5,13,-11); add(-23,14,-7);         // level out, heading north
+  const R = 6;                               // vertical loop (heading +z)
+  for(let k=0;k<=12;k++){
+    const phi = (k/12)*Math.PI*2;
+    add(-23 + (k/12)*2, 14 + R*(1-Math.cos(phi)), -5 + R*Math.sin(phi) + (k/12)*10);
+  }
+  add(-21,14,7); add(-14,14,16);             // glide back east
+  add(-12,13,26); add(-5,9,31);              // sweep round behind the shrine
+  add(0,5,29); add(0,2.2,26.5);              // line up with the pad, heading south
+  add(0,0.95,24.5);                          // landing on the pad
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/DRAGON_STEP));
+  const step = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], U = [], Q = [];
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  // "up" vector per sample. Outside the loop it is simply the world's up (projected perpendicular to the
+  // track); through the vertical loop it is parallel-transported so it can turn upside down, and it is
+  // blended back to the upright frame right after the loop so no twist is left over.
+  const worldUp = new THREE.Vector3(0,1,0);
+  const uprightAt = (i)=>{
+    const t = T[i];
+    return worldUp.clone().sub(t.clone().multiplyScalar(worldUp.dot(t))).normalize();
+  };
+  const nearestIdx = (x,y,z)=>{
+    let best = 0, bd = 1e9;
+    for(let i=0;i<=n;i++){
+      const q = P[i];
+      const d = (q.x-x)**2 + (q.y-y)**2 + (q.z-z)**2;
+      if(d < bd){ bd = d; best = i; }
+    }
+    return best;
+  };
+  const iL0 = nearestIdx(-23,14,-5), iL1 = nearestIdx(-21,14,5);
+  const BLEND_BACK = 8, BLEND_FWD = 24;
+  for(let i=0;i<=n;i++) U.push(uprightAt(i));
+  let ut = U[iL0].clone();
+  for(let i=iL0+1;i<=Math.min(n, iL1+BLEND_FWD);i++){
+    const q = new THREE.Quaternion().setFromUnitVectors(T[i-1], T[i]);
+    ut = ut.clone().applyQuaternion(q);
+    ut.sub(T[i].clone().multiplyScalar(ut.dot(T[i]))).normalize();
+    let w = 0;
+    if(i > iL1 - BLEND_BACK) w = dragonSstep((i - (iL1 - BLEND_BACK)) / (BLEND_BACK + BLEND_FWD));
+    const ref = uprightAt(i);
+    const mixed = ut.clone().multiplyScalar(1-w).addScaledVector(ref, w);
+    mixed.sub(T[i].clone().multiplyScalar(mixed.dot(T[i]))).normalize();
+    U[i] = mixed;
+  }
+  for(let i=0;i<=n;i++){
+    // basis x axis = U x T: seen from behind the dragon (the chase camera) this points to the LEFT
+    const left = U[i].clone().cross(T[i]).normalize();
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, U[i], T[i])));
+  }
+  // banking into turns (zero while the track is nearly vertical)
+  const raw = [];
+  for(let i=0;i<=n;i++){
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const dpsi = Math.atan2(Math.sin(d), Math.cos(d));
+    const rate = dpsi / (2*step);
+    const hLen = Math.hypot(T[i].x, T[i].z);
+    raw.push(Math.max(-0.8, Math.min(0.8, -rate*6.0*hLen)));
+  }
+  const bank = raw.map((_,i)=>{
+    let sum = 0, c = 0;
+    for(let j=Math.max(0,i-10); j<=Math.min(n,i+10); j++){ sum += raw[j]; c++; }
+    return sum/c;
+  });
+  return { pts:P, T, U, Q, bank, total, step, n };
+})();
+
+const _dfTmpQ = new THREE.Quaternion();
+const _dfAxisZ = new THREE.Vector3(0,0,1);
+function dragonFrameAt(s, out){
+  out = out || { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  const P = DRAGON_PATH;
+  let bank = 0;
+  if(s <= 0){
+    out.pos.copy(P.pts[0]).addScaledVector(P.T[0], s);
+    out.q.copy(P.Q[0]);
+  } else if(s >= P.total){
+    out.pos.copy(P.pts[P.n]).addScaledVector(P.T[P.n], s - P.total);
+    out.q.copy(P.Q[P.n]);
+  } else {
+    const f = s / P.step;
+    const i = Math.min(P.n-1, Math.floor(f));
+    const k = f - i;
+    out.pos.copy(P.pts[i]).lerp(P.pts[i+1], k);
+    out.q.copy(P.Q[i]).slerp(P.Q[i+1], k);
+    bank = P.bank[i]*(1-k) + P.bank[i+1]*k;
+  }
+  _dfTmpQ.setFromAxisAngle(_dfAxisZ, bank);
+  out.q.multiply(_dfTmpQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+
+// where the four ring pairs stand: the track sample nearest to each target point
+const DRAGON_GATE_TARGETS = [[15.1,11.5,-14.5],[1.4,2.2,-30.5],[-20.3,10.5,-14.8],[-13.8,13.7,16]];
+const DRAGON_GATES = DRAGON_GATE_TARGETS.map(tg=>{
+  let best = 0, bd = 1e9;
+  for(let i=0;i<=DRAGON_PATH.n;i++){
+    const p = DRAGON_PATH.pts[i];
+    const d = (p.x-tg[0])**2 + (p.y-tg[1])**2 + (p.z-tg[2])**2;
+    if(d < bd){ bd = d; best = i; }
+  }
+  return { s: best*DRAGON_PATH.step, answered:false, latCur:0, latTarget:0, ok:null, pick:-1, q:null, rings:[], labels:[] };
+});
+
+function dragonLatAt(s){
+  let sum = 0;
+  for(let gi=0; gi<DRAGON_GATES.length; gi++){
+    const g = DRAGON_GATES[gi];
+    if(!g.latCur) continue;
+    const d = s - g.s;
+    let w = 0;
+    if(d > -4 && d < 8){
+      if(d < -0.3) w = dragonSstep((d+4)/3.7);
+      else if(d <= 0.3) w = 1;
+      else w = 1 - dragonSstep((d-0.3)/7.7);
+    }
+    sum += g.latCur * w;
+  }
+  return sum;
+}
+
+// --- the dragon itself ---
+const dragonSegs = [];
+const dragonGroup = new THREE.Group();
+sakuraDecorGroup.add(dragonGroup);
+{
+  const palette = [0xFF8FB6,0xFFB07A,0xFFD873,0xB8E986,0x6FE0C2,0x6BCBFF,0xB9A6E8];
+  for(let i=0;i<=DRAGON_SEG_COUNT;i++){
+    const r = i === 0 ? 0.7 : Math.max(0.2, 0.6 - i*0.034);
+    const col = i === 0 ? 0xFF8FB6 : palette[i % palette.length];
+    const seg = new THREE.Mesh(new THREE.SphereGeometry(r,16,12), new THREE.MeshLambertMaterial({color:col}));
+    if(i > 0){
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(r*0.5, r*1.0, 4), new THREE.MeshLambertMaterial({color: i%2 ? 0xFFD873 : 0xFF6B9D}));
+      fin.position.y = r*0.95;
+      seg.add(fin);
+    }
+    dragonGroup.add(seg);
+    dragonSegs.push(seg);
+  }
+  const head = dragonSegs[0];
+  const white = new THREE.MeshLambertMaterial({color:0xFFFFFF});
+  const dark = new THREE.MeshLambertMaterial({color:0x2A2A2A});
+  const gold = new THREE.MeshLambertMaterial({color:0xFFD873});
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.38,14,10), new THREE.MeshLambertMaterial({color:0xFFB7C9}));
+  snout.scale.set(1,0.72,1.1);
+  snout.position.set(0,-0.12,0.62);
+  head.add(snout);
+  [-1,1].forEach(side=>{
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15,10,8), white);
+    eye.position.set(side*0.32,0.2,0.5);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,6), dark);
+    pupil.position.set(side*0.32,0.2,0.63);
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.55,6), gold);
+    horn.position.set(side*0.28,0.62,-0.1);
+    horn.rotation.z = -side*0.35;
+    const whisker = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,1.1,5), white);
+    whisker.rotation.z = Math.PI/2 - side*0.25;
+    whisker.position.set(side*0.7,-0.12,0.68);
+    head.add(eye, pupil, horn, whisker);
+  });
+  for(let i=0;i<3;i++){
+    const mane = new THREE.Mesh(new THREE.ConeGeometry(0.16,0.45,5), new THREE.MeshLambertMaterial({color:0xFF6B9D}));
+    mane.position.set(0,0.62,-0.45-i*0.3);
+    mane.rotation.x = -0.6;
+    head.add(mane);
+  }
+}
+
+const _dfA = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+const _dfR = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+function layoutDragon(sHead, bobY, wiggle){
+  const nowS = performance.now()/1000;
+  for(let i=0;i<dragonSegs.length;i++){
+    const si = sHead - i*DRAGON_SEG_SPACING;
+    dragonFrameAt(si, _dfA);
+    const lat = dragonLatAt(si) + Math.sin(nowS*3.2 - i*0.7)*wiggle;
+    const m = dragonSegs[i];
+    m.position.copy(_dfA.pos).addScaledVector(_dfA.left, lat);
+    m.position.y += bobY;
+    m.quaternion.copy(_dfA.q);
+  }
+}
+function placeDragonRider(sHead, bobY){
+  dragonFrameAt(sHead - DRAGON_RIDER_BACK, _dfR);
+  const lat = dragonLatAt(sHead - DRAGON_RIDER_BACK);
+  player.position.copy(_dfR.pos).addScaledVector(_dfR.left, lat).addScaledVector(_dfR.up, 0.4);
+  player.position.y += bobY;
+  player.quaternion.copy(_dfR.q);
+}
+
+// --- ring pairs (always visible in the sky as a teaser; labels only while asking) ---
+function makeRingLabel(){
+  const c = document.createElement('canvas');
+  c.width = 320; c.height = 112;
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:false }));
+  sp.scale.set(4.2, 1.47, 1);
+  sp.renderOrder = 10;
+  sp.visible = false;
+  sp.userData.canvas = c;
+  sp.userData.tex = tex;
+  return sp;
+}
+function setRingLabel(sp, text){
+  const c = sp.userData.canvas;
+  let ctx = null;
+  try{ ctx = c.getContext('2d'); }catch(e){}
+  if(!ctx) return;
+  ctx.clearRect(0,0,c.width,c.height);
+  const w = c.width-12, h = c.height-12, x = 6, y = 6, r = 26;
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arc(x+w-r,y+r,r,-Math.PI/2,0);
+  ctx.lineTo(x+w,y+h-r); ctx.arc(x+w-r,y+h-r,r,0,Math.PI/2);
+  ctx.lineTo(x+r,y+h); ctx.arc(x+r,y+h-r,r,Math.PI/2,Math.PI);
+  ctx.lineTo(x,y+r); ctx.arc(x+r,y+r,r,Math.PI,Math.PI*1.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#4A3B5C';
+  ctx.font = '800 ' + (text.length > 8 ? 34 : 46) + 'px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, c.width/2, c.height/2+2);
+  sp.userData.tex.needsUpdate = true;
+}
+DRAGON_GATES.forEach(g=>{
+  const f = dragonFrameAt(g.s);
+  [1,-1].forEach((side,idx)=>{            // idx 0 = left ring (pink), idx 1 = right ring (blue)
+    const color = idx === 0 ? 0xFF8FB6 : 0x6BCBFF;
+    const grp = new THREE.Group();
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(DRAGON_RING_R,0.2,10,36), new THREE.MeshBasicMaterial({color}));
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(DRAGON_RING_R-0.1,28), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.16, side:THREE.DoubleSide, depthWrite:false}));
+    grp.add(torus, disc);
+    grp.position.copy(f.pos).addScaledVector(f.left, side*DRAGON_GATE_LAT).addScaledVector(f.up, 1.0);
+    grp.quaternion.copy(f.q);
+    sakuraDecorGroup.add(grp);
+    const label = makeRingLabel();
+    label.position.copy(grp.position).addScaledVector(f.up, DRAGON_RING_R + 1.1);
+    sakuraDecorGroup.add(label);
+    g.rings.push({ grp, torus, disc, color, pulse:0 });
+    g.labels.push(label);
+  });
+});
+
+// --- boarding shrine ---
+function makeDragonShrine(x,z){
+  const g = new THREE.Group();
+  const stone = new THREE.MeshLambertMaterial({color:0xB9B2A6});
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(3.0,3.2,0.16,28), stone);
+  pad.position.y = 0.08;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6,0.07,6,36), new THREE.MeshBasicMaterial({color:0xFFD873}));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.y = 0.18;
+  g.add(pad, ring);
+  const marker = makeFloatingMarker('🐉', 3.6);
+  g.add(marker);
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+sakuraDecorGroup.add(makeStoneLantern(-3.6,22.6));
+sakuraDecorGroup.add(makeStoneLantern(3.6,22.6));
+
+// --- ride state, HUD, questions ---
+const dragon = { active:false, phase:'idle', s:0, t:0, gateIdx:0, asking:false, correct:0,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(0,0,-1) };
+
+function pickDragonQuestion(){
+  const pool = VOCAB.filter(v => v.en.length <= 16 && v.ja.length <= 12);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  let other = target, guard = 0;
+  while((other.en === target.en || other.ja === target.ja) && guard++ < 200){
+    other = pool[Math.floor(Math.random()*pool.length)];
+  }
+  const options = Math.random() < 0.5 ? [target, other] : [other, target];
+  return { target, options };
+}
+function getDragonHud(){
+  let el = document.getElementById('dragonHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'dragonHud';
+  el.style.cssText = 'position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:520; width:min(94vw,480px); background:rgba(255,250,244,0.94); border-radius:22px; padding:12px 12px 14px; box-shadow:0 12px 34px rgba(0,0,0,.3); text-align:center; display:none; color:#4A3B5C;';
+  const btn = 'flex:1; min-height:62px; padding:8px 6px; font-size:17px; font-weight:800; border:0; border-radius:16px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+  el.innerHTML =
+    '<div id="dragonHudHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+    '<div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:6px 0 10px;">' +
+      '<div id="dragonHudWord" style="font-size:26px; font-weight:800;"></div>' +
+      '<button id="dragonHudSound" style="width:44px; height:44px; border:0; border-radius:22px; background:#EFE7F5; font-size:20px; cursor:pointer;">🔊</button>' +
+    '</div>' +
+    '<div style="display:flex; gap:10px;">' +
+      '<button id="dragonOpt0" style="'+btn+' background:#FFD1E3;"></button>' +
+      '<button id="dragonOpt1" style="'+btn+' background:#CBEBFF;"></button>' +
+    '</div>' +
+    '<div id="dragonHudMsg" style="min-height:18px; margin-top:8px; font-size:13px; font-weight:800;"></div>';
+  document.body.appendChild(el);
+  [0,1].forEach(i => el.querySelector('#dragonOpt'+i).addEventListener('click', ()=> answerDragon(i)));
+  el.querySelector('#dragonHudSound').addEventListener('click', ()=>{
+    const g = DRAGON_GATES[dragon.gateIdx];
+    if(g && g.q){ try{ speakEnglish(g.q.target.en); }catch(e){} }
+  });
+  return el;
+}
+function hideDragonHud(){
+  const el = document.getElementById('dragonHud');
+  if(el) el.style.display = 'none';
+}
+function askDragonQuestion(g){
+  g.q = pickDragonQuestion();
+  const el = getDragonHud();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  el.querySelector('#dragonHudHead').textContent = '🐉 リング ' + (dragon.gateIdx+1) + '/' + DRAGON_GATES.length + '　えいごに あう りんを えらぼう！';
+  el.querySelector('#dragonHudWord').textContent = g.q.target.en;
+  [0,1].forEach(i=>{
+    const b = el.querySelector('#dragonOpt'+i);
+    const ja = g.q.options[i].ja;
+    b.textContent = (i === 0 ? '◀ ' : '') + ja + (i === 1 ? ' ▶' : '');
+    b.style.fontSize = ja.length > 7 ? '14px' : '17px';
+    b.disabled = false;
+    b.style.outline = 'none';
+    setRingLabel(g.labels[i], ja);
+    g.labels[i].visible = true;
+  });
+  el.querySelector('#dragonHudMsg').textContent = '';
+  el.style.display = 'block';
+  try{ speakEnglish(g.q.target.en); }catch(e){}
+}
+function answerDragon(side){
+  if(!dragon.active || !dragon.asking) return;
+  const g = DRAGON_GATES[dragon.gateIdx];
+  if(!g || g.answered) return;
+  g.answered = true;
+  dragon.asking = false;
+  g.pick = side;
+  g.latTarget = (side === 0 ? 1 : -1) * DRAGON_GATE_LAT;   // + = toward the left ring
+  g.ok = (g.q.options[side].en === g.q.target.en);
+  const el = getDragonHud();
+  const msg = el.querySelector('#dragonHudMsg');
+  [0,1].forEach(i=>{
+    const b = el.querySelector('#dragonOpt'+i);
+    b.disabled = true;
+    if(g.q.options[i].en === g.q.target.en) b.style.outline = '4px solid #6BD48A';
+  });
+  g.rings[side].pulse = 0.7;
+  if(g.ok){
+    dragon.correct++;
+    addCoins(1);
+    playCorrectSound();
+    g.rings[side].torus.material.color.set(0xFFD873);
+    msg.textContent = '⭕ せいかい！ ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+  } else {
+    playWrongSound();
+    g.rings[side].torus.material.color.set(0x9A9AA8);
+    msg.textContent = '❌ ざんねん… ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+  }
+  setTimeout(()=>{ if(dragon.active) hideDragonHud(); }, 2000);
+}
+
+function resetDragonGates(){
+  DRAGON_GATES.forEach(g=>{
+    g.answered = false; g.latCur = 0; g.latTarget = 0; g.ok = null; g.pick = -1; g.q = null;
+    g.rings.forEach(r => { r.torus.material.color.set(r.color); r.pulse = 0; r.grp.scale.set(1,1,1); });
+    g.labels.forEach(l => { l.visible = false; });
+  });
+}
+function parkDragon(){
+  layoutDragon(0, 0, 0);
+  player.quaternion.identity();
+}
+
+function boardDragonRide(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  resetDragonGates();
+  Object.assign(dragon, { active:true, phase:'fly', s:0, t:0, gateIdx:0, asking:false, correct:0 });
+  dragon.camDir.set(0,0,-1);
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  rideCaption('<span style="font-size:14px;">Hold on tight! Here we go!</span><br><span style="font-size:12px; opacity:.85;">しっかり つかまってね！しゅっぱつ！</span>');
+}
+function endDragonRide(){
+  dragon.active = false;
+  dragon.phase = 'idle';
+  rideActive = false;
+  hideDragonHud();
+  resetDragonGates();
+  const cap = document.getElementById('rideCaption');
+  if(cap) cap.style.opacity = '0';
+  parkDragon();
+  player.position.set(DRAGON_LANDING.x, 0, DRAGON_LANDING.z);
+  player.rotation.set(0, Math.PI, 0);
+  camera.position.set(DRAGON_LANDING.x, 2.6, DRAGON_LANDING.z + 6.8);
+}
+function cancelDragonRide(){
+  if(!dragon.active) return;
+  endDragonRide();
+}
+function finishDragonRide(){
+  const total = DRAGON_GATES.length;
+  const correct = dragon.correct;
+  const bonus = (correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endDragonRide();
+  saveProgress();
+  showToast('🐉 空の旅、おつかれさま！ ' + total + 'もん中' + correct + 'もん せいかい　+' + (correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+
+function dragonSpeedAt(y){
+  return Math.max(4.5, Math.min(13, 5 + 1.8*Math.sqrt(Math.max(0, 22 - y))));
+}
+function updateDragonRide(dt){
+  const nowS = performance.now()/1000;
+  if(!dragon.active){
+    if(sakuraDecorGroup.visible){
+      layoutDragon(0, Math.sin(nowS*1.6)*0.08, 0.05);
+      DRAGON_GATES.forEach(g => g.rings.forEach(r => { r.torus.rotation.z = nowS*0.6; }));
+    }
+    return;
+  }
+  dragon.t += dt;
+  const g = DRAGON_GATES[dragon.gateIdx];
+  dragonFrameAt(dragon.s, _dfA);
+  let v = dragonSpeedAt(_dfA.pos.y) * Math.min(1, 0.3 + dragon.t/3.5);
+  let hovering = false;
+  if(g && !g.answered){
+    const dist = g.s - dragon.s;
+    if(dist < DRAGON_ASK_DIST && !dragon.asking){
+      dragon.asking = true;
+      askDragonQuestion(g);
+    }
+    if(dragon.asking){
+      if(dist > 2.4) v *= 0.3;      // slow-motion approach
+      else { v = 0; hovering = true; } // hover in front of the rings until the player answers
+    }
+  }
+  dragon.s += v*dt;
+  if(g && g.answered && dragon.s > g.s + 10){
+    g.labels.forEach(l => { l.visible = false; });
+    dragon.gateIdx++;
+  }
+  const k = 1 - Math.exp(-dt*3.2);
+  DRAGON_GATES.forEach(gg=>{
+    gg.latCur += (gg.latTarget - gg.latCur)*k;
+    gg.rings.forEach(r=>{
+      if(r.pulse > 0){
+        r.pulse = Math.max(0, r.pulse - dt);
+        const sc = 1 + Math.sin((r.pulse/0.7)*Math.PI)*0.35;
+        r.grp.scale.set(sc,sc,sc);
+      }
+    });
+  });
+  if(dragon.s >= DRAGON_PATH.total - 0.05){ finishDragonRide(); return; }
+  const bobY = hovering ? Math.sin(nowS*4)*0.12 : 0;
+  layoutDragon(dragon.s, bobY, 0.12);
+  placeDragonRider(dragon.s, bobY);
+  // chase camera: behind the rider along the (smoothed) horizontal heading
+  dragonFrameAt(dragon.s - DRAGON_RIDER_BACK, _dfR);
+  const hl = Math.hypot(_dfR.fwd.x, _dfR.fwd.z);
+  if(hl > 0.35){
+    const kk = 1 - Math.exp(-dt*2.2);
+    dragon.camDir.x += (_dfR.fwd.x/hl - dragon.camDir.x)*kk;
+    dragon.camDir.z += (_dfR.fwd.z/hl - dragon.camDir.z)*kk;
+    const L = Math.hypot(dragon.camDir.x, dragon.camDir.z) || 1;
+    dragon.camDir.x /= L; dragon.camDir.z /= L;
+  }
+  const rp = player.position;
+  dragon.camPos.set(rp.x - dragon.camDir.x*8.5, rp.y + 3.6, rp.z - dragon.camDir.z*8.5);
+  dragon.camLook.set(rp.x + dragon.camDir.x*2.5, rp.y + 0.8, rp.z + dragon.camDir.z*2.5);
+}
+
 /* =========================================================
    THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
    noted, all shown only in ゆめのくにテーマパーク
@@ -7064,17 +7617,18 @@ const landmarks = [
   { ...makeHorrorHouse(-18,-16), id:'horror', type:'horror', title:'ハウス・オブ・ホラー', sub:'ちょっと怖いお話を聞く', emoji:'👻', bg:'3A2F55', label:'👻 中に入る' },
   { ...makePandaMascot(15,-4), id:'panda', type:'panda', title:'パンダのプーちゃん', sub:'あいさつしてみよう', emoji:'🐼', bg:'2A2A2A', label:'🐼 あいさつする' },
   { ...makeSasukeTower(26,-7), id:'sasuketower', type:'sasuketower', title:'サスケタワー', sub:'てっぺんまでのぼって景色を楽しもう', emoji:'🏆', bg:'FF6B6B', label:'🏆 のぼる' },
-  { ...makeBoatDock(1,-19.2), id:'boatride', type:'boatride', title:'こいの池の舟下り', sub:'門の英単語を選んですすもう', emoji:'🛶', bg:'7FC8D8', label:'🛶 のりこむ' },
+  { ...makeBoatDock(-3,-18.2), id:'boatride', type:'boatride', title:'こいの池の舟下り', sub:'門の英単語を選んですすもう', emoji:'🛶', bg:'7FC8D8', label:'🛶 のりこむ' },
   { ...makeFestivalStall(-5.5,11.5,Math.PI+0.25,'goldfish'), id:'goldfish', type:'goldfish', title:'金魚すくい', sub:'おわんの ことばに あう金魚をすくおう', emoji:'🐟', bg:'7FC8D8', label:'🐟 あそぶ' },
   { ...makeFestivalStall(5.5,12.5,Math.PI-0.25,'shooting'), id:'shooting', type:'shooting', title:'射的', sub:'えいごに あう けいひんを うとう', emoji:'🎯', bg:'FF8FA3', label:'🎯 あそぶ' },
   { ...makeRickshawStand(-1.5,1.25), id:'rickshaw', type:'rickshaw', title:'人力車ツアー', sub:'英語ガイドと島をめぐろう', emoji:'🛺', bg:'FFB7C9', label:'🛺 のりこむ' },
   { ...makeFireworkPad(-9.5,-16), id:'fireworks', type:'fireworks', title:'花火台', sub:'つづりを ならべて 花火を打ち上げよう', emoji:'🎆', bg:'2A2F6B', label:'🎆 打ち上げる' },
+  { ...makeDragonShrine(0,24.5), id:'skydragon', type:'skydragon', title:'空とぶ龍コースター', sub:'龍にのって そらを とぼう', emoji:'🐉', bg:'FF8FB6', label:'🐉 のりこむ' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride','sasuketower']);
-const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw']); // koi pond boat dock
+const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw','skydragon']); // koi pond boat dock
 const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
 fireworksPadLandmark = landmarks.find(l => l.id === 'fireworks') || null;
@@ -7874,6 +8428,7 @@ function animate(){
   updateSakuraPond(dt,t);
   updateBoatRide(dt);
   updateRickshaw(dt);
+  updateDragonRide(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -7903,10 +8458,17 @@ function animate(){
     camHeight,
     Math.cos(playerFacing) * -camDist
   );
-  const desiredCamPos = player.position.clone().add(camOffset);
-  camera.position.lerp(desiredCamPos, 1 - Math.pow(0.001, dt));
+  let desiredCamPos = player.position.clone().add(camOffset);
+  let camLerp = 1 - Math.pow(0.001, dt);
   const lookHeight = inMazeMode ? 1.3 : 1.1;
-  const lookTarget = player.position.clone().add(new THREE.Vector3(0,lookHeight,0));
+  let lookTarget = player.position.clone().add(new THREE.Vector3(0,lookHeight,0));
+  if(dragon.active){
+    // sky dragon ride: chase camera computed by updateDragonRide
+    desiredCamPos = dragon.camPos.clone();
+    lookTarget = dragon.camLook.clone();
+    camLerp = 1 - Math.pow(0.00002, dt);
+  }
+  camera.position.lerp(desiredCamPos, camLerp);
   camera.lookAt(lookTarget);
 
   renderer.render(scene, camera);
@@ -8707,6 +9269,7 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   else if(closest.type === 'shooting') openShooting();
   else if(closest.type === 'rickshaw') boardRickshaw(closest);
   else if(closest.type === 'fireworks') openFireworks();
+  else if(closest.type === 'skydragon') boardDragonRide(closest);
   else if(closest.type === 'coasterride') boardCoasterRide(closest);
   else if(closest.type === 'sasuketower') boardSasukeTower(closest);
   else openLandmark(closest);
