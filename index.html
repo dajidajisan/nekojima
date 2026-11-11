@@ -3095,7 +3095,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.28.0';
+const GAME_VERSION = 'v1.29.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -3123,6 +3123,7 @@ function travelToIsland(id){
   cancelDragonRide();
   cancelSleigh();
   cancelSled();
+  cancelAuroraFlight();
   currentIslandId = id;
   inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
@@ -6137,8 +6138,10 @@ function updateRickshaw(dt){
 ========================================================= */
 var fireworksPadLandmark = null;
 function updateFireworksPad(){
-  if(!fireworksPadLandmark) return;
-  fireworksPadLandmark.group.visible = (currentIslandId === 'sakura' && isNight);
+  if(fireworksPadLandmark) fireworksPadLandmark.group.visible = (currentIslandId === 'sakura' && isNight);
+  const iceNight = (currentIslandId === 'ice' && isNight);
+  if(auroraPadLandmark) auroraPadLandmark.group.visible = iceNight;
+  if(auroraCraft && !af.active) auroraCraft.visible = iceNight;
 }
 function makeFireworkPad(x,z){
   const g = new THREE.Group();
@@ -7073,6 +7076,7 @@ const iceSnowPhase = [];
 let iceAuroraMat = null;
 let iceAuroraTex = null;
 let iceAuroraLevel = 0;
+let iceAuroraBoost = false;      // forced bright while the aurora flight is running
 (function(){
   const c = document.createElement('canvas');
   c.width = 512; c.height = 256;
@@ -7118,7 +7122,7 @@ function updateIceDecor(dt,t){
   }
   if(icePalaceFlake) icePalaceFlake.rotation.z = t*0.4;
   if(iceAuroraMat){
-    const target = isNight ? 0.85 : 0;
+    const target = iceAuroraBoost ? 1.0 : (isNight ? 0.85 : 0);
     iceAuroraLevel += (target - iceAuroraLevel) * (1 - Math.exp(-dt*1.5));
     iceAuroraTex.offset.x = (t*0.01) % 1;
     iceAuroraMat.opacity = iceAuroraLevel * (0.85 + 0.15*Math.sin(t*0.7));   // slow shimmer (does not feed back into the level)
@@ -8047,6 +8051,372 @@ function openSnowmanBuild(){
 }
 
 
+
+/* =========================================================
+   🌌 オーロラ飛行 (aurora flight) — ice island, night only. The player
+   stands on a glowing snowflake and sweeps twice around the island, up
+   among the aurora, at speed (the camera's field of view widens as it
+   accelerates). Six times a row of three glowing orbs is waiting: the
+   guide says an English word (the HUD shows it), the orbs carry Japanese
+   meanings, and you have a few seconds to slide into the right lane
+   (tap ◀ ▲ ▶). Real-time: no waiting, the flight never stops.
+========================================================= */
+var auroraCraft = null;
+var auroraPadLandmark = null;
+const AF_STATION = { x:-18, z:-7 };
+const AF_LANDING = { x:-18, z:-10 };
+const AF_STEP = 0.5;
+const AF_LANE = 3.6;
+const AF_SPEED = 11;
+const AF_ASK_DIST = 40;
+
+const AF_PATH = (function(){
+  const pts = [];
+  const add = (x,y,z) => pts.push(new THREE.Vector3(x,y,z));
+  const x0 = AF_STATION.x, z0 = AF_STATION.z, r0 = Math.hypot(x0,z0), th0 = Math.atan2(z0,x0);
+  const M = 120, sweep = Math.PI*4;                          // two laps, counter-clockwise
+  add(x0, 0.9, z0);
+  for(let k=1;k<=M;k++){
+    const f = k/M, th = th0 + sweep*f;
+    const ramp = dragonSstep(Math.min(1, f/0.2));
+    let r = r0 + (36 - r0)*ramp + 4*Math.sin(6*Math.PI*f)*ramp;
+    let y = 0.9 + 24*dragonSstep(Math.min(1, f/0.22)) + 4*Math.sin(8*Math.PI*f)*ramp;
+    if(f > 0.88){ const g = (f-0.88)/0.12; r = r*(1-g) + r0*g; y = y*(1-g*g) + 0.9*g*g; }
+    add(r*Math.cos(th), y, r*Math.sin(th));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/AF_STEP));
+  const step = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], Q = [], raw = [];
+  const worldUp = new THREE.Vector3(0,1,0);
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  for(let i=0;i<=n;i++){
+    const u = worldUp.clone().sub(T[i].clone().multiplyScalar(worldUp.dot(T[i]))).normalize();
+    const left = u.clone().cross(T[i]).normalize();
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, u, T[i])));
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const rate = Math.atan2(Math.sin(d), Math.cos(d)) / (2*step);
+    raw.push(Math.max(-0.7, Math.min(0.7, -rate*9.0*Math.hypot(T[i].x, T[i].z))));
+  }
+  const bank = raw.map((_,i)=>{ let sum = 0, c = 0; for(let j=Math.max(0,i-8); j<=Math.min(n,i+8); j++){ sum += raw[j]; c++; } return sum/c; });
+  return { pts:P, T, Q, bank, total, step, n };
+})();
+
+const _afTmpQ = new THREE.Quaternion();
+const _afAxisZ = new THREE.Vector3(0,0,1);
+function afFrameAt(s, out){
+  out = out || { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  const P = AF_PATH;
+  let bank = 0;
+  if(s <= 0){ out.pos.copy(P.pts[0]).addScaledVector(P.T[0], s); out.q.copy(P.Q[0]); }
+  else if(s >= P.total){ out.pos.copy(P.pts[P.n]).addScaledVector(P.T[P.n], s - P.total); out.q.copy(P.Q[P.n]); }
+  else {
+    const f = s / P.step, i = Math.min(P.n-1, Math.floor(f)), k = f - i;
+    out.pos.copy(P.pts[i]).lerp(P.pts[i+1], k);
+    out.q.copy(P.Q[i]).slerp(P.Q[i+1], k);
+    bank = P.bank[i]*(1-k) + P.bank[i+1]*k;
+  }
+  _afTmpQ.setFromAxisAngle(_afAxisZ, bank);
+  out.q.multiply(_afTmpQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+
+// --- the glowing snowflake the player rides ---
+auroraCraft = new THREE.Group();
+{
+  const glow = new THREE.MeshPhongMaterial({ color:0xBFE9FF, shininess:120, emissive:0x6FC3FF, emissiveIntensity:0.6 });
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,0.14,24), glow); disc.position.y = 0.07;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.35,0.07,8,28), new THREE.MeshBasicMaterial({color:0xFFFFFF})); ring.rotation.x = Math.PI/2; ring.position.y = 0.1;
+  auroraCraft.add(disc, ring);
+  [0,Math.PI/3,Math.PI*2/3].forEach(a=>{
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.09,0.2), new THREE.MeshBasicMaterial({color:0xE6F7FF}));
+    arm.rotation.y = a; arm.position.y = 0.06; auroraCraft.add(arm);
+  });
+}
+auroraCraft.position.set(AF_STATION.x, 1.1, AF_STATION.z);
+auroraCraft.quaternion.copy(AF_PATH.Q[0]);
+auroraCraft.visible = false;
+iceDecorGroup.add(auroraCraft);
+
+// sparkle dust scattered along the flight path + a glittering trail behind the craft
+const afDust = (function(){
+  const n = 360, pos = new Float32Array(n*3);
+  const fr = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  for(let i=0;i<n;i++){
+    afFrameAt(Math.random()*AF_PATH.total, fr);
+    pos[i*3]   = fr.pos.x + (Math.random()-0.5)*16;
+    pos[i*3+1] = fr.pos.y + (Math.random()-0.5)*10;
+    pos[i*3+2] = fr.pos.z + (Math.random()-0.5)*16;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xCFF3FF, size:0.45, transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.visible = false;
+  iceDecorGroup.add(pts);
+  return pts;
+})();
+const AF_TRAIL_N = 44;
+const afTrail = (function(){
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(AF_TRAIL_N*3),3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xBFE9FF, size:0.5, transparent:true, opacity:0.9, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.visible = false;
+  iceDecorGroup.add(pts);
+  return pts;
+})();
+
+// --- the six rows of glowing orbs ---
+const AF_GATES = [0.22,0.34,0.46,0.58,0.70,0.82].map(f=>({ s:f*AF_PATH.total, asked:false, done:false, q:null, orbs:[], labels:[] }));
+const AF_ORB_COLORS = [0xFF8FB6, 0xFFE08A, 0x6BCBFF];     // left, centre, right
+AF_GATES.forEach(g=>{
+  const fr = afFrameAt(g.s);
+  for(let lane=0; lane<3; lane++){
+    const grp = new THREE.Group();
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.9,16,12), new THREE.MeshBasicMaterial({ color:AF_ORB_COLORS[lane] }));
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.55,0.12,8,30), new THREE.MeshBasicMaterial({ color:AF_ORB_COLORS[lane] }));
+    grp.add(orb, halo);
+    grp.position.copy(fr.pos).addScaledVector(fr.left, (1-lane)*AF_LANE).addScaledVector(fr.up, 1.2);
+    grp.quaternion.copy(fr.q);
+    grp.visible = false;
+    iceDecorGroup.add(grp);
+    const label = makeRingLabel();
+    label.position.copy(grp.position).addScaledVector(fr.up, 2.9);
+    iceDecorGroup.add(label);
+    g.orbs.push({ grp, orb, halo, color:AF_ORB_COLORS[lane], pulse:0 });
+    g.labels.push(label);
+  }
+});
+
+// --- launch pad (landmark; only appears at night) ---
+function makeAuroraPad(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.4,0.16,24), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:100, emissive:0x3A8FD0, emissiveIntensity:0.3}));
+  pad.position.y = 0.08;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9,0.06,6,32), new THREE.MeshBasicMaterial({color:0x9FE8FF})); ring.rotation.x = -Math.PI/2; ring.position.y = 0.2;
+  g.add(pad, ring);
+  const marker = makeFloatingMarker('🌌', 3.0);
+  g.add(marker, makeBlobShadow(1.8));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// --- ride state + HUD (always on screen during the flight, so nothing can hide a question) ---
+const af = { active:false, s:0, t:0, lat:0, laneTarget:1, gateIdx:0, correct:0, shake:0, fovBase:52,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(1,0,0), feedbackUntil:0 };
+const _afA = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+const _afT = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+
+function getAfHud(){
+  let el = document.getElementById('afHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'afHud';
+  el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+  const laneCss = 'flex:1; min-height:68px; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+  el.innerHTML =
+    '<div id="afTop" style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+      '<div id="afHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+      '<div style="display:flex; align-items:center; justify-content:center; gap:10px;">' +
+        '<div id="afWord" style="font-size:26px; font-weight:800;"></div>' +
+        '<button id="afSound" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button>' +
+      '</div>' +
+      '<div id="afMsg" style="min-height:18px; font-size:13px; font-weight:800;"></div>' +
+    '</div>' +
+    '<div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; gap:8px;">' +
+      '<button id="afLane0" style="'+laneCss+' background:#FFD1E3;"></button>' +
+      '<button id="afLane1" style="'+laneCss+' background:#FFF0B8;"></button>' +
+      '<button id="afLane2" style="'+laneCss+' background:#CBEBFF;"></button>' +
+    '</div>';
+  document.body.appendChild(el);
+  [0,1,2].forEach(i => el.querySelector('#afLane'+i).addEventListener('pointerdown', (e)=>{ e.preventDefault(); af.laneTarget = i; refreshAfLaneButtons(); }));
+  el.querySelector('#afSound').addEventListener('click', ()=>{
+    const g = AF_GATES.find(x => x.asked && !x.done) || AF_GATES[af.gateIdx];
+    if(g && g.q){ try{ speakEnglish(g.q.target.en); }catch(e){} }
+  });
+  return el;
+}
+function refreshAfLaneButtons(){
+  const el = document.getElementById('afHud'); if(!el) return;
+  [0,1,2].forEach(i => { el.querySelector('#afLane'+i).style.outline = (af.laneTarget === i) ? '4px solid #4A3B5C' : 'none'; });
+}
+function hideAfHud(){ const el = document.getElementById('afHud'); if(el) el.style.display = 'none'; }
+function pickAfQuestion(){
+  const pool = VOCAB.filter(v => v.en.length <= 12 && v.ja.length <= 9);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  const opts = [target];
+  let guard = 0;
+  while(opts.length < 3 && guard++ < 300){
+    const c = pool[Math.floor(Math.random()*pool.length)];
+    if(opts.some(o => o.en === c.en || o.ja === c.ja)) continue;
+    opts.push(c);
+  }
+  for(let i=opts.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [opts[i],opts[j]] = [opts[j],opts[i]]; }
+  return { target, options:opts };
+}
+function setAfLaneLabels(opts){
+  const el = getAfHud();
+  const arrows = ['◀ ','▲ ','▶ '];
+  [0,1,2].forEach(i=>{
+    const b = el.querySelector('#afLane'+i);
+    b.textContent = opts ? (arrows[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i];
+    b.style.fontSize = (opts && opts[i].ja.length > 5) ? '14px' : '17px';
+  });
+}
+function askAfQuestion(g, idx){
+  g.asked = true;
+  g.q = pickAfQuestion();
+  const el = getAfHud();
+  el.querySelector('#afHead').textContent = '🌌 ' + (idx+1) + '/' + AF_GATES.length + '　この えいごの いみの レーンへ！';
+  el.querySelector('#afWord').textContent = g.q.target.en;
+  el.querySelector('#afMsg').textContent = '';
+  setAfLaneLabels(g.q.options);
+  for(let lane=0; lane<3; lane++){ setRingLabel(g.labels[lane], g.q.options[lane].ja); g.labels[lane].visible = true; g.orbs[lane].grp.visible = true; }
+  try{ speakEnglish(g.q.target.en); }catch(e){}
+}
+function resolveAfGate(g){
+  g.done = true;
+  const lane = Math.max(0, Math.min(2, 1 - Math.round(af.lat/AF_LANE)));
+  const ok = (g.q.options[lane].en === g.q.target.en);
+  const el = getAfHud(), msg = el.querySelector('#afMsg');
+  g.orbs[lane].pulse = 0.8;
+  if(ok){
+    af.correct++; addCoins(1); playCorrectSound();
+    g.orbs[lane].orb.material.color.set(0xFFFFFF);
+    msg.textContent = '⭕ ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+    try{ speakEnglish(g.q.target.en); }catch(e){}
+  } else {
+    playWrongSound(); af.shake = 0.5;
+    g.orbs[lane].orb.material.color.set(0x7C7C8C);
+    msg.textContent = '❌ こたえは「' + g.q.target.ja + '」';
+  }
+  setAfLaneLabels(null);
+  setTimeout(()=>{ g.labels.forEach(l => { l.visible = false; }); g.orbs.forEach(o => { o.grp.visible = false; }); }, 900);
+}
+function resetAfGates(){
+  AF_GATES.forEach(g=>{
+    g.asked = false; g.done = false; g.q = null;
+    g.labels.forEach(l => { l.visible = false; });
+    g.orbs.forEach(o => { o.grp.visible = false; o.orb.material.color.set(o.color); o.pulse = 0; o.grp.scale.set(1,1,1); });
+  });
+}
+function parkAuroraCraft(){
+  auroraCraft.position.set(AF_STATION.x, 1.1, AF_STATION.z);
+  auroraCraft.quaternion.copy(AF_PATH.Q[0]);
+  player.quaternion.identity();
+}
+function boardAuroraFlight(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  resetAfGates();
+  Object.assign(af, { active:true, s:0, t:0, lat:0, laneTarget:1, gateIdx:0, correct:0, shake:0 });
+  af.camDir.set(AF_PATH.T[0].x, 0, AF_PATH.T[0].z).normalize();
+  iceAuroraBoost = true;
+  afDust.visible = true; afTrail.visible = true;
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  const el = getAfHud();
+  el.querySelector('#afHead').textContent = '🌌 オーロラ飛行';
+  el.querySelector('#afWord').textContent = 'Ready…';
+  el.querySelector('#afMsg').textContent = 'つぎの もんだいを まっていてね';
+  setAfLaneLabels(null);
+  refreshAfLaneButtons();
+  el.style.display = 'block';
+}
+function endAuroraFlight(){
+  af.active = false;
+  rideActive = false;
+  iceAuroraBoost = false;
+  afDust.visible = false; afTrail.visible = false;
+  hideAfHud();
+  resetAfGates();
+  parkAuroraCraft();
+  player.position.set(AF_LANDING.x, 0, AF_LANDING.z);
+  player.rotation.set(0, 0, 0);
+  camera.fov = af.fovBase; camera.updateProjectionMatrix();
+  camera.position.set(AF_LANDING.x, 2.6, AF_LANDING.z - 6.8);
+}
+function cancelAuroraFlight(){ if(af.active) endAuroraFlight(); }
+function finishAuroraFlight(){
+  const total = AF_GATES.length, correct = af.correct;
+  const bonus = (correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endAuroraFlight();
+  saveProgress();
+  showToast('🌌 オーロラ飛行、おつかれさま！ ' + total + 'もん中' + correct + 'もん せいかい　+' + (correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+function updateAuroraFlight(dt){
+  const nowS = performance.now()/1000;
+  if(!af.active){
+    if(auroraCraft.visible){ auroraCraft.position.y = 1.1 + Math.sin(nowS*1.8)*0.12; auroraCraft.rotation.y += dt*0.4; }
+    return;
+  }
+  af.t += dt;
+  // speed: accelerate off the pad, brake for the landing
+  let v = AF_SPEED * Math.min(1, 0.25 + af.t/3);
+  const left = AF_PATH.total - af.s;
+  if(left < 30) v *= Math.max(0.35, left/30);
+  af.s += v*dt;
+  if(af.s >= AF_PATH.total - 0.05){ finishAuroraFlight(); return; }
+  // lane steering
+  const latTarget = (1 - af.laneTarget) * AF_LANE;
+  af.lat += (latTarget - af.lat) * (1 - Math.exp(-dt*5));
+  // ask / resolve the orb rows
+  AF_GATES.forEach((g,i)=>{
+    if(!g.asked && g.s - af.s < AF_ASK_DIST && g.s - af.s > 0){ askAfQuestion(g, i); af.gateIdx = i; }
+    if(g.asked && !g.done && af.s >= g.s) resolveAfGate(g);
+    g.orbs.forEach(o=>{
+      if(o.pulse > 0){ o.pulse = Math.max(0, o.pulse - dt); const sc = 1 + Math.sin((o.pulse/0.8)*Math.PI)*0.6; o.grp.scale.set(sc,sc,sc); }
+      if(o.grp.visible) o.halo.rotation.z += dt*1.5;
+    });
+  });
+  // pose the craft and the rider
+  afFrameAt(af.s, _afA);
+  auroraCraft.position.copy(_afA.pos).addScaledVector(_afA.left, af.lat);
+  auroraCraft.quaternion.copy(_afA.q);
+  player.position.copy(auroraCraft.position).addScaledVector(_afA.up, 0.15);
+  player.quaternion.copy(_afA.q);
+  // glittering trail
+  const tp = afTrail.geometry.attributes.position.array;
+  for(let i=0;i<AF_TRAIL_N;i++){
+    afFrameAt(af.s - 0.5 - i*0.45, _afT);
+    tp[i*3]   = _afT.pos.x + _afT.left.x*af.lat + (Math.random()-0.5)*0.3;
+    tp[i*3+1] = _afT.pos.y + _afT.left.y*af.lat + (Math.random()-0.5)*0.3;
+    tp[i*3+2] = _afT.pos.z + _afT.left.z*af.lat + (Math.random()-0.5)*0.3;
+  }
+  afTrail.geometry.attributes.position.needsUpdate = true;
+  // chase camera: close behind, field of view widens with speed
+  const hl = Math.hypot(_afA.fwd.x, _afA.fwd.z);
+  if(hl > 0.35){
+    const kk = 1 - Math.exp(-dt*3);
+    af.camDir.x += (_afA.fwd.x/hl - af.camDir.x)*kk;
+    af.camDir.z += (_afA.fwd.z/hl - af.camDir.z)*kk;
+    const L = Math.hypot(af.camDir.x, af.camDir.z) || 1;
+    af.camDir.x /= L; af.camDir.z /= L;
+  }
+  const rp = player.position;
+  af.camPos.set(rp.x - af.camDir.x*7.5, rp.y + 2.8, rp.z - af.camDir.z*7.5);
+  af.camLook.set(rp.x + af.camDir.x*3 + _afA.fwd.x*2, rp.y + 0.9 + _afA.fwd.y*2.5, rp.z + af.camDir.z*3 + _afA.fwd.z*2);
+  if(af.shake > 0){
+    af.shake = Math.max(0, af.shake - dt);
+    af.camPos.x += (Math.random()-0.5)*0.5*af.shake*2; af.camPos.y += (Math.random()-0.5)*0.5*af.shake*2;
+  }
+  const speedFrac = Math.min(1, v/AF_SPEED);
+  camera.fov += ((af.fovBase + 16*speedFrac) - camera.fov) * (1 - Math.exp(-dt*4));
+  camera.updateProjectionMatrix();
+}
+
 /* =========================================================
    THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
    noted, all shown only in ゆめのくにテーマパーク
@@ -8833,6 +9203,7 @@ const landmarks = [
   { ...makeSleighStand(-4,1), id:'sleigh', type:'sleigh', title:'トナカイそりツアー', sub:'英語ガイドと雪の島をめぐろう', emoji:'🦌', bg:'9FD8F5', label:'🦌 のりこむ' },
   { ...makeSnowWorkshop(4,1), id:'snowbuild', type:'snowbuild', title:'ゆきだるまづくり', sub:'英語を聞いて ゆきだるまを つくろう', emoji:'⛄', bg:'DDEFFB', label:'⛄ あそぶ' },
   { ...makeSledStation(18,-9.2), id:'sledrun', type:'sledrun', title:'そりコースター', sub:'雪の空を すべりおりよう', emoji:'🛷', bg:'6BB5E8', label:'🛷 のりこむ' },
+  { ...makeAuroraPad(-18,-7), id:'auroraflight', type:'auroraflight', title:'オーロラ飛行', sub:'雪の結晶にのって オーロラの空へ', emoji:'🌌', bg:'2A2F6B', label:'🌌 とびたつ' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
@@ -8843,6 +9214,7 @@ const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rick
 const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
 fireworksPadLandmark = landmarks.find(l => l.id === 'fireworks') || null;
+auroraPadLandmark = landmarks.find(l => l.id === 'auroraflight') || null;
 updateFireworksPad();
 
 /* =========================================================
@@ -9644,6 +10016,7 @@ function animate(){
   updateDragonRide(dt);
   updateSleigh(dt);
   updateSled(dt);
+  updateAuroraFlight(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -9687,6 +10060,11 @@ function animate(){
     desiredCamPos = sled.camPos.clone();
     lookTarget = sled.camLook.clone();
     camLerp = 1 - Math.pow(0.00002, dt);
+  } else if(af.active){
+    // aurora flight: close chase camera computed by updateAuroraFlight
+    desiredCamPos = af.camPos.clone();
+    lookTarget = af.camLook.clone();
+    camLerp = 1 - Math.pow(0.00001, dt);
   }
   camera.position.lerp(desiredCamPos, camLerp);
   camera.lookAt(lookTarget);
@@ -10492,6 +10870,7 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   else if(closest.type === 'skydragon') boardDragonRide(closest);
   else if(closest.type === 'sleigh') boardSleigh(closest);
   else if(closest.type === 'sledrun') boardSled(closest);
+  else if(closest.type === 'auroraflight') boardAuroraFlight(closest);
   else if(closest.type === 'snowbuild') openSnowmanBuild();
   else if(closest.type === 'coasterride') boardCoasterRide(closest);
   else if(closest.type === 'sasuketower') boardSasukeTower(closest);
