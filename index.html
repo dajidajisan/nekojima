@@ -122,6 +122,25 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
 }
 .speak-btn svg{width:20px; height:20px;}
 
+/* Used where hearing a line is required before the player can move on
+   (first NPC turn, quiz feedback) — a plain round icon button wasn't
+   communicating "you need to tap this to continue" clearly enough, so
+   this is wider, carries its own label, and pulses gently to draw the
+   eye. */
+.listen-required-btn{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none;
+  border-radius:999px; padding:13px 26px; font-weight:800; font-size:14.5px; cursor:pointer;
+  box-shadow:0 6px 16px rgba(63,199,166,0.4); font-family:'M PLUS Rounded 1c',sans-serif;
+  animation: listenPulse 1.7s ease-in-out infinite;
+}
+.listen-required-btn svg{ width:19px; height:19px; flex-shrink:0; }
+.listen-required-btn:disabled{ animation:none; opacity:0.55; box-shadow:none; cursor:default; }
+@keyframes listenPulse{
+  0%,100%{ transform:scale(1); box-shadow:0 6px 16px rgba(63,199,166,0.4); }
+  50%{ transform:scale(1.04); box-shadow:0 8px 20px rgba(63,199,166,0.55); }
+}
+
 .order-controls{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 .undo-btn{
   background:#FBF9FF; border:2px solid #ECE5FA; border-radius:999px; padding:9px 16px;
@@ -227,6 +246,7 @@ html,body{margin:0; padding:0; width:100%; height:100%; overflow:hidden; font-fa
   opacity:0; transform:translateY(8px); pointer-events:none; transition:all .25s ease;
 }
 .quiz-footer-btn.show{opacity:1; transform:translateY(0); pointer-events:auto;}
+.quiz-footer-btn.show:disabled{ background:#DCD8E8; color:#9088A8; box-shadow:none; cursor:default; pointer-events:none; }
 .close-x{position:absolute; top:16px; right:18px; background:none; border:none; font-size:26px; color:var(--plum-soft); cursor:pointer; padding:6px; line-height:1;}
 
 .npc-done-panel{display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 0;}
@@ -311,7 +331,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
       </div>
     </div>
     <div class="daily-wrap">
-      <span>📅 <span id="dailyCount">0</span>/<span id="dailyGoalLabel">15</span></span>
+      <span>📅 <span id="dailyCount">0</span>/<span id="dailyGoalLabel">10</span></span>
       <span>🔥<span id="streakCount">0</span>日</span>
       <span class="coin-inline">
         <svg class="coin-icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg>
@@ -345,13 +365,45 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
       <button id="islandBadge">🌳 はじまりの島</button>
     </div>
     <div class="settings-row">
+      <span class="settings-row-label">よみあげの声</span>
+      <button id="voiceSettingBtn">🔊 えらぶ</button>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">音声のログ<span id="voiceDebugBadge" style="display:none; margin-left:4px; background:#F06A82; color:#fff; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px;"></span></span>
+      <button id="voiceDebugBtn">🔧 かくにん</button>
+    </div>
+    <div class="settings-row">
       <span class="settings-row-label">セーブコード</span>
       <button id="myCodeBtn">🔑 マイコードを見る</button>
     </div>
     <div class="settings-row">
       <span class="settings-row-label">バージョン</span>
-      <span class="settings-row-value" id="versionLabel">v1.0.0</span>
+      <span class="settings-row-value" id="versionLabel">v1.19.0</span>
     </div>
+  </div>
+</div>
+
+<div id="voiceDebugOverlay">
+  <div class="npc-create-card" style="max-width:420px;">
+    <button class="close-x" id="closeVoiceDebugOverlay">✕</button>
+    <h2>🔧 音声のログ</h2>
+    <p class="review-empty" style="margin:0 0 4px; text-align:left; font-size:11.5px;">キャラクターの声が出ない時に、ここに理由が記録されます。うまく再生できなかったら、この画面のスクリーンショットを送ってください。</p>
+    <div style="display:flex; gap:8px; margin:6px 0 4px;">
+      <button id="voiceDebugTestBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:var(--mint-deep); color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">🔊 ためす</button>
+      <button id="voiceDebugClearBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:#DCD8E8; color:var(--plum); font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">クリア</button>
+      <button id="voiceDebugCopyBtn" style="flex:1; border:none; border-radius:10px; padding:9px; background:#DCD8E8; color:var(--plum); font-weight:800; font-size:12.5px; cursor:pointer; font-family:'M PLUS Rounded 1c',sans-serif;">コピー</button>
+    </div>
+    <p class="review-empty" id="voiceDebugEmpty">まだログが ないよ。「ためす」を押すか、キャラクターと話してみてね。</p>
+    <div id="voiceDebugList" style="max-height:50vh; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<div id="voiceOverlay">
+  <div class="npc-create-card" style="max-width:360px;">
+    <button class="close-x" id="closeVoiceOverlay">✕</button>
+    <h2>🔊 よみあげの声</h2>
+    <p class="review-empty" id="voiceEmpty" style="display:none;">この端末では えいごの声が みつからなかったよ。</p>
+    <div id="voiceList"></div>
   </div>
 </div>
 
@@ -446,6 +498,41 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
 .settings-row:last-child{ border-bottom:none; }
 .settings-row-label{ font-size:13px; font-weight:800; color:var(--plum-soft); }
 .settings-row-value{ font-size:12.5px; font-weight:800; color:var(--plum); font-family:'Fredoka',sans-serif; }
+#voiceOverlay{
+  position:fixed; inset:0; z-index:84; display:none;
+  align-items:center; justify-content:center;
+  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
+}
+#voiceOverlay.show{ display:flex; }
+.voice-item{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:#FBF9FF; border:2px solid #ECE5FA; border-radius:12px; padding:10px 14px; margin-top:8px;
+  cursor:pointer;
+}
+.voice-item.active{ background:linear-gradient(135deg,#FFF3EC,#FFE8D9); border-color:var(--sunshine-deep); }
+.voice-item .voice-name{ font-family:'M PLUS Rounded 1c',sans-serif; font-weight:800; color:var(--plum); font-size:13px; }
+.voice-item .voice-lang{ display:block; font-weight:700; color:var(--plum-soft); font-size:11px; margin-top:1px; }
+.voice-item .voice-play{
+  background:var(--mint-deep); color:#fff; border:none; border-radius:50%;
+  width:30px; height:30px; font-size:13px; cursor:pointer; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.voice-item .voice-check{ color:var(--sunshine-deep); font-size:16px; font-weight:800; flex-shrink:0; width:18px; text-align:center; }
+#voiceDebugOverlay{
+  position:fixed; inset:0; z-index:85; display:none;
+  align-items:center; justify-content:center;
+  background:rgba(74,59,92,0.5); backdrop-filter:blur(3px);
+}
+#voiceDebugOverlay.show{ display:flex; }
+.voice-debug-item{
+  background:#FBF9FF; border-left:4px solid #B9AEDD; border-radius:8px;
+  padding:8px 10px; margin-top:6px; font-family:monospace; font-size:11px; color:var(--plum);
+  line-height:1.5; white-space:pre-wrap; word-break:break-word;
+}
+.voice-debug-item.ok{ border-left-color:var(--mint-deep); }
+.voice-debug-item.warn{ border-left-color:var(--sunshine-deep); }
+.voice-debug-item.error{ border-left-color:#F06A82; }
+.voice-debug-item .vd-time{ color:var(--plum-soft); font-weight:700; }
 #islandOverlay{
   position:fixed; inset:0; z-index:86; display:none;
   align-items:center; justify-content:center;
@@ -597,7 +684,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   margin-top:2px; border:none; border-radius:8px; padding:6px; font-size:11px; font-weight:800; cursor:pointer;
   background:var(--coral-deep); color:#fff; font-family:'M PLUS Rounded 1c',sans-serif;
 }
-.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#9088A8; cursor:default; }
+.cat-card .acquire-btn:disabled{ background:#DCD8E8; color:#4A3B5C; cursor:default; }
 .cat-card .owned-label{ font-size:11px; font-weight:800; color:var(--mint-deep); margin-top:2px; }
 
 #catDetailOverlay{
@@ -762,6 +849,58 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   background:rgba(200,110,160,0.45);
 }
 .mg-endpanel.show{ display:flex; }
+
+/* ---------- INVADER (ねずみインベーダー) MINIGAME ---------- */
+#invaderOverlay{
+  position:fixed; inset:0; z-index:200; display:none;
+  align-items:center; justify-content:center;
+  background:linear-gradient(180deg, #CFE8FF 0%, #BFDCFF 55%, #A9CDFB 100%);
+}
+#invaderOverlay.show{ display:flex; }
+.iv-frame{
+  width:100%; height:100%; max-width:520px; max-height:100vh;
+  display:flex; flex-direction:column; align-items:center;
+  padding:14px; box-sizing:border-box; position:relative;
+  font-family:'M PLUS Rounded 1c',sans-serif; overflow:hidden;
+}
+.iv-hud{ width:100%; display:flex; align-items:center; gap:10px; color:#2E4A6B; margin-bottom:8px; }
+.iv-close{
+  background:rgba(255,255,255,0.65); border:none; color:#2E4A6B; width:34px; height:34px;
+  border-radius:50%; font-size:16px; cursor:pointer; flex-shrink:0;
+}
+.iv-score{ font-family:'Fredoka',sans-serif; font-weight:700; font-size:15px; white-space:nowrap; flex:1; }
+.iv-wave-label{ font-size:12px; font-weight:800; color:#2E4A6B; background:rgba(255,255,255,0.65); padding:4px 10px; border-radius:999px; }
+.iv-field{
+  position:relative; width:100%; flex:1; border-radius:20px; overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 100%);
+  border:3px solid rgba(255,255,255,0.6); touch-action:none;
+}
+.iv-mouse{
+  position:absolute; width:34px; height:34px; font-size:26px;
+  display:flex; align-items:center; justify-content:center;
+  transform:translate(-50%,-50%); transition:top .18s linear, filter .15s;
+  filter:drop-shadow(0 2px 2px rgba(0,0,0,0.15));
+}
+.iv-mouse.pop{ animation:ivPop .3s ease forwards; }
+@keyframes ivPop{ 0%{ transform:translate(-50%,-50%) scale(1); opacity:1;} 100%{ transform:translate(-50%,-50%) scale(1.8); opacity:0;} }
+.iv-player{
+  position:absolute; bottom:8px; width:48px; height:48px; font-size:38px;
+  display:flex; align-items:center; justify-content:center;
+  transform:translateX(-50%); transition:left .05s linear;
+  filter:drop-shadow(0 3px 3px rgba(0,0,0,0.2));
+}
+.iv-bullet{
+  position:absolute; width:10px; height:16px; border-radius:6px;
+  background:linear-gradient(180deg, #FFF6C9, #FFD873);
+  box-shadow:0 0 6px rgba(255,216,115,0.9);
+  transform:translate(-50%,-50%);
+}
+.iv-life-icon{ font-size:14px; }
+.iv-endpanel{
+  position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(60,100,160,0.45);
+}
+.iv-endpanel.show{ display:flex; }
 </style>
 
 
@@ -851,11 +990,11 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
 
     <div class="reward-section">
       <div class="reward-section-title">🎮 ミニゲーム</div>
-      <div class="minigame-card">
+      <div class="minigame-card playable" id="invaderCard">
         <div class="minigame-emoji">🐭</div>
         <div>
           <div class="minigame-name">ねずみインベーダー</div>
-          <div class="minigame-status">近日公開</div>
+          <div class="minigame-status">タップしてあそぶ！</div>
         </div>
       </div>
       <div class="minigame-card" id="loderunnerCard">
@@ -903,7 +1042,7 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
   <div class="mg-frame">
     <div class="mg-hud">
       <button class="mg-close" id="mgCloseBtn">✕</button>
-      <div class="mg-score" id="mgScore">🪙 0　ラウンド 1/8</div>
+      <div class="mg-score" id="mgScore"><svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:-3px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg> 0　ラウンド 1/8</div>
     </div>
     <div class="mg-prompt-card">
       <div class="mg-prompt-label">この日本語にあう えいごを たたこう！</div>
@@ -912,6 +1051,20 @@ if (hostname.includes('localhost') || hostname.includes('git-dev') || hostname.i
     </div>
     <div class="mg-field" id="mgField"></div>
     <div class="mg-endpanel" id="mgEndPanel"></div>
+  </div>
+</div>
+
+<div id="invaderOverlay">
+  <div class="iv-frame">
+    <div class="iv-hud">
+      <button class="iv-close" id="ivCloseBtn">✕</button>
+      <div class="iv-score" id="ivScore"><svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:-3px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg> 0</div>
+      <div class="iv-wave-label" id="ivWaveLabel">ウェーブ 1/3</div>
+    </div>
+    <div class="iv-field" id="ivField">
+      <div class="iv-player" id="ivPlayer">🐱</div>
+    </div>
+    <div class="iv-endpanel" id="ivEndPanel"></div>
   </div>
 </div>
 
@@ -1009,6 +1162,7 @@ document.getElementById('myCodeBtn').addEventListener('click', ()=>{
 
 document.getElementById('settingsBtn').addEventListener('click', ()=>{
   document.getElementById('settingsOverlay').classList.add('show');
+  updateVoiceSettingLabel();
 });
 document.getElementById('closeSettings').addEventListener('click', ()=>{
   document.getElementById('settingsOverlay').classList.remove('show');
@@ -2657,7 +2811,7 @@ function updateWordPercent(){
 }
 
 /* ---------- daily quota + streak + level ---------- */
-const DAILY_GOAL = 15;
+const DAILY_GOAL = 10;
 let dailyCount = 0;
 let lastPlayDate = null;   // 'YYYY-MM-DD' — date dailyCount belongs to
 let lastGoalDate = null;   // 'YYYY-MM-DD' — last date the goal of 15 was reached
@@ -2685,7 +2839,7 @@ function recordDailyProgress(){
     else if(lastGoalDate !== todayStr()) streak = 1;
     lastGoalDate = todayStr();
     addCoins(10);
-    showToast(`🎉 今日の目標（15問）は達成したよ！（${streak}日れんぞく）でも… Keep going! 🐾 ボーナス +10🪙`);
+    showDailyGoalModal(streak);
   }
   updateDailyHUD();
   saveProgress();
@@ -2750,7 +2904,10 @@ function advanceSRSReview(en){
   if(nextStage >= SRS_INTERVALS.length){
     delete srsSchedule[en]; // graduated — reinforced enough times to drop it
   } else {
-    srsSchedule[en] = { stage: nextStage, dueAt: totalAnswered + SRS_INTERVALS[nextStage] };
+    // keep the firstTry flag alive across stages so the review notebook
+    // can keep showing "かくにん中" (rather than a mistake count) for a
+    // word that has never actually been answered wrong
+    srsSchedule[en] = { stage: nextStage, dueAt: totalAnswered + SRS_INTERVALS[nextStage], firstTry: existing.firstTry };
   }
   saveProgress();
 }
@@ -2922,7 +3079,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.1.1';
+const GAME_VERSION = 'v1.19.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -3749,7 +3906,7 @@ function makeGuideRobot(x,z,rotY){
   head.position.y = 1.15;
   g.add(head);
   [-1,1].forEach(side=>{
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.05,10), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:100}));
     eye.position.set(side*0.08,1.17,0.19);
     g.add(eye);
   });
@@ -4743,7 +4900,7 @@ function makeCarousel(x,z){
     mount.position.set(Math.cos(a)*pr, 0.85, Math.sin(a)*pr);
     spinner.add(mount);
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.14,6), mount.material);
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06,0.1,6), mount.material);
       ear.position.set(Math.cos(a)*pr+side*0.12, 1.08, Math.sin(a)*pr);
       spinner.add(ear);
     });
@@ -5342,14 +5499,14 @@ function makeCatRobot(x,z){
   g.add(head);
   // cat-ear attachments, keeping the robot recognizably "neko"
   [-1,1].forEach(side=>{
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.18,4), new THREE.MeshPhongMaterial({color:0xC7CBE0, shininess:100}));
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.12,4), new THREE.MeshPhongMaterial({color:0xC7CBE0, shininess:100}));
     ear.position.set(side*0.18, 1.42, 0);
     ear.rotation.y = Math.PI/4;
     g.add(ear);
   });
   // glowing LED eyes
   [-1,1].forEach(side=>{
-    const eye = new THREE.Mesh(new THREE.CircleGeometry(0.06,12), new THREE.MeshBasicMaterial({color:0x6BCBFF}));
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), new THREE.MeshPhongMaterial({color:0x6BCBFF, shininess:100}));
     eye.position.set(side*0.12, 1.17, 0.23);
     g.add(eye);
   });
@@ -5594,23 +5751,21 @@ function makeCharacter({ bodyColor, earColor, earType }){
     // usual behind-the-character camera angle.
     function makeEarTexture(outer, inner){
       const c = document.createElement('canvas');
-      c.width = 140; c.height = 160;
+      c.width = 140; c.height = 120;
       const ctx = c.getContext('2d');
       const hex = n => '#' + n.toString(16).padStart(6,'0');
       ctx.fillStyle = hex(outer);
       ctx.beginPath();
-      ctx.moveTo(18, 160);
-      ctx.quadraticCurveTo(2, 95, 50, 18);
-      ctx.quadraticCurveTo(70, -6, 90, 18);
-      ctx.quadraticCurveTo(138, 95, 122, 160);
+      ctx.moveTo(8, 120);
+      ctx.lineTo(70, 8);
+      ctx.lineTo(132, 120);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = hex(inner);
       ctx.beginPath();
-      ctx.moveTo(38, 155);
-      ctx.quadraticCurveTo(28, 108, 58, 52);
-      ctx.quadraticCurveTo(70, 36, 82, 52);
-      ctx.quadraticCurveTo(112, 108, 102, 155);
+      ctx.moveTo(28, 108);
+      ctx.lineTo(70, 34);
+      ctx.lineTo(112, 108);
       ctx.closePath();
       ctx.fill();
       return new THREE.CanvasTexture(c);
@@ -5618,11 +5773,11 @@ function makeCharacter({ bodyColor, earColor, earType }){
     [-1,1].forEach(side=>{
       const tex = makeEarTexture(bodyColor, earColor);
       const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide});
-      const earGeo = new THREE.PlaneGeometry(0.46,0.53);
-      earGeo.translate(0, 0.265, 0); // move the pivot to the bottom edge (the base/attachment point), so rotation swings the tip, not the base
+      const earGeo = new THREE.PlaneGeometry(0.36,0.32);
+      earGeo.translate(0, 0.16, 0); // move the pivot to the bottom edge (the base/attachment point), so rotation swings the tip, not the base
       const ear = new THREE.Mesh(earGeo, mat);
-      ear.position.set(side*0.42, 1.83, -0.03); // base sits slightly inside the head surface (surface is ~1.885 here) for a seamless connection
-      ear.rotation.z = -side*(Math.PI/4); // 45° outward lean, pivoting from the base
+      ear.position.set(side*0.34, 1.88, -0.03); // base sits slightly inside the head surface (surface is ~1.885 here) for a seamless connection
+      ear.rotation.z = -side*(Math.PI/8); // slighter outward lean for a perkier, cat-like look
       g.add(ear);
     });
     // nose + mouth, drawn as a small canvas decal so the mouth can be a
@@ -5689,7 +5844,7 @@ function makeCharacter({ bodyColor, earColor, earType }){
     });
   } else if(earType === 'owl'){
     [-1,1].forEach(side=>{
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.13,0.2,4), toon(bodyColor));
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08,0.13,4), toon(bodyColor));
       ear.position.set(side*0.26, 1.9, -0.05);
       g.add(ear);
     });
@@ -5707,9 +5862,9 @@ function makeCharacter({ bodyColor, earColor, earType }){
     g.add(cheek);
   });
 
-  // big simple round eyes (flat dots, closer to the clean line-art look)
-  const eyeGeo = new THREE.CircleGeometry(0.115,16);
-  const eyeMat = new THREE.MeshBasicMaterial({color:0x2E2A3A});
+  // big simple round eyes (3D spheres for a rounder look)
+  const eyeGeo = new THREE.SphereGeometry(0.115,12,12);
+  const eyeMat = new THREE.MeshPhongMaterial({color:0x2E2A3A, shininess:80});
   [-1,1].forEach(side=>{
     const eye = new THREE.Mesh(eyeGeo, eyeMat);
     eye.position.set(side*0.26, 1.36, 0.665);
@@ -5917,13 +6072,30 @@ function getAudioCtx(){
     audioCtx = new Ctx();
     audioCtx.addEventListener('statechange', ()=> updateAudioDebug());
   }
-  if(audioCtx.state === 'suspended') audioCtx.resume();
+  if(audioCtx.state === 'suspended'){
+    audioCtx.resume().then(()=> updateAudioDebug('resume ok')).catch(e=>{
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 効果音(AudioContext)のresumeに失敗: ' + e.message);
+    });
+  }
   updateAudioDebug();
   return audioCtx;
 }
 
-// (debug indicator removed now that sound is confirmed working)
-function updateAudioDebug(){ /* no-op */ }
+// Logs into the same on-screen debug log as speech (Settings > 音声のログ),
+// but only when the state actually changes — playFootstepSound() alone can
+// call this many times a second while walking, so logging every call would
+// flood the log with noise instead of surfacing the moment sound effects
+// actually stop working (e.g. iOS suspending the context in the background).
+let lastAudioDebugState = null;
+function updateAudioDebug(note){
+  const state = audioCtx ? audioCtx.state : 'no-context';
+  if(state === lastAudioDebugState) return;
+  const prev = lastAudioDebugState;
+  lastAudioDebugState = state;
+  if(typeof logVoiceDebug !== 'function') return; // logging not loaded yet — shouldn't happen, but stay safe
+  const level = (state === 'suspended' || state === 'no-context') ? 'warn' : 'ok';
+  logVoiceDebug(level, `🔈 効果音の状態がかわった: ${prev === null ? '(起動)' : prev} → ${state}${note ? ' ['+note+']' : ''}`);
+}
 
 // unlock audio on the very first touch anywhere on the page. iOS Safari
 // can require more than just creating/resuming the context — actually
@@ -5938,6 +6110,12 @@ function updateAudioDebug(){ /* no-op */ }
 // with the switch in silent mode.
 const SILENT_WAV_DATA_URI = 'data:audio/wav;base64,UklGRoQJAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWAJAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA=';
 let unlockAudioEl = null;
+// When speakEnglish() deliberately pauses the silent loop for the
+// duration of an utterance (see below), this is set true so the
+// 'pause' listener doesn't immediately fight to resume it — that
+// scramble-to-resume itself seems to be what was cutting into the
+// utterance's volume, fading it out shortly after it started.
+let unlockAudioIntentionalPause = false;
 
 document.addEventListener('pointerdown', unlockAudio, { once:true, capture:true });
 function unlockAudio(){
@@ -5958,11 +6136,59 @@ function unlockAudio(){
     unlockAudioEl.loop = true;
     unlockAudioEl.volume = 0.01;
     unlockAudioEl.src = SILENT_WAV_DATA_URI;
-    unlockAudioEl.play().catch(()=>{});
+    unlockAudioEl.play().catch(e=>{
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生に失敗（ミュートスイッチ対策が効かない可能性）: ' + e.message);
+    });
+    // If iOS ever pauses this loop on its own — most likely because
+    // speechSynthesis playback briefly takes over the audio session —
+    // the mute-switch workaround silently stops protecting the game's
+    // sound effects. Both log it AND try to resume it immediately, so
+    // footsteps don't stay silent for the rest of the session.
+    unlockAudioEl.addEventListener('pause', ()=>{
+      if(unlockAudioIntentionalPause) return; // we paused this ourselves — see speakEnglish
+      if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループ再生が とまった → 再開をこころみる');
+      unlockAudioEl.play().catch(e=>{
+        if(typeof logVoiceDebug === 'function') logVoiceDebug('warn', '🔈 無音ループの再開に失敗: ' + e.message);
+      });
+    });
   }
+
+  // NOTE: previously tried speaking a short audible line right here, on
+  // the page's very first tap anywhere (not just the "New Game"
+  // button), to give a resumed session (which skips that button
+  // entirely) the same treatment. Real device testing showed this made
+  // things WORSE — this handler runs in the capture phase, ahead of
+  // whatever button the player actually tapped, so it isn't reliably
+  // "inside" that button's own click handler the way speechSynthesis
+  // seems to require. Removed; audible speech now only ever happens
+  // from an actual button's own click handler (はなしかける, つぎへ,
+  // こたえる, きく, etc.) — see speakEnglish() call sites.
 
   updateAudioDebug('unlock tried, ctx=' + (ctx ? ctx.state : 'none'));
 }
+
+// iOS can suspend AudioContext and reset however "warmed up" the speech
+// engine was whenever the tab goes to the background — device sleep,
+// switching to another app, the screen locking — all without firing any
+// error the page could react to. Device logs from a resumed session (as
+// opposed to a fresh "New Game") show the exact same symptom the very
+// first tap used to have: the first line plays for a second, then goes
+// silent, and footsteps disappear too. Re-running the same wake-up steps
+// used on that very first tap, this time triggered by the page becoming
+// visible again, gives a resumed session the same treatment as a new one.
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState !== 'visible') return;
+  if(typeof logVoiceDebug === 'function') logVoiceDebug('info', '👀 ページが ふたたび みえるようになった → おとを たてなおす');
+
+  // Resume AudioContext if iOS suspended it while backgrounded.
+  getAudioCtx();
+
+  // Resume the silent background loop (mute-switch workaround) if iOS
+  // paused it.
+  if(unlockAudioEl && unlockAudioEl.paused){
+    unlockAudioEl.play().catch(()=>{});
+  }
+});
 
 let toneCallCount = 0;
 function playTone(freq, duration, startTime, gain, type){
@@ -6306,16 +6532,19 @@ document.getElementById('closeReview').addEventListener('click', ()=>{
 });
 
 function renderReviewList(){
-  const entries = Object.entries(mistakeCounts);
+  const mistakeEntries = Object.entries(mistakeCounts);
+  // words that are correct so far but still under the lighter
+  // one-time "did they really learn it" spaced check
+  const confirmEntries = Object.keys(srsSchedule).filter(en => srsSchedule[en].firstTry && !mistakeCounts[en]);
   reviewList.innerHTML = '';
-  if(entries.length === 0){
+  if(mistakeEntries.length === 0 && confirmEntries.length === 0){
     reviewEmpty.style.display = 'block';
     reviewStartBtn.style.display = 'none';
     return;
   }
   reviewEmpty.style.display = 'none';
   reviewStartBtn.style.display = 'block';
-  entries.forEach(([en,count])=>{
+  mistakeEntries.forEach(([en,count])=>{
     const v = VOCAB.find(x=>x.en===en);
     if(!v) return;
     const row = document.createElement('div');
@@ -6323,10 +6552,22 @@ function renderReviewList(){
     row.innerHTML = `<span class="w">${v.en}<small>${v.ja}</small></span><span class="n">${count}かい まちがえた</span>`;
     reviewList.appendChild(row);
   });
+  confirmEntries.forEach(en=>{
+    const v = VOCAB.find(x=>x.en===en);
+    if(!v) return;
+    const row = document.createElement('div');
+    row.className = 'review-item';
+    row.innerHTML = `<span class="w">${v.en}<small>${v.ja}</small></span><span class="n" style="color:var(--mint-deep);">✓ かくにん中</span>`;
+    reviewList.appendChild(row);
+  });
 }
 
 reviewStartBtn.addEventListener('click', ()=>{
-  const items = Object.keys(mistakeCounts).map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const mistakeItems = Object.keys(mistakeCounts).map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const confirmItems = Object.keys(srsSchedule)
+    .filter(en => srsSchedule[en].firstTry && !mistakeCounts[en])
+    .map(en => VOCAB.find(v=>v.en===en)).filter(Boolean);
+  const items = [...mistakeItems, ...confirmItems];
   if(items.length === 0) return;
   reviewOverlay.classList.remove('show');
 
@@ -6474,7 +6715,7 @@ function renderCatAlbum(){
       <span class="name">${owned ? c.name : '？？？'}</span>
       ${owned
         ? `<span class="owned-label">✓ タップでしょうさい</span>`
-        : `<button class="acquire-btn" data-id="${c.id}" ${canAfford?'':'disabled'}>${canAfford ? `てにいれる（${c.cost}🪙）` : `${c.cost}🪙 ひつよう`}</button>`
+        : `<button class="acquire-btn" data-id="${c.id}" ${canAfford?'':'disabled'}>${canAfford ? `てにいれる（${c.cost}🪙）` : `${c.cost}<svg viewBox="0 0 24 24" style="width:14px; height:14px; vertical-align:-2px; margin:0 1px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg> ひつよう`}</button>`
       }
     </div>`;
   }).join('');
@@ -6588,18 +6829,15 @@ function petCat(id, el){
     }, i*90);
   }
 
-  // friendship milestone — a bigger celebration + small coin bonus,
+  // friendship milestone — a bigger celebration
   // only the first time each threshold is crossed
   if(FRIEND_MILESTONES.includes(newCount)){
-    coins += 3;
-    updateCoinHUD();
-    saveProgress();
     const toast = document.createElement('div');
     toast.className = 'garden-milestone-toast';
     const level = friendLevel(newCount);
     toast.innerHTML = `<div style="font-size:36px;">🎉</div>
       <div style="font-weight:800; color:var(--plum); font-size:15px; margin-top:4px;">${breed.name}と なかよし度アップ！</div>
-      <div style="font-size:13px; color:var(--plum-soft); margin-top:2px;">${'💗'.repeat(Math.min(level,3))} +3🪙</div>`;
+      <div style="font-size:13px; color:var(--plum-soft); margin-top:2px;">${'💗'.repeat(Math.min(level,3))}</div>`;
     document.body.appendChild(toast);
     setTimeout(()=> toast.remove(), 1800);
   }
@@ -7022,6 +7260,10 @@ function mgClose(){
   document.getElementById('moguraOverlay').classList.remove('show');
   if(moguraState && moguraState.timerHandle) clearInterval(moguraState.timerHandle);
   moguraState = null;
+  // Remove the hammer and any remaining paw prints
+  if(mgHammerEl && mgHammerEl.parentNode) mgHammerEl.parentNode.removeChild(mgHammerEl);
+  mgHammerEl = null;
+  document.querySelectorAll('.mg-paw-burst').forEach(el=> el.remove());
 }
 document.getElementById('moguraCard').addEventListener('click', mgOpen);
 document.getElementById('mgCloseBtn').addEventListener('click', mgClose);
@@ -7056,7 +7298,8 @@ function mgNextRound(){
   const { target, options } = mgPickWords();
   moguraState.target = target;
   document.getElementById('mgPromptJa').textContent = target.ja;
-  document.getElementById('mgScore').textContent = `🪙 ${moguraState.coins}　ラウンド ${moguraState.round}/${MOGURA_ROUNDS}`;
+  const mgCoinSvg = '<svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:-3px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg>';
+  document.getElementById('mgScore').innerHTML = `${mgCoinSvg} ${moguraState.coins}　ラウンド ${moguraState.round}/${MOGURA_ROUNDS}`;
 
   const field = document.getElementById('mgField');
   field.innerHTML = '';
@@ -7196,6 +7439,247 @@ function mgShowEnd(){
 }
 
 /* =========================================================
+   MINIGAME: ねずみインベーダー (Mouse Invaders)
+   A simple, no-vocab arcade shooter — pure arcade fun as a change
+   of pace from the word-learning games. The cat auto-fires; the
+   player only needs to slide left/right, which keeps it approachable
+   for younger players.
+========================================================= */
+const INVADER_WAVES = 3;
+const INVADER_ROWS = 3;
+const INVADER_COLS = 5;
+const INVADER_LIVES = 3;
+const INVADER_FIRE_INTERVAL = 650; // ms between auto-shots
+const INVADER_BULLET_SPEED = 480; // px/sec
+let invaderState = null;
+let ivPointerHandler = null;
+
+function ivOpen(){
+  document.getElementById('invaderOverlay').classList.add('show');
+  document.getElementById('ivEndPanel').classList.remove('show');
+  invaderState = {
+    wave: 1, coins: 0, lives: INVADER_LIVES,
+    mice: [], bullets: [],
+    dir: 1, speed: 26, // px/sec horizontal drift
+    playerX: 50, // percentage across field width
+    running: true,
+    lastTime: null,
+    lastShot: 0,
+  };
+  ivSetupWave();
+  ivBindControls();
+  ivUpdateHUD();
+  requestAnimationFrame(ivLoop);
+}
+
+function ivClose(){
+  document.getElementById('invaderOverlay').classList.remove('show');
+  if(invaderState) invaderState.running = false;
+  invaderState = null;
+  ivUnbindControls();
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+}
+document.getElementById('invaderCard').addEventListener('click', ivOpen);
+document.getElementById('ivCloseBtn').addEventListener('click', ivClose);
+
+function ivSetupWave(){
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+  invaderState.mice = [];
+  invaderState.bullets = [];
+  invaderState.dir = 1;
+  invaderState.speed = 22 + (invaderState.wave-1)*10;
+
+  const rect = field.getBoundingClientRect();
+  const marginX = 34;
+  const usableWidth = Math.max(rect.width - marginX*2, 40);
+  const spacingX = INVADER_COLS > 1 ? usableWidth / (INVADER_COLS - 1) : 0;
+  const spacingY = 42;
+  const startY = 30;
+
+  for(let r=0;r<INVADER_ROWS;r++){
+    for(let c=0;c<INVADER_COLS;c++){
+      const el = document.createElement('div');
+      el.className = 'iv-mouse';
+      el.textContent = '🐭';
+      field.appendChild(el);
+      const mouse = {
+        el,
+        x: marginX + c*spacingX,
+        y: startY + r*spacingY,
+        alive: true,
+      };
+      invaderState.mice.push(mouse);
+      el.style.left = mouse.x + 'px';
+      el.style.top = mouse.y + 'px';
+    }
+  }
+}
+
+function ivUpdateHUD(){
+  const coinSvg = '<svg viewBox="0 0 24 24" style="width:16px; height:16px; vertical-align:-3px;"><circle cx="12" cy="12" r="10" fill="#FFD54A" stroke="#E8A93C" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="#E8A93C" stroke-width="1.2"/></svg>';
+  document.getElementById('ivScore').innerHTML = `${coinSvg} ${invaderState.coins}　${'❤️'.repeat(Math.max(invaderState.lives,0))}`;
+  document.getElementById('ivWaveLabel').textContent = `ウェーブ ${invaderState.wave}/${INVADER_WAVES}`;
+}
+
+function ivBindControls(){
+  const field = document.getElementById('ivField');
+  ivPointerHandler = (e)=>{
+    if(!invaderState) return;
+    const rect = field.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+    invaderState.playerX = pct;
+  };
+  field.addEventListener('pointerdown', ivPointerHandler);
+  field.addEventListener('pointermove', ivPointerHandler);
+}
+function ivUnbindControls(){
+  const field = document.getElementById('ivField');
+  if(ivPointerHandler){
+    field.removeEventListener('pointerdown', ivPointerHandler);
+    field.removeEventListener('pointermove', ivPointerHandler);
+  }
+  ivPointerHandler = null;
+}
+
+function ivLoop(timestamp){
+  if(!invaderState || !invaderState.running) return;
+  if(invaderState.lastTime == null) invaderState.lastTime = timestamp;
+  const dt = Math.min((timestamp - invaderState.lastTime) / 1000, 0.05);
+  invaderState.lastTime = timestamp;
+
+  const field = document.getElementById('ivField');
+  const rect = field.getBoundingClientRect();
+
+  // move player
+  const player = document.getElementById('ivPlayer');
+  player.style.left = (invaderState.playerX/100*rect.width) + 'px';
+  player.style.bottom = '8px';
+
+  // move mice as a group, dropping down at the edges
+  let hitEdge = false;
+  const aliveMice = invaderState.mice.filter(m=>m.alive);
+  aliveMice.forEach(m=>{ m.x += invaderState.dir * invaderState.speed * dt; });
+  aliveMice.forEach(m=>{
+    if(m.x < 20 || m.x > rect.width - 20) hitEdge = true;
+  });
+  if(hitEdge){
+    invaderState.dir *= -1;
+    aliveMice.forEach(m=>{ m.y += 22; });
+  }
+  aliveMice.forEach(m=>{
+    m.el.style.left = m.x + 'px';
+    m.el.style.top = m.y + 'px';
+  });
+
+  // check if mice reached the player's row -> lose a life and reset wave
+  const dangerY = rect.height - 60;
+  if(aliveMice.some(m=> m.y >= dangerY)){
+    ivLoseLife();
+    return;
+  }
+
+  // auto-fire
+  invaderState.lastShot += dt*1000;
+  if(invaderState.lastShot >= INVADER_FIRE_INTERVAL){
+    invaderState.lastShot = 0;
+    const bulletEl = document.createElement('div');
+    bulletEl.className = 'iv-bullet';
+    field.appendChild(bulletEl);
+    invaderState.bullets.push({
+      el: bulletEl,
+      x: invaderState.playerX/100*rect.width,
+      y: rect.height - 34,
+    });
+  }
+
+  // move bullets, check collisions
+  invaderState.bullets.forEach(b=>{ b.y -= INVADER_BULLET_SPEED * dt; });
+  invaderState.bullets.forEach(b=>{
+    if(!b.hit){
+      for(const m of aliveMice){
+        if(!m.alive) continue;
+        const dx = Math.abs(b.x - m.x), dy = Math.abs(b.y - m.y);
+        if(dx < 18 && dy < 18){
+          m.alive = false;
+          b.hit = true;
+          m.el.classList.add('pop');
+          setTimeout(()=> m.el.remove(), 300);
+          invaderState.coins += 1;
+          coins += 1;
+          updateCoinHUD();
+          saveProgress();
+          ivUpdateHUD();
+          break;
+        }
+      }
+    }
+  });
+  invaderState.bullets = invaderState.bullets.filter(b=>{
+    const dead = b.hit || b.y < -20;
+    if(dead) b.el.remove();
+    return !dead;
+  });
+  invaderState.bullets.forEach(b=>{
+    b.el.style.left = b.x + 'px';
+    b.el.style.top = b.y + 'px';
+  });
+
+  // wave clear check
+  if(invaderState.mice.every(m=>!m.alive)){
+    invaderState.wave++;
+    if(invaderState.wave > INVADER_WAVES){
+      ivShowEnd(true);
+      return;
+    }
+    ivSetupWave();
+    ivUpdateHUD();
+  }
+
+  requestAnimationFrame(ivLoop);
+}
+
+function ivLoseLife(){
+  invaderState.lives--;
+  playWrongSound();
+  const field = document.getElementById('ivField');
+  field.querySelectorAll('.iv-mouse, .iv-bullet').forEach(el=> el.remove());
+  if(invaderState.lives <= 0){
+    ivUpdateHUD();
+    ivShowEnd(false);
+    return;
+  }
+  invaderState.lastTime = null;
+  ivSetupWave();
+  ivUpdateHUD();
+  requestAnimationFrame(ivLoop);
+}
+
+function ivShowEnd(cleared){
+  invaderState.running = false;
+  ivUnbindControls();
+  const panel = document.getElementById('ivEndPanel');
+  const finalCoins = invaderState.coins;
+  panel.innerHTML = `
+    <div class="lr-endcard">
+      <div class="emoji">${cleared ? '🏆' : '🐭'}</div>
+      <h3>${cleared ? 'ぜんめつクリア！' : 'おしまい！'}</h3>
+      <p>${finalCoins}びき たいじした！</p>
+      <button id="ivRetryBtn">もういちど</button>
+      <button class="secondary" id="ivExitBtn">とじる</button>
+    </div>
+  `;
+  panel.classList.add('show');
+  document.getElementById('ivRetryBtn').onclick = ()=>{
+    panel.classList.remove('show');
+    ivOpen();
+  };
+  document.getElementById('ivExitBtn').onclick = ivClose;
+}
+
+/* =========================================================
    NPC PROFILE CARD
 ========================================================= */
 const npcProfileOverlay = document.getElementById('npcProfileOverlay');
@@ -7278,17 +7762,56 @@ async function generateSmallTalk(npc){
 
 function renderSmallTalkTurn(turns, turnIndex, onDone){
   const chat = turns[turnIndex];
+  const isFirstTurn = turnIndex === 0;
+  const fullText = chat.opener + ' ' + chat.reply;
   quizBody.innerHTML = `
     <div class="dialogue-bubble"><span class="en">${chat.opener}</span><span class="ja">${chat.openerJa}</span></div>
     <div class="reaction-bubble"><span class="en">${chat.reply}</span><span class="ja">${chat.replyJa}</span></div>
+    ${isFirstTurn ? `<button class="listen-required-btn" id="firstTurnListenBtn" style="align-self:center; margin-top:8px;">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      <span id="firstTurnListenBtnLabel">はつおんを きいて すすもう</span>
+    </button>` : ''}
   `;
-  speakEnglish(chat.opener + ' ' + chat.reply);
   nextBtn.textContent = 'つぎへ →';
   nextBtn.classList.add('show');
   if(turnIndex + 1 < turns.length){
     nextBtn.onclick = () => renderSmallTalkTurn(turns, turnIndex + 1, onDone);
   } else {
     nextBtn.onclick = onDone;
+  }
+
+  if(isFirstTurn){
+    // The very first line of a brand-new conversation is the one most
+    // likely to go silent on iOS when fired automatically right after
+    // the AI-generation network wait — device logs consistently show
+    // it's the single biggest source of "no sound" reports, even after
+    // many other fixes. Requiring an actual tap to trigger it means the
+    // speak() call always traces directly back to a real user gesture,
+    // which real device testing shows is far more reliable than an
+    // automatic call ever was. "つぎへ" stays disabled until the line
+    // has actually been heard (or definitively failed), so the player
+    // can't skip past dialogue that was never spoken. The button's own
+    // label (rather than a bare icon) and its gentle pulse are there to
+    // make "tap this first" obvious rather than optional-looking.
+    nextBtn.disabled = true;
+    const listenBtn = document.getElementById('firstTurnListenBtn');
+    const listenBtnLabel = document.getElementById('firstTurnListenBtnLabel');
+    listenBtn.onclick = ()=>{
+      listenBtn.disabled = true;
+      listenBtnLabel.textContent = 'さいせいちゅう…';
+      speakEnglish(fullText, ()=>{
+        nextBtn.disabled = false;
+        listenBtnLabel.textContent = 'きけたよ！ ↓ つぎへ すすもう';
+      });
+    };
+  } else {
+    // Later turns are triggered by the player's own "つぎへ" tap — a
+    // real user gesture, the same pattern that's been reliable
+    // throughout testing — so this can still fire automatically. Still
+    // block "つぎへ" until the line settles, so the player hears it
+    // rather than skipping past it.
+    nextBtn.disabled = true;
+    speakEnglish(fullText, ()=>{ nextBtn.disabled = false; });
   }
 }
 
@@ -8827,15 +9350,21 @@ function handleBlankAnswer(input, typedValue, item){
   const acceptable = [item.en, item.usedPhrase].filter(Boolean).map(s=>s.trim().toLowerCase());
   const correct = acceptable.includes(typed);
 
+  nextBtn.classList.add('show');
+
   if(correct){
+    recordDailyProgress(); // today's goal now counts correct answers only
     input.classList.add('correct');
     if(slot) slot.classList.add('filled-correct');
     quizCard.classList.add('flash-good');
     markMastered(item);
-    recordDailyProgress();
     burstSparkles(input);
     playCorrectSound();
-    speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
+    // Block "つぎへ" until the correct-answer line has actually been
+    // heard (or the safety-net timeout inside speakEnglish gives up),
+    // so the player can't skip past dialogue that was never spoken.
+    nextBtn.disabled = true;
+    speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '), ()=>{ nextBtn.disabled = false; });
     document.getElementById('feedbackSlot').innerHTML =
       `<div class="feedback-banner correct">✅ Correct! <span class="ja">せいかい！</span></div>`;
     if(item.reaction){
@@ -8854,7 +9383,6 @@ function handleBlankAnswer(input, typedValue, item){
       `<div class="feedback-banner wrong">❌ Not quite! <span class="ja">おしい！</span> <span class="correct-answer-inline">せいかい: ${item.usedPhrase || item.en}</span></div>`;
     recordMistake(item.en);
   }
-  nextBtn.classList.add('show');
 }
 
 /* ---------- exercise 2: build the English sentence (word order / 英作文) ---------- */
@@ -8872,6 +9400,7 @@ function renderOrderExercise(item){
       <button class="speak-btn" id="speakBtn" aria-label="お手本を聞く">
         <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8.5a5 5 0 010 7" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       </button>
+      <button class="undo-btn" id="decisionBtn" style="display:none; background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff;">✅ 決定</button>
     </div>
     <div class="chip-pool" id="chipPool"></div>
     <div id="feedbackSlot"></div>
@@ -8901,7 +9430,7 @@ function renderOrderExercise(item){
         built.push(idx);
         renderChips();
         renderBuild();
-        if(built.length === tokens.length) checkOrder();
+        renderDecisionBtn();
       };
       chipPool.appendChild(chip);
     });
@@ -8918,9 +9447,19 @@ function renderOrderExercise(item){
         built = built.filter(i=>i!==idx);
         renderChips();
         renderBuild();
+        renderDecisionBtn();
       };
       buildLine.appendChild(chip);
     });
+  }
+
+  function renderDecisionBtn(){
+    const decisionBtn = document.getElementById('decisionBtn');
+    if(built.length === tokens.length){
+      decisionBtn.style.display = 'block';
+    } else {
+      decisionBtn.style.display = 'none';
+    }
   }
 
   function checkOrder(){
@@ -8930,11 +9469,17 @@ function renderOrderExercise(item){
     const buildChips = buildLine.querySelectorAll('.build-chip');
     buildChips.forEach(c=> c.classList.add('locked'));
 
+    nextBtn.classList.add('show');
+    // Block "つぎへ" until the feedback line has actually been heard
+    // (or the safety-net timeout inside speakEnglish gives up), on both
+    // the correct and wrong paths below — both speak a line.
+    nextBtn.disabled = true;
+
     if(correct){
+      recordDailyProgress(); // today's goal now counts correct answers only
       buildChips.forEach(c=> c.classList.add('correct'));
       quizCard.classList.add('flash-good');
       markMastered(item);
-      recordDailyProgress();
       burstSparkles(buildLine);
       playCorrectSound();
       document.getElementById('feedbackSlot').innerHTML =
@@ -8946,7 +9491,7 @@ function renderOrderExercise(item){
       recordMistakeResolved(item.en);
       conversationContext = formatExchange(item);
       prefetchUpcoming();
-      speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '));
+      speakEnglish([item.opener, item.sentence, item.reaction].filter(Boolean).join(' '), ()=>{ nextBtn.disabled = false; });
     } else {
       buildChips.forEach(c=> c.classList.add('wrong'));
       quizCard.classList.add('flash-bad');
@@ -8958,10 +9503,11 @@ function renderOrderExercise(item){
       ans.textContent = 'せいかい: ' + item.sentence;
       quizBody.appendChild(ans);
       recordMistake(item.en);
-      speakEnglish(item.sentence);
+      speakEnglish(item.sentence, ()=>{ nextBtn.disabled = false; });
     }
-    nextBtn.classList.add('show');
   }
+
+  document.getElementById('decisionBtn').onclick = ()=> checkOrder();
 
   renderChips();
 }
@@ -8971,37 +9517,360 @@ function markMastered(item){
     masteredWords.add(item.en);
     addOrb(); // awards +3 coins for a brand-new word
     refreshAllNpcCounts();
+    // A word that was correct on the very first try (never missed) hasn't
+    // been "battle tested" the way a word that was later corrected has —
+    // it might have been answered by looking it up rather than from
+    // memory. Route it through spaced review too (starting one interval
+    // in, since a first-try correct answer still earns a little more
+    // trust than an outright mistake) — it needs two more correct
+    // answers, spread out over time, before it's dropped as fully
+    // learned. A miss at any point during that check routes it into the
+    // normal mistake-review flow instead.
+    if(!srsSchedule[item.en]){
+      srsSchedule[item.en] = { stage: 1, dueAt: totalAnswered + SRS_INTERVALS[1], firstTry: true };
+      saveProgress();
+    }
   } else {
     addCoins(1); // smaller reward for correctly reviewing an already-known word
   }
   saveProgress();
 }
 
-/* ---------- voice selection: use Samantha (US English) on Safari/iOS ---------- */
+/* =========================================================
+   VOICE DEBUG LOG — records what actually happens each time we try
+   to speak, so we can see on a real device (e.g. an iPad where speech
+   is unreliable) whether calls are blocked, error out, or simply never
+   fire their "start" event. Never sent anywhere — purely on-screen so
+   the person can screenshot or copy it.
+   Defined before voice selection below, since that code logs during
+   its own module-level initialization.
+========================================================= */
+const VOICE_DEBUG_MAX = 40;
+let voiceDebugLog = [];
+let voiceDebugSeq = 0;
+
+function voiceDebugTimestamp(){
+  const d = new Date();
+  return d.toTimeString().slice(0,8) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function logVoiceDebug(level, message){
+  voiceDebugSeq++;
+  voiceDebugLog.push({ id: voiceDebugSeq, level, message, time: voiceDebugTimestamp() });
+  if(voiceDebugLog.length > VOICE_DEBUG_MAX) voiceDebugLog.shift();
+  const badge = document.getElementById('voiceDebugBadge');
+  if(badge && (level === 'warn' || level === 'error')){
+    badge.style.display = 'inline-block';
+    badge.textContent = '!';
+  }
+  // referenced by element id (not a module-level const) so this stays
+  // safe to call from the very top of the script
+  const overlayEl = document.getElementById('voiceDebugOverlay');
+  if(overlayEl && overlayEl.classList.contains('show') && typeof renderVoiceDebugList === 'function') renderVoiceDebugList();
+}
+
+/* ---------- voice selection: user's saved choice > Noelle (US English) > any en-US ---------- */
+const VOICE_STORAGE_KEY = 'neko_voice_name'; // per-device choice — browsers/OSes offer different
+                                              // voices, so this is never part of the cloud save
 let preferredVoice = null;
 function pickPreferredVoice(){
   if(!('speechSynthesis' in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   if(!voices.length) return null;
-  return voices.find(v => v.name === 'Samantha')
-      || voices.find(v => v.name.includes('Samantha'))
-      || voices.find(v => v.lang === 'en-US')
+  const savedName = localStorage.getItem(VOICE_STORAGE_KEY);
+  if(savedName){
+    const saved = voices.find(v => v.name === savedName);
+    if(saved) return saved;
+  }
+  // Prefer voices marked localService (bundled on the device) over
+  // network-dependent ones. A network voice needs a round-trip to
+  // Apple's servers before it can start speaking, which is a
+  // plausible contributor to the delays/silent failures seen on iOS —
+  // an on-device voice has no such dependency.
+  const enUS = voices.filter(v => v.lang === 'en-US');
+  return voices.find(v => v.name === 'Noelle' && v.localService)
+      || voices.find(v => v.name === 'Noelle')
+      || voices.find(v => v.name.includes('Noelle') && v.localService)
+      || voices.find(v => v.name.includes('Noelle'))
+      || enUS.find(v => v.localService)
+      || enUS[0]
+      || voices.find(v => v.localService)
       || voices[0];
 }
 if('speechSynthesis' in window){
   preferredVoice = pickPreferredVoice();
-  window.speechSynthesis.onvoiceschanged = ()=>{ preferredVoice = pickPreferredVoice(); };
+  logVoiceDebug('info', `起動時の声リスト: ${window.speechSynthesis.getVoices().length}件 / えらばれた声=${preferredVoice ? preferredVoice.name : 'なし'}`);
+  window.speechSynthesis.onvoiceschanged = ()=>{
+    preferredVoice = pickPreferredVoice();
+    logVoiceDebug('info', `声リストが更新された: ${window.speechSynthesis.getVoices().length}件 / えらばれた声=${preferredVoice ? preferredVoice.name : 'なし'}`);
+    updateVoiceSettingLabel();
+  };
+} else {
+  logVoiceDebug('error', 'このブラウザは speechSynthesis に対応していません');
 }
 
-function speakEnglish(text){
-  if(!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang='en-US'; u.rate=0.85;
-  if(!preferredVoice) preferredVoice = pickPreferredVoice();
-  if(preferredVoice) u.voice = preferredVoice;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
+function updateVoiceSettingLabel(){
+  const btn = document.getElementById('voiceSettingBtn');
+  if(!btn) return;
+  btn.textContent = preferredVoice && preferredVoice.name ? `🔊 ${preferredVoice.name}` : '🔊 えらぶ';
 }
+
+// Long-documented browser quirk: a SpeechSynthesisUtterance object only
+// reliably stays connected to the native speech engine for as long as
+// JavaScript keeps a strong reference to it. Utterance objects created
+// as a plain local variable (as this one used to be) can become eligible
+// for garbage collection the moment the creating function returns, even
+// though the engine hasn't finished (or even started) speaking it yet —
+// on some devices/OS versions this silently kills the utterance midway
+// through, or before onstart even fires. Keeping every in-flight
+// utterance in this array holds a live reference until it's done.
+window.__pendingUtterances = window.__pendingUtterances || [];
+
+// How long to wait for an utterance to settle (onstart/onend/onerror)
+// before giving up and letting the player continue anyway — see the
+// safety-net setTimeout inside speakEnglish(). Was 4000ms; raised after
+// feedback that 4s cut off some longer, legitimately-still-playing
+// lines (multi-sentence quiz feedback especially) before they finished.
+const SPEECH_SETTLE_TIMEOUT_MS = 8000;
+
+function speakEnglish(text, onSettled){
+  const preview = text.length > 60 ? text.slice(0,60) + '…' : text;
+  if(!('speechSynthesis' in window)){
+    logVoiceDebug('error', `[${preview}] このブラウザは speechSynthesis 非対応`);
+    if(typeof onSettled === 'function') onSettled();
+    return;
+  }
+
+  const ss = window.speechSynthesis;
+  const beforeState = `speaking=${ss.speaking} pending=${ss.pending} paused=${ss.paused}`;
+
+  const u = new SpeechSynthesisUtterance(text);
+  // Rate was previously 0.85 (slightly slower, for easier listening).
+  // Real device reports show playback physically cutting out partway
+  // through a line (e.g. "Hi..." then silence) even though onstart
+  // fired normally — a failure mode the API's own events can't detect.
+  // A slower rate means more total playback time per line, which
+  // enlarges the window for whatever is causing that cutoff. Back to
+  // the standard rate to shrink that window; not a guaranteed fix, but
+  // an untested, low-risk one.
+  u.lang='en-US'; u.rate=1.0;
+  // Explicitly assigning a specific SpeechSynthesisVoice object here.
+  // Tried leaving this unset (letting the browser pick its own default)
+  // as an experiment, but real device testing showed that made things
+  // WORSE, not better — fewer utterances fired at all. So an explicitly
+  // chosen voice is kept, even though its reliability is still
+  // imperfect.
+  const voice = pickPreferredVoice();
+  if(voice){ preferredVoice = voice; u.voice = voice; }
+  const voiceLabel = voice ? `${voice.name}${voice.localService ? '・内蔵' : '・ネットワーク'}` : '(未選択・システム既定)';
+
+  logVoiceDebug('info', `▶ 再生しよう: [${preview}]\n声=${voiceLabel} / ${beforeState}`);
+
+  window.__pendingUtterances.push(u);
+  let settledFired = false;
+  function releaseUtterance(){
+    const idx = window.__pendingUtterances.indexOf(u);
+    if(idx !== -1) window.__pendingUtterances.splice(idx, 1);
+    // onSettled fires exactly once, whether the utterance finished
+    // normally or errored out — used to re-enable a "つぎへ" button
+    // that was disabled while this line was meant to be playing, so
+    // the player can't skip past dialogue before it's actually spoken.
+    // Deliberately NOT chained into further speak() calls (unlike an
+    // earlier attempt at this) — that caused two independent chains to
+    // run in parallel and talk over each other.
+    if(!settledFired){
+      settledFired = true;
+      // Resume the silent background loop now that this utterance has
+      // settled — paired with the deliberate pause() right before
+      // speak() below. Clear the "intentional" flag first so the
+      // 'pause' listener goes back to doing its normal job afterwards.
+      if(unlockAudioEl){
+        unlockAudioIntentionalPause = false;
+        if(unlockAudioEl.paused) unlockAudioEl.play().catch(()=>{});
+      }
+      if(typeof onSettled === 'function') onSettled();
+    }
+  }
+
+  u.onstart = ()=>{
+    logVoiceDebug('ok', `✓ 再生スタート: [${preview}]`);
+  };
+  u.onend = ()=>{
+    logVoiceDebug('ok', `✓ さいごまで再生できた: [${preview}]`);
+    releaseUtterance();
+  };
+  u.onerror = (ev)=>{
+    logVoiceDebug('error', `✗ エラー発生: [${preview}]\nerror=${ev.error || '不明'}`);
+    releaseUtterance();
+  };
+
+  // Safety net: real device logs show speechSynthesis can occasionally
+  // swallow a speak() call completely silently — no onstart, no onend,
+  // no onerror, ever. Without this, a "つぎへ" button waiting on
+  // onSettled would stay disabled forever and the player would be
+  // stuck. Forcing onSettled after a few seconds guarantees they can
+  // always continue, even in that worst case. Kept generous (rather
+  // than a snappy couple of seconds) since some lines here run several
+  // sentences together and can legitimately take a while to finish.
+  if(typeof onSettled === 'function'){
+    setTimeout(()=>{
+      if(!settledFired){
+        settledFired = true;
+        if(unlockAudioEl){
+          unlockAudioIntentionalPause = false;
+          if(unlockAudioEl.paused) unlockAudioEl.play().catch(()=>{});
+        }
+        onSettled();
+      }
+    }, SPEECH_SETTLE_TIMEOUT_MS);
+  }
+
+  if(ss.speaking || ss.pending){
+    ss.cancel();
+  }
+
+  // Deliberately pause the silent background loop right before
+  // speaking. Real device logs consistently show it getting paused
+  // anyway right as speech starts — most likely iOS audio-ducking /
+  // session-priority behavior kicking in — and our own scramble to
+  // resume it (the 'pause' listener above, in its normal mode) seems to
+  // be exactly what was fading the speech out shortly after it started.
+  // Pausing it ourselves, on our own terms, and flagging it as
+  // intentional so that listener stays quiet during this one
+  // utterance, should remove that tug-of-war over the audio session.
+  if(unlockAudioEl){
+    unlockAudioIntentionalPause = true;
+    unlockAudioEl.pause();
+  }
+  ss.speak(u);
+}
+
+/* ---------- voice picker UI (Settings > よみあげの声) ---------- */
+const voiceOverlay = document.getElementById('voiceOverlay');
+const voiceListEl = document.getElementById('voiceList');
+const voiceEmptyEl = document.getElementById('voiceEmpty');
+
+function getEnglishVoiceList(){
+  if(!('speechSynthesis' in window)) return [];
+  return window.speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+}
+
+function renderVoiceList(){
+  let voices = getEnglishVoiceList();
+  // some browsers report voices asynchronously — if the list is empty,
+  // nudge speechSynthesis and try again shortly before giving up
+  if(voices.length === 0 && 'speechSynthesis' in window){
+    window.speechSynthesis.getVoices();
+    setTimeout(()=>{
+      if(voiceOverlay.classList.contains('show')) renderVoiceList();
+    }, 300);
+  }
+  voiceListEl.innerHTML = '';
+  if(voices.length === 0){
+    voiceEmptyEl.style.display = 'block';
+    return;
+  }
+  voiceEmptyEl.style.display = 'none';
+  const savedName = localStorage.getItem(VOICE_STORAGE_KEY);
+  const currentName = preferredVoice ? preferredVoice.name : null;
+  voices.forEach(v=>{
+    const row = document.createElement('div');
+    const isActive = savedName ? v.name === savedName : v.name === currentName;
+    row.className = 'voice-item' + (isActive ? ' active' : '');
+    row.innerHTML = `
+      <span class="voice-check">${isActive ? '✓' : ''}</span>
+      <span style="flex:1;">
+        <span class="voice-name">${v.name}</span>
+        <span class="voice-lang">${v.lang}</span>
+      </span>
+      <button class="voice-play" aria-label="ためしに聞く">▶</button>
+    `;
+    row.querySelector('.voice-play').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if('speechSynthesis' in window){
+        const u = new SpeechSynthesisUtterance('Hello! Nice to meet you.');
+        u.voice = v; u.lang = v.lang; u.rate = 1.0;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      }
+    });
+    row.addEventListener('click', ()=>{
+      localStorage.setItem(VOICE_STORAGE_KEY, v.name);
+      preferredVoice = v;
+      renderVoiceList();
+      updateVoiceSettingLabel();
+    });
+    voiceListEl.appendChild(row);
+  });
+}
+
+document.getElementById('voiceSettingBtn').addEventListener('click', ()=>{
+  renderVoiceList();
+  voiceOverlay.classList.add('show');
+});
+document.getElementById('closeVoiceOverlay').addEventListener('click', ()=>{
+  voiceOverlay.classList.remove('show');
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+});
+
+/* ---------- voice debug log UI (Settings > 音声のログ) ---------- */
+const voiceDebugOverlay = document.getElementById('voiceDebugOverlay');
+const voiceDebugListEl = document.getElementById('voiceDebugList');
+const voiceDebugEmptyEl = document.getElementById('voiceDebugEmpty');
+
+function renderVoiceDebugList(){
+  if(voiceDebugLog.length === 0){
+    voiceDebugEmptyEl.style.display = 'block';
+    voiceDebugListEl.innerHTML = '';
+    return;
+  }
+  voiceDebugEmptyEl.style.display = 'none';
+  // newest first, so the most relevant entry is visible without scrolling
+  const rows = voiceDebugLog.slice().reverse().map(entry=>{
+    const cls = entry.level === 'ok' ? 'ok' : entry.level === 'warn' ? 'warn' : entry.level === 'error' ? 'error' : '';
+    const escaped = entry.message.replace(/</g,'&lt;');
+    return `<div class="voice-debug-item ${cls}"><span class="vd-time">${entry.time}</span>  ${escaped}</div>`;
+  }).join('');
+  voiceDebugListEl.innerHTML = rows;
+}
+
+function voiceDebugLogToText(){
+  return voiceDebugLog.map(e => `[${e.time}] ${e.message}`).join('\n');
+}
+
+document.getElementById('voiceDebugBtn').addEventListener('click', ()=>{
+  const badge = document.getElementById('voiceDebugBadge');
+  if(badge){ badge.style.display = 'none'; }
+  renderVoiceDebugList();
+  voiceDebugOverlay.classList.add('show');
+});
+document.getElementById('closeVoiceDebugOverlay').addEventListener('click', ()=>{
+  voiceDebugOverlay.classList.remove('show');
+});
+document.getElementById('voiceDebugTestBtn').addEventListener('click', ()=>{
+  speakEnglish('Hello! Can you hear me? This is a test.');
+});
+document.getElementById('voiceDebugClearBtn').addEventListener('click', ()=>{
+  voiceDebugLog = [];
+  renderVoiceDebugList();
+});
+document.getElementById('voiceDebugCopyBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('voiceDebugCopyBtn');
+  const text = voiceDebugLogToText() || '(ログはまだ ありません)';
+  try{
+    await navigator.clipboard.writeText(text);
+    const original = btn.textContent;
+    btn.textContent = 'コピーした！';
+    setTimeout(()=>{ btn.textContent = original; }, 1500);
+  } catch(e){
+    // clipboard API may be unavailable — select the text as a fallback
+    // by putting it in the empty-state paragraph briefly
+    voiceDebugListEl.innerHTML = `<div class="voice-debug-item">${text.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`;
+    voiceDebugEmptyEl.style.display = 'none';
+  }
+});
+
+
 
 const ORB_POSITIONS = [[24,48],[32,48],[40,48],[22,42],[30,42],[38,42],[42,42],[24,36],[32,36],[40,36],[28,30],[36,30]];
 const ORB_COLORS = ['#FF8FA3','#FFD873','#6FE0C2','#B9A6E8'];
@@ -9038,6 +9907,46 @@ function showToast(text){
   t.textContent = text;
   document.body.appendChild(t);
   setTimeout(()=> t.remove(), 5000);
+}
+
+function showDailyGoalModal(streak){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; inset:0; z-index:98; background:rgba(74,59,92,0.6); display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
+  
+  const card = document.createElement('div');
+  card.style.cssText = 'width:min(90vw, 380px); background:#fff; border-radius:24px; padding:32px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; font-family:"M PLUS Rounded 1c", sans-serif;';
+  
+  const emoji = document.createElement('div');
+  emoji.style.cssText = 'font-size:56px;';
+  emoji.textContent = '🎉';
+  card.appendChild(emoji);
+  
+  const msg = document.createElement('div');
+  msg.style.cssText = 'font-size:18px; font-weight:800; color:var(--plum); line-height:1.5;';
+  msg.innerHTML = `すごい！<br>今日の${DAILY_GOAL}問に せいかいした！<br>（${streak}日れんぞく）`;
+  card.appendChild(msg);
+  
+  const submsg = document.createElement('div');
+  submsg.style.cssText = 'font-size:13px; color:var(--plum-soft); font-weight:700; line-height:1.6;';
+  submsg.innerHTML = `ゲームはそのまま続けられるよ 🐾<br>ボーナス <span style="color:var(--sunshine-deep); font-size:14px;">+10🪙</span>`;
+  card.appendChild(submsg);
+  
+  const okBtn = document.createElement('button');
+  okBtn.style.cssText = 'margin-top:12px; background:linear-gradient(135deg, var(--mint), var(--mint-deep)); color:#fff; border:none; border-radius:12px; padding:14px 32px; font-weight:800; font-size:16px; cursor:pointer; font-family:"M PLUS Rounded 1c", sans-serif; box-shadow:0 4px 12px rgba(63,199,166,0.4);';
+  okBtn.textContent = 'やった！';
+  okBtn.style.transition = 'transform 0.1s ease';
+  okBtn.onmouseover = ()=> okBtn.style.transform = 'scale(1.05)';
+  okBtn.onmouseout = ()=> okBtn.style.transform = 'scale(1)';
+  
+  okBtn.onclick = ()=>{
+    overlay.remove();
+  };
+  card.appendChild(okBtn);
+  
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  
+  okBtn.focus();
 }
 
 function burstSparkles(btn){
