@@ -3095,7 +3095,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.29.0';
+const GAME_VERSION = 'v1.30.0';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -3124,6 +3124,9 @@ function travelToIsland(id){
   cancelSleigh();
   cancelSled();
   cancelAuroraFlight();
+  cancelSlalom();
+  cancelBalloon();
+  cancelZip();
   currentIslandId = id;
   inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
@@ -8417,6 +8420,622 @@ function updateAuroraFlight(dt){
   camera.updateProjectionMatrix();
 }
 
+
+/* =========================================================
+   NEW RIDES, PART A — shared track utilities, a generic "lane ride"
+   (real-time: slide into the lane that holds the right answer) and the
+   ⛷️ スラローム around the ice palace.
+========================================================= */
+function makeTrackPath(pts, step, bankGain, bankClamp){
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/step));
+  const st = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], Q = [], raw = [];
+  const wu = new THREE.Vector3(0,1,0);
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  for(let i=0;i<=n;i++){
+    const u = wu.clone().sub(T[i].clone().multiplyScalar(wu.dot(T[i]))).normalize();
+    const left = u.clone().cross(T[i]).normalize();
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, u, T[i])));
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const rate = Math.atan2(Math.sin(d), Math.cos(d)) / (2*st);
+    raw.push(Math.max(-bankClamp, Math.min(bankClamp, -rate*bankGain*Math.hypot(T[i].x, T[i].z))));
+  }
+  const bank = raw.map((_,i)=>{ let sum = 0, c = 0; for(let j=Math.max(0,i-8); j<=Math.min(n,i+8); j++){ sum += raw[j]; c++; } return sum/c; });
+  return { pts:P, T, Q, bank, total, step:st, n };
+}
+const _tfQ = new THREE.Quaternion();
+const _tfZ = new THREE.Vector3(0,0,1);
+function newFrame(){ return { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 }; }
+function trackFrameAt(path, s, out){
+  out = out || newFrame();
+  let bank = 0;
+  if(s <= 0){ out.pos.copy(path.pts[0]).addScaledVector(path.T[0], s); out.q.copy(path.Q[0]); }
+  else if(s >= path.total){ out.pos.copy(path.pts[path.n]).addScaledVector(path.T[path.n], s - path.total); out.q.copy(path.Q[path.n]); }
+  else {
+    const f = s / path.step, i = Math.min(path.n-1, Math.floor(f)), k = f - i;
+    out.pos.copy(path.pts[i]).lerp(path.pts[i+1], k);
+    out.q.copy(path.Q[i]).slerp(path.Q[i+1], k);
+    bank = path.bank[i]*(1-k) + path.bank[i+1]*k;
+  }
+  _tfQ.setFromAxisAngle(_tfZ, bank);
+  out.q.multiply(_tfQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+// a visible ribbon (channel) along a path, plus pillars where wanted
+function buildTrackRibbon(path, group, color, emissive, pillarWhere){
+  const fr = newFrame(), verts = [], idx = [];
+  const m = Math.floor(path.total/0.5);
+  for(let i=0;i<=m;i++){
+    trackFrameAt(path, Math.min(path.total, i*0.5), fr);
+    [[0.95,0.4],[0.8,-0.02],[-0.8,-0.02],[-0.95,0.4]].forEach(([lx,uy])=>{
+      verts.push(fr.pos.x + fr.left.x*lx + fr.up.x*uy, fr.pos.y + fr.left.y*lx + fr.up.y*uy, fr.pos.z + fr.left.z*lx + fr.up.z*uy);
+    });
+    if(i > 0) for(let k=0;k<3;k++){ const a = (i-1)*4+k, b = a+1, c = i*4+k, d = c+1; idx.push(a,b,c, b,d,c); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  group.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, transparent:true, opacity:0.88, side:THREE.DoubleSide, shininess:100, emissive, emissiveIntensity:0.3 })));
+  const pm = new THREE.MeshPhongMaterial({ color:0xDDEFFB, shininess:80 });
+  for(let s=3; s<path.total; s+=6){
+    if(!pillarWhere(s)) continue;
+    trackFrameAt(path, s, fr);
+    if(fr.pos.y < 1.3) continue;
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,fr.pos.y-0.15,8), pm);
+    pil.position.set(fr.pos.x, (fr.pos.y-0.15)/2, fr.pos.z);
+    group.add(pil);
+  }
+}
+
+function createLaneRide(cfg){
+  const S = { active:false, s:0, t:0, lat:0, laneTarget:1, correct:0, shake:0,
+    camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(1,0,0) };
+  const path = cfg.path, fa = newFrame(), ft = newFrame();
+  const gates = cfg.gateS.map(s => ({ s, asked:false, done:false, q:null, marks:[], labels:[] }));
+  gates.forEach(g=>{
+    const fr = trackFrameAt(path, g.s);
+    for(let lane=0; lane<3; lane++){
+      const mk = cfg.buildMarker(lane, cfg.colors[lane]);
+      mk.position.copy(fr.pos).addScaledVector(fr.left, (1-lane)*cfg.laneW).addScaledVector(fr.up, cfg.markerUp);
+      mk.quaternion.copy(fr.q);
+      mk.visible = false;
+      cfg.group.add(mk);
+      const label = makeRingLabel();
+      label.position.copy(mk.position).addScaledVector(fr.up, cfg.labelUp);
+      cfg.group.add(label);
+      g.marks.push({ grp:mk, pulse:0 });
+      g.labels.push(label);
+    }
+  });
+  let trail = null;
+  if(cfg.trail){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40*3),3));
+    trail = new THREE.Points(geo, new THREE.PointsMaterial({ color:cfg.trailColor, size:0.45, transparent:true, opacity:0.9, depthWrite:false }));
+    trail.frustumCulled = false; trail.visible = false;
+    cfg.group.add(trail);
+  }
+  function hud(){
+    let el = document.getElementById(cfg.hudId);
+    if(el) return el;
+    el = document.createElement('div');
+    el.id = cfg.hudId;
+    el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+    const lc = 'flex:1; min-height:68px; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+    el.innerHTML =
+      '<div style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+        '<div class="h" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+        '<div style="display:flex; align-items:center; justify-content:center; gap:10px;"><div class="w" style="font-size:26px; font-weight:800;"></div>' +
+        '<button class="snd" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button></div>' +
+        '<div class="m" style="min-height:18px; font-size:13px; font-weight:800;"></div></div>' +
+      '<div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; gap:8px;">' +
+        '<button class="l0" style="'+lc+' background:#FFD1E3;"></button><button class="l1" style="'+lc+' background:#FFF0B8;"></button><button class="l2" style="'+lc+' background:#CBEBFF;"></button></div>';
+    document.body.appendChild(el);
+    [0,1,2].forEach(i => el.querySelector('.l'+i).addEventListener('pointerdown', (e)=>{ e.preventDefault(); S.laneTarget = i; refreshBtns(); }));
+    el.querySelector('.snd').addEventListener('click', ()=>{ const g = gates.find(x => x.asked && !x.done); if(g && g.q){ try{ speakEnglish(g.q.target.en); }catch(e){} } });
+    return el;
+  }
+  function refreshBtns(){ const el = document.getElementById(cfg.hudId); if(!el) return; [0,1,2].forEach(i => { el.querySelector('.l'+i).style.outline = (S.laneTarget === i) ? '4px solid #4A3B5C' : 'none'; }); }
+  function setLaneLabels(opts){
+    const el = hud(); const ar = ['◀ ','▲ ','▶ '];
+    [0,1,2].forEach(i=>{ const b = el.querySelector('.l'+i); b.textContent = opts ? (ar[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i]; b.style.fontSize = (opts && opts[i].ja.length > 5) ? '14px' : '17px'; });
+  }
+  function ask(g, i){
+    g.asked = true; g.q = pickAfQuestion();
+    const el = hud();
+    el.querySelector('.h').textContent = cfg.emoji + ' ' + (i+1) + '/' + gates.length + '　この えいごの いみの レーンへ！';
+    el.querySelector('.w').textContent = g.q.target.en;
+    el.querySelector('.m').textContent = '';
+    setLaneLabels(g.q.options);
+    for(let lane=0; lane<3; lane++){ setRingLabel(g.labels[lane], g.q.options[lane].ja); g.labels[lane].visible = true; g.marks[lane].grp.visible = true; }
+    try{ speakEnglish(g.q.target.en); }catch(e){}
+  }
+  function resolve(g){
+    g.done = true;
+    const lane = Math.max(0, Math.min(2, 1 - Math.round(S.lat/cfg.laneW)));
+    const ok = (g.q.options[lane].en === g.q.target.en);
+    const msg = hud().querySelector('.m');
+    g.marks[lane].pulse = 0.8;
+    if(ok){ S.correct++; addCoins(1); playCorrectSound(); msg.textContent = '⭕ ' + g.q.target.en + ' ＝ ' + g.q.target.ja; try{ speakEnglish(g.q.target.en); }catch(e){} }
+    else { playWrongSound(); S.shake = 0.5; msg.textContent = '❌ こたえは「' + g.q.target.ja + '」'; }
+    setLaneLabels(null);
+    setTimeout(()=>{ g.labels.forEach(l => { l.visible = false; }); g.marks.forEach(m => { m.grp.visible = false; }); }, 900);
+  }
+  function reset(){
+    gates.forEach(g=>{ g.asked = false; g.done = false; g.q = null; g.labels.forEach(l => { l.visible = false; }); g.marks.forEach(m => { m.grp.visible = false; m.pulse = 0; m.grp.scale.set(1,1,1); }); });
+  }
+  function pose(s, lat){
+    trackFrameAt(path, s, fa);
+    cfg.vehicle.position.copy(fa.pos).addScaledVector(fa.left, lat);
+    cfg.vehicle.quaternion.copy(fa.q);
+    player.position.copy(cfg.vehicle.position).addScaledVector(fa.up, cfg.playerUp);
+    player.quaternion.copy(fa.q);
+  }
+  function park(){ cfg.vehicle.position.copy(path.pts[0]); cfg.vehicle.quaternion.copy(path.Q[0]); player.quaternion.identity(); }
+  function board(){
+    if(rideActive) return;
+    if(cfg.onBoard) cfg.onBoard();
+    rideActive = true; reset();
+    Object.assign(S, { active:true, s:0, t:0, lat:0, laneTarget:1, correct:0, shake:0 });
+    S.camDir.set(path.T[0].x, 0, path.T[0].z).normalize();
+    if(trail) trail.visible = true;
+    moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+    const el = hud(); el.querySelector('.h').textContent = cfg.emoji + ' ' + cfg.name; el.querySelector('.w').textContent = 'Ready…'; el.querySelector('.m').textContent = 'つぎの もんだいを まっていてね';
+    setLaneLabels(null); refreshBtns(); el.style.display = 'block';
+  }
+  function end(){
+    S.active = false; rideActive = false;
+    if(trail) trail.visible = false;
+    const el = document.getElementById(cfg.hudId); if(el) el.style.display = 'none';
+    reset(); park();
+    if(cfg.onEnd) cfg.onEnd();
+    player.position.set(cfg.landing.x, 0, cfg.landing.z); player.rotation.set(0,0,0);
+    camera.fov = 52; camera.updateProjectionMatrix();
+    camera.position.set(cfg.landing.x, 2.6, cfg.landing.z - 6.8);
+  }
+  function cancel(){ if(S.active) end(); }
+  function finish(){
+    const n = gates.length, bonus = (S.correct === n) ? 1 : 0;
+    if(bonus) addCoins(1);
+    const c = S.correct;
+    end(); saveProgress();
+    showToast(cfg.emoji + ' ' + cfg.name + '、おつかれさま！ ' + n + 'もん中' + c + 'もん せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+  }
+  function update(dt){
+    const nowS = performance.now()/1000;
+    if(!S.active){ if(cfg.idle) cfg.idle(dt, nowS); return; }
+    S.t += dt;
+    let v = cfg.speedAt(S.s, path) * Math.min(1, 0.3 + S.t/2.5);
+    const left = path.total - S.s;
+    if(left < 30) v *= Math.max(0.35, left/30);
+    S.s += v*dt;
+    if(S.s >= path.total - 0.05){ finish(); return; }
+    S.lat += ((1 - S.laneTarget)*cfg.laneW - S.lat) * (1 - Math.exp(-dt*5));
+    gates.forEach((g,i)=>{
+      if(!g.asked && g.s - S.s < cfg.askDist && g.s - S.s > 0) ask(g, i);
+      if(g.asked && !g.done && S.s >= g.s) resolve(g);
+      g.marks.forEach(m=>{ if(m.pulse > 0){ m.pulse = Math.max(0, m.pulse - dt); const sc = 1 + Math.sin((m.pulse/0.8)*Math.PI)*0.5; m.grp.scale.set(sc,sc,sc); } });
+    });
+    pose(S.s, S.lat);
+    if(trail){
+      const tp = trail.geometry.attributes.position.array;
+      for(let i=0;i<40;i++){
+        trackFrameAt(path, S.s - 0.4 - i*0.4, ft);
+        tp[i*3] = ft.pos.x + ft.left.x*S.lat + (Math.random()-0.5)*0.35;
+        tp[i*3+1] = ft.pos.y + ft.left.y*S.lat + 0.2 + (Math.random()-0.5)*0.35;
+        tp[i*3+2] = ft.pos.z + ft.left.z*S.lat + (Math.random()-0.5)*0.35;
+      }
+      trail.geometry.attributes.position.needsUpdate = true;
+    }
+    trackFrameAt(path, S.s, fa);
+    const hl = Math.hypot(fa.fwd.x, fa.fwd.z);
+    if(hl > 0.35){
+      const kk = 1 - Math.exp(-dt*3);
+      S.camDir.x += (fa.fwd.x/hl - S.camDir.x)*kk; S.camDir.z += (fa.fwd.z/hl - S.camDir.z)*kk;
+      const L = Math.hypot(S.camDir.x, S.camDir.z) || 1; S.camDir.x /= L; S.camDir.z /= L;
+    }
+    const rp = player.position;
+    S.camPos.set(rp.x - S.camDir.x*cfg.camBack, rp.y + cfg.camUp, rp.z - S.camDir.z*cfg.camBack);
+    S.camLook.set(rp.x + S.camDir.x*3, rp.y + 1.0, rp.z + S.camDir.z*3);
+    if(S.shake > 0){ S.shake = Math.max(0, S.shake - dt); S.camPos.x += (Math.random()-0.5)*S.shake; S.camPos.y += (Math.random()-0.5)*S.shake; }
+    camera.fov += ((52 + cfg.fovExtra*Math.min(1, v/cfg.speedRef)) - camera.fov) * (1 - Math.exp(-dt*4));
+    camera.updateProjectionMatrix();
+  }
+  return { board, update, cancel, state:S, gates, path, park };
+}
+
+// ---------- ⛷️ スラローム: a spiral run around the ice palace ----------
+const SL_TH0 = 190*Math.PI/180;                      // start on the west side of the palace
+const SL_STATION = { x:12*Math.cos(SL_TH0), z:27 + 12*Math.sin(SL_TH0) };
+const SL_PATH = (function(){
+  const pts = [];
+  const M = 190;
+  for(let k=0;k<=M;k++){
+    const f = k/M;
+    const th = SL_TH0 + (f < 0.16 ? Math.PI*(f/0.16) : Math.PI + 5*Math.PI*((f-0.16)/0.84));   // 180° lift, then 2.5 turns down
+    let y;
+    if(f < 0.16) y = 0.9 + 13.1*dragonSstep(f/0.16);
+    else if(f < 0.93) y = 14 - 9*dragonSstep((f-0.16)/0.77);
+    else y = 5 - 4.1*dragonSstep((f-0.93)/0.07);
+    const r = 12.5 + 1.5*Math.sin(14*Math.PI*f);
+    pts.push(new THREE.Vector3(r*Math.cos(th), y, 27 + r*Math.sin(th)));
+  }
+  pts[0].set(SL_STATION.x, 0.9, SL_STATION.z);
+  pts[M].set(SL_STATION.x, 0.9, SL_STATION.z);
+  return makeTrackPath(pts, 0.5, 8.0, 0.8);
+})();
+const slalomGroup = new THREE.Group();
+iceDecorGroup.add(slalomGroup);
+buildTrackRibbon(SL_PATH, slalomGroup, 0xE6F3FF, 0x4A90D0, s => s < 30 || s > SL_PATH.total - 12);
+const slalomSkis = new THREE.Group();
+{
+  const m = new THREE.MeshLambertMaterial({color:0xD9453D});
+  [-0.32,0.32].forEach(x=>{ const ski = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.06,1.7), m); ski.position.set(x,0.04,0.1); slalomSkis.add(ski); });
+  slalomGroup.add(slalomSkis);
+}
+slalomSkis.position.copy(SL_PATH.pts[0]);
+function makeSlalomFlag(lane, color){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,3.2,6), new THREE.MeshLambertMaterial({color:0xEFEFEF})); pole.position.y = 1.6;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.9,0.05), new THREE.MeshLambertMaterial({color})); flag.position.set(0.75,2.8,0);
+  g.add(pole, flag);
+  return g;
+}
+const slalomRide = createLaneRide({
+  hudId:'slalomHud', emoji:'⛷️', name:'スラローム', group:slalomGroup, path:SL_PATH, vehicle:slalomSkis, playerUp:0.08,
+  gateS:[0.32,0.46,0.60,0.74,0.88].map(f => f*SL_PATH.total),
+  colors:[0xD9453D,0xF2C230,0x4F8FE0], buildMarker:makeSlalomFlag, laneW:3.0, markerUp:0.0, labelUp:4.2,
+  askDist:30, trail:true, trailColor:0xFFFFFF, camBack:7, camUp:2.8, fovExtra:16, speedRef:9.5,
+  landing:{ x:SL_STATION.x + 1.8, z:SL_STATION.z - 2.0 },
+  speedAt:(s,p)=> (s < 30 ? 4.5 : 9.5),
+});
+function boardSlalom(l){ slalomRide.board(); }
+function cancelSlalom(){ slalomRide.cancel(); }
+function updateSlalom(dt){ slalomRide.update(dt); }
+function makeSlalomStation(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.15,18), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:90})); pad.position.y = 0.08;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), new THREE.MeshLambertMaterial({color:0x7A5C4A})); post.position.y = 0.85;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04), new THREE.MeshLambertMaterial({color:0x4F8FE0})); flag.position.set(0.4,1.5,0);
+  g.add(pad, post, flag);
+  const marker = makeFloatingMarker('⛷️', 2.7);
+  g.add(marker, makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+
+/* =========================================================
+   NEW RIDES, PART B — 🪂 ジップライン (sakura island: from a tower behind
+   the shrine, over the torii, down to the boat dock; the guide talks while
+   you fly, then asks questions at the landing) and 🎈 熱気球 (ice island: a
+   hot-air balloon you steer by English commands — up, down, left, right,
+   north, south, east, west).
+========================================================= */
+// ---------- 🪂 ジップライン ----------
+const ZIP_A = new THREE.Vector3(0,20,32), ZIP_B = new THREE.Vector3(-3,2.8,-18.5);
+const ZIP_PATH = (function(){
+  const pts = [];
+  for(let k=0;k<=12;k++){
+    const t = k/12;
+    const p = ZIP_A.clone().lerp(ZIP_B, t);
+    p.y -= 2.5*4*t*(1-t);                          // a little sag in the cable
+    pts.push(p);
+  }
+  return makeTrackPath(pts, 0.5, 0, 0.1);
+})();
+const zipGroup = new THREE.Group();
+sakuraDecorGroup.add(zipGroup);
+const zipTrolley = new THREE.Group();
+{
+  const wood = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const red = new THREE.MeshPhongMaterial({color:0xD9453D, shininess:40});
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.45,19.4,10), wood); post.position.set(ZIP_A.x, 9.7, ZIP_A.z);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3,0.25,3), wood); deck.position.set(ZIP_A.x, 19.5, ZIP_A.z);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.2,0.3), red); beam.position.set(ZIP_A.x, 22.4, ZIP_A.z);
+  [-1.5,1.5].forEach(dx=>{ const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,2.9,6), red); pil.position.set(ZIP_A.x+dx, 20.95, ZIP_A.z); zipGroup.add(pil); });
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6,1.0,4), new THREE.MeshLambertMaterial({color:0x4A5568})); roof.rotation.y = Math.PI/4; roof.position.set(ZIP_A.x, 23.1, ZIP_A.z);
+  zipGroup.add(post, deck, beam, roof);
+  const endPost = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.25,3.5,8), wood); endPost.position.set(-1.6,1.75,-18.3);
+  const endFlag = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.45,0.05), red); endFlag.position.set(-1.2,3.2,-18.3);
+  zipGroup.add(endPost, endFlag);
+  const curve = new THREE.CatmullRomCurve3(ZIP_PATH.pts.filter((_,i)=> i % 40 === 0 || i === ZIP_PATH.n));
+  zipGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.05, 6, false), new THREE.MeshLambertMaterial({color:0x2A2A2A})));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.35), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,1.9,5), new THREE.MeshLambertMaterial({color:0xD9453D})); rope.position.y = -1.0;
+  zipTrolley.add(body, rope);
+  zipGroup.add(zipTrolley);
+}
+zipTrolley.position.copy(ZIP_A).setY(ZIP_A.y + 0.4);
+function makeZipStation(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.15,18), new THREE.MeshLambertMaterial({color:0xB9B2A6})); pad.position.y = 0.08;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), new THREE.MeshLambertMaterial({color:0x7A5C4A})); post.position.y = 0.85;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04), new THREE.MeshLambertMaterial({color:0xD9453D})); flag.position.set(0.4,1.5,0);
+  g.add(pad, post, flag);
+  const marker = makeFloatingMarker('🪂', 2.7);
+  g.add(marker, makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+const ZIP_LINES = [
+  { at:0.08, en:"We are very high up! The whole island looks tiny.", ja:"とても高いところに いるよ！島ぜんぶが ちいさく 見えるね。" },
+  { at:0.42, en:"Look! We are flying over the big red torii gate.", ja:"見て！大きな赤い鳥居の上を とんでいるよ。" },
+  { at:0.84, en:"Here is the koi lake. Let's land near the water!", ja:"こいの池だよ。水のそばに おりよう！" },
+];
+const ZIP_QUIZ = [
+  { en:"How does the island look from the sky?", good:"Tiny", bad:"Huge", ja:"空から見ると、島は「ちいさく」見えたね。" },
+  { en:"What did we fly over?", good:"A torii gate", bad:"A bridge", ja:"「鳥居」の上を とんだよ。" },
+  { en:"Where did we land?", good:"Near the lake", bad:"On a mountain", ja:"「池のそば」に おりたよ。" },
+];
+const zip = { active:false, cam:false, phase:'idle', s:0, t:0, subIdx:0, qIdx:0, correct:0, hideTimer:0,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(0,0,-1) };
+const _zA = newFrame();
+function zipSub(){
+  let el = document.getElementById('zipSub');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'zipSub';
+  el.style.cssText = 'position:fixed; left:50%; top:14px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,255,255,0.93); border-radius:18px; padding:10px 14px; text-align:center; box-shadow:0 6px 20px rgba(0,0,0,.25); color:#4A3B5C; display:none;';
+  el.innerHTML = '<div class="e" style="font-size:19px; font-weight:800; line-height:1.4;"></div><div class="j" style="font-size:12px; font-weight:700; opacity:.8; margin-top:4px;"></div>';
+  document.body.appendChild(el);
+  return el;
+}
+function zipQuizHud(){
+  let el = document.getElementById('zipQuiz');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'zipQuiz';
+  el.style.cssText = 'position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,250,244,0.97); border-radius:22px; padding:14px; box-shadow:0 12px 34px rgba(0,0,0,.28); text-align:center; display:none; color:#4A3B5C;';
+  document.body.appendChild(el);
+  return el;
+}
+function showZipQuestion(){
+  const q = ZIP_QUIZ[zip.qIdx];
+  const el = zipQuizHud(); el.innerHTML = '';
+  const head = document.createElement('div'); head.style.cssText = 'font-size:12px; font-weight:800; opacity:.7;'; head.textContent = '🪂 ' + (zip.qIdx+1) + '/' + ZIP_QUIZ.length;
+  const qe = document.createElement('div'); qe.style.cssText = 'font-size:19px; font-weight:800; margin:8px 0 12px;'; qe.textContent = q.en;
+  const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:10px;';
+  const msg = document.createElement('div'); msg.style.cssText = 'min-height:18px; margin-top:10px; font-size:13px; font-weight:800;';
+  const opts = [{t:q.good, ok:true},{t:q.bad, ok:false}]; if(Math.random() < 0.5) opts.reverse();
+  let answered = false;
+  const btns = opts.map(o=>{
+    const b = document.createElement('button'); b.textContent = o.t;
+    b.style.cssText = 'flex:1; min-height:54px; font-size:17px; font-weight:800; border:0; border-radius:16px; background:#FFE1EC; color:#4A3B5C; cursor:pointer;';
+    b.addEventListener('click', ()=>{
+      if(answered || !zip.active) return; answered = true;
+      btns.forEach(x => x.disabled = true);
+      if(o.ok){ b.style.background = '#B8F0C8'; zip.correct++; addCoins(1); playCorrectSound(); msg.textContent = '⭕ せいかい！ ' + q.ja; }
+      else { b.style.background = '#FFC1C1'; playWrongSound(); msg.textContent = '❌ ざんねん… ' + q.ja; }
+      clearTimeout(zip.hideTimer);
+      zip.hideTimer = setTimeout(()=>{ if(!zip.active) return; zip.qIdx++; if(zip.qIdx < ZIP_QUIZ.length) showZipQuestion(); else finishZip(); }, 2000);
+    });
+    row.appendChild(b); return b;
+  });
+  el.append(head, qe, row, msg); el.style.display = 'block';
+}
+function boardZip(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  Object.assign(zip, { active:true, cam:true, phase:'ride', s:0, t:0, subIdx:0, qIdx:0, correct:0 });
+  zip.camDir.set(ZIP_PATH.T[0].x, 0, ZIP_PATH.T[0].z).normalize();
+  moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+  const sub = zipSub(); sub.style.display = 'none';
+}
+function endZip(){
+  clearTimeout(zip.hideTimer);
+  zip.active = false; zip.cam = false; zip.phase = 'idle'; rideActive = false;
+  const sub = document.getElementById('zipSub'); if(sub) sub.style.display = 'none';
+  const qh = document.getElementById('zipQuiz'); if(qh) qh.style.display = 'none';
+  zipTrolley.position.copy(ZIP_A).setY(ZIP_A.y + 0.4);
+  player.rotation.set(0,0,0);
+  player.position.set(0, 0, 29.2);
+  camera.fov = 52; camera.updateProjectionMatrix();
+  camera.position.set(0, 2.6, 29.2 - 6.8);
+}
+function cancelZip(){ if(zip.active) endZip(); }
+function finishZip(){
+  const n = ZIP_QUIZ.length, c = zip.correct, bonus = (c === n) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endZip(); saveProgress();
+  showToast('🪂 ジップライン、おつかれさま！ ' + n + 'もん中' + c + 'もん せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : '') + '　かえりは ケーブルカーで もどったよ');
+}
+function updateZip(dt){
+  if(!zip.active) return;
+  zip.t += dt;
+  if(zip.phase === 'ride'){
+    const left = ZIP_PATH.total - zip.s;
+    let v = 3 + 9*Math.min(1, zip.s/20);
+    if(left < 14) v *= Math.max(0.22, left/14);
+    zip.s += v*dt;
+    const frac = zip.s / ZIP_PATH.total;
+    if(zip.subIdx < ZIP_LINES.length && frac >= ZIP_LINES[zip.subIdx].at){
+      const L = ZIP_LINES[zip.subIdx++]; const sub = zipSub();
+      sub.querySelector('.e').textContent = L.en; sub.querySelector('.j').textContent = L.ja; sub.style.display = 'block';
+      try{ speakEnglish(L.en); }catch(e){}
+      setTimeout(()=>{ if(zip.active && zip.phase === 'ride' && sub.querySelector('.e').textContent === L.en) sub.style.display = 'none'; }, 4200);
+    }
+    trackFrameAt(ZIP_PATH, Math.min(zip.s, ZIP_PATH.total), _zA);
+    zipTrolley.position.copy(_zA.pos).setY(_zA.pos.y + 0.4);
+    const yaw = Math.atan2(_zA.fwd.x, _zA.fwd.z);
+    player.position.set(_zA.pos.x, _zA.pos.y - 2.3, _zA.pos.z);
+    player.rotation.set(0, yaw, 0);
+    const hl = Math.hypot(_zA.fwd.x, _zA.fwd.z);
+    if(hl > 0.3){ const kk = 1 - Math.exp(-dt*3); zip.camDir.x += (_zA.fwd.x/hl - zip.camDir.x)*kk; zip.camDir.z += (_zA.fwd.z/hl - zip.camDir.z)*kk; const L2 = Math.hypot(zip.camDir.x, zip.camDir.z) || 1; zip.camDir.x /= L2; zip.camDir.z /= L2; }
+    zip.camPos.set(player.position.x - zip.camDir.x*7, player.position.y + 3.6, player.position.z - zip.camDir.z*7);
+    zip.camLook.set(player.position.x + zip.camDir.x*4, player.position.y + 0.4, player.position.z + zip.camDir.z*4);
+    camera.fov += ((52 + 12*Math.min(1, v/12)) - camera.fov) * (1 - Math.exp(-dt*4));
+    camera.updateProjectionMatrix();
+    if(zip.s >= ZIP_PATH.total - 0.05){
+      zip.phase = 'quiz'; zip.cam = false;
+      camera.fov = 52; camera.updateProjectionMatrix();
+      const sub = document.getElementById('zipSub'); if(sub) sub.style.display = 'none';
+      player.position.set(ZIP_B.x, 0.2, ZIP_B.z + 0.6); player.rotation.set(0, Math.PI, 0);
+      showZipQuestion();
+    }
+  }
+}
+
+// ---------- 🎈 熱気球 ----------
+const BAL_PAD = { x:14, z:-3 };
+const BAL_CMDS = [
+  { id:'up',    en:'Go up!',     ja:'上へ ゆこう！',       vec:[0,9,0],  label:'⬆ up' },
+  { id:'down',  en:'Go down!',   ja:'下へ おりよう！',     vec:[0,-9,0], label:'⬇ down' },
+  { id:'left',  en:'Turn left!', ja:'左へ すすもう！',     vec:[9,0,0],  label:'⬅ left' },
+  { id:'right', en:'Turn right!',ja:'右へ すすもう！',     vec:[-9,0,0], label:'➡ right' },
+  { id:'north', en:'Go north!',  ja:'北へ すすもう！（おしろの ほう）', vec:[0,0,9], label:'N north' },
+  { id:'south', en:'Go south!',  ja:'南へ すすもう！',     vec:[0,0,-9], label:'S south' },
+  { id:'east',  en:'Go east!',   ja:'東へ すすもう！（みぎ）', vec:[-9,0,0], label:'E east' },
+  { id:'west',  en:'Go west!',   ja:'西へ すすもう！（ひだり）', vec:[9,0,0], label:'W west' },
+];
+const balloonMesh = new THREE.Group();
+{
+  const g = new THREE.SphereGeometry(3.1,28,18);
+  const col = new THREE.Color(), pos = g.attributes.position, colors = [];
+  const sectors = [0xFF6B6B,0xFFF0C8,0x6BB5E8,0xFFF0C8];
+  for(let i=0;i<pos.count;i++){
+    const ang = Math.atan2(pos.getZ(i), pos.getX(i)) + Math.PI;
+    col.set(sectors[Math.floor(ang/(Math.PI*2)*8) % 4]);
+    colors.push(col.r, col.g, col.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+  const env = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true }));
+  env.scale.set(1,1.2,1); env.position.y = 5.2;
+  const basket = new THREE.Mesh(new THREE.BoxGeometry(1.7,1.0,1.7), new THREE.MeshLambertMaterial({color:0xB5835A})); basket.position.y = 0.5;
+  balloonMesh.add(env, basket);
+  [[-0.8,-0.8],[0.8,-0.8],[-0.8,0.8],[0.8,0.8]].forEach(([dx,dz])=>{
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,2.7,4), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+    rope.position.set(dx*0.85, 2.3, dz*0.85); rope.rotation.z = -dx*0.12; rope.rotation.x = dz*0.12;
+    balloonMesh.add(rope);
+  });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,8), new THREE.MeshBasicMaterial({color:0xFFB04A})); flame.position.y = 2.6;
+  balloonMesh.add(flame, makeBlobShadow(1.6));
+}
+balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z);
+iceDecorGroup.add(balloonMesh);
+function makeBalloonPad(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.6,0.15,22), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:90})); pad.position.y = 0.08;
+  g.add(pad);
+  const marker = makeFloatingMarker('🎈', 3.2);
+  g.add(marker, makeBlobShadow(2));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+const bal = { active:false, phase:'idle', t:0, pos:new THREE.Vector3(BAL_PAD.x,0,BAL_PAD.z), from:new THREE.Vector3(), to:new THREE.Vector3(),
+  order:[], idx:0, firstTry:true, correct:0, cmdAt:0, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
+function balHud(){
+  let el = document.getElementById('balHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'balHud';
+  el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+  const bc = 'flex:1; min-height:52px; font-size:16px; font-weight:800; border:0; border-radius:16px; background:#FFF; color:#4A3B5C; cursor:pointer; pointer-events:auto; box-shadow:0 3px 0 #BFD6EE; -webkit-tap-highlight-color:transparent;';
+  let rows = '';
+  for(let r=0;r<2;r++){ rows += '<div style="display:flex; gap:8px;">'; for(let c=0;c<4;c++) rows += '<button class="b'+(r*4+c)+'" style="'+bc+'">'+BAL_CMDS[r*4+c].label+'</button>'; rows += '</div>'; }
+  el.innerHTML =
+    '<div style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.93); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+      '<div class="h" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+      '<div style="display:flex; align-items:center; justify-content:center; gap:10px;"><div class="e" style="font-size:26px; font-weight:800;"></div>' +
+      '<button class="snd" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button></div>' +
+      '<div class="j" style="font-size:13px; font-weight:700; opacity:.8;"></div><div class="m" style="min-height:18px; font-size:13px; font-weight:800;"></div></div>' +
+    '<div style="position:absolute; bottom:18px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; flex-direction:column; gap:8px;">' + rows + '</div>';
+  document.body.appendChild(el);
+  BAL_CMDS.forEach((c,i)=> el.querySelector('.b'+i).addEventListener('click', ()=> balTap(c.id)));
+  el.querySelector('.snd').addEventListener('click', ()=>{ const c = bal.order[bal.idx]; if(c){ try{ speakEnglish(c.en); }catch(e){} } });
+  return el;
+}
+function balShowCommand(){
+  const c = bal.order[bal.idx]; const el = balHud();
+  bal.phase = 'wait'; bal.firstTry = true;
+  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　えいごの とおりに ふうせんを うごかそう';
+  el.querySelector('.e').textContent = c.en; el.querySelector('.j').textContent = c.ja; el.querySelector('.m').textContent = '';
+  try{ speakEnglish(c.en); }catch(e){}
+}
+function balTap(id){
+  if(!bal.active || bal.phase !== 'wait') return;
+  const c = bal.order[bal.idx], msg = balHud().querySelector('.m');
+  if(id === c.id){
+    if(bal.firstTry){ bal.correct++; addCoins(1); }
+    playCorrectSound(); msg.textContent = '⭕ ' + c.en;
+    bal.from.copy(bal.pos);
+    bal.to.set(bal.pos.x + c.vec[0], bal.pos.y + c.vec[1], bal.pos.z + c.vec[2]);
+    const r = Math.hypot(bal.to.x, bal.to.z); if(r > 30){ bal.to.x *= 30/r; bal.to.z *= 30/r; }
+    bal.to.y = Math.max(8, Math.min(40, bal.to.y));
+    bal.phase = 'move'; bal.t = 0;
+  } else {
+    bal.firstTry = false; playWrongSound(); msg.textContent = '🔊 もういちど よく きいてみよう';
+  }
+}
+function boardBalloon(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  bal.order = BAL_CMDS.slice().sort(()=>Math.random()-0.5);
+  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0 });
+  bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
+  moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+  const el = balHud(); el.querySelector('.h').textContent = '🎈 ねつききゅう'; el.querySelector('.e').textContent = 'Up we go…'; el.querySelector('.j').textContent = 'ゆっくり のぼっていくよ'; el.querySelector('.m').textContent = '';
+  el.style.display = 'block';
+}
+function endBalloon(){
+  bal.active = false; bal.phase = 'idle'; rideActive = false;
+  const el = document.getElementById('balHud'); if(el) el.style.display = 'none';
+  bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
+  balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z); balloonMesh.rotation.set(0,0,0);
+  player.position.set(BAL_PAD.x - 3.2, 0, BAL_PAD.z); player.rotation.set(0,0,0);
+  camera.position.set(BAL_PAD.x - 3.2, 2.6, BAL_PAD.z - 6.8);
+}
+function cancelBalloon(){ if(bal.active) endBalloon(); }
+function finishBalloon(){
+  const n = bal.order.length, c = bal.correct, bonus = (c === n) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endBalloon(); saveProgress();
+  showToast('🎈 熱気球、おつかれさま！ ' + n + 'こ中' + c + 'こ いっぱつで せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+function updateBalloon(dt){
+  const nowS = performance.now()/1000;
+  if(!bal.active){
+    if(iceDecorGroup.visible) balloonMesh.rotation.z = Math.sin(nowS*0.9)*0.02;
+    return;
+  }
+  bal.t += dt;
+  const ease = x => x*x*(3-2*x);
+  if(bal.phase === 'rise'){
+    const k = Math.min(1, bal.t/4); bal.pos.y = 20*ease(k);
+    if(k >= 1){ balShowCommand(); }
+  } else if(bal.phase === 'move'){
+    const k = Math.min(1, bal.t/2.4); bal.pos.lerpVectors(bal.from, bal.to, ease(k));
+    if(k >= 1){
+      bal.idx++;
+      if(bal.idx >= bal.order.length){ bal.phase = 'descend'; bal.t = 0; bal.from.copy(bal.pos); const el = balHud(); el.querySelector('.e').textContent = 'Going home…'; el.querySelector('.j').textContent = 'おりていくよ'; el.querySelector('.m').textContent = ''; }
+      else { bal.phase = 'pause'; setTimeout(()=>{ if(bal.active && bal.phase === 'pause') balShowCommand(); }, 400); }
+    }
+  } else if(bal.phase === 'descend'){
+    const k = Math.min(1, bal.t/5);
+    bal.pos.set(bal.from.x + (BAL_PAD.x - bal.from.x)*ease(k), bal.from.y*(1-ease(k)), bal.from.z + (BAL_PAD.z - bal.from.z)*ease(k));
+    if(k >= 1){ finishBalloon(); return; }
+  }
+  balloonMesh.position.copy(bal.pos);
+  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;
+  player.position.set(bal.pos.x, bal.pos.y + 0.5, bal.pos.z);
+  player.rotation.set(0,0,0);
+  // camera: from the south looking north, so "north" is up the screen and east is to the right
+  bal.camPos.set(bal.pos.x, bal.pos.y + 4.5, bal.pos.z - 14);
+  bal.camLook.set(bal.pos.x, bal.pos.y + 2.8, bal.pos.z + 8);
+}
+
 /* =========================================================
    THEMEPARK ATMOSPHERE DECORATIONS — purely visual, animated where
    noted, all shown only in ゆめのくにテーマパーク
@@ -9204,13 +9823,16 @@ const landmarks = [
   { ...makeSnowWorkshop(4,1), id:'snowbuild', type:'snowbuild', title:'ゆきだるまづくり', sub:'英語を聞いて ゆきだるまを つくろう', emoji:'⛄', bg:'DDEFFB', label:'⛄ あそぶ' },
   { ...makeSledStation(18,-9.2), id:'sledrun', type:'sledrun', title:'そりコースター', sub:'雪の空を すべりおりよう', emoji:'🛷', bg:'6BB5E8', label:'🛷 のりこむ' },
   { ...makeAuroraPad(-18,-7), id:'auroraflight', type:'auroraflight', title:'オーロラ飛行', sub:'雪の結晶にのって オーロラの空へ', emoji:'🌌', bg:'2A2F6B', label:'🌌 とびたつ' },
+  { ...makeSlalomStation(SL_STATION.x, SL_STATION.z-2.3), id:'slalom', type:'slalom', title:'スラローム', sub:'氷のお城のまわりを すべりおりよう', emoji:'⛷️', bg:'4F8FE0', label:'⛷️ のりこむ' },
+  { ...makeBalloonPad(BAL_PAD.x, BAL_PAD.z), id:'balloon', type:'balloon', title:'熱気球', sub:'えいごの めいれいで ふうせんを うごかそう', emoji:'🎈', bg:'FF8FA3', label:'🎈 のりこむ' },
+  { ...makeZipStation(0,29.2), id:'zipline', type:'zipline', title:'ジップライン', sub:'神社の塔から 池まで 空をすべろう', emoji:'🪂', bg:'D9453D', label:'🪂 のりこむ' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride','sasuketower']);
-const ICE_ONLY_LANDMARK_IDS = new Set(['sleigh','sledrun','snowbuild']); // ice island gimmicks
-const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw','skydragon']); // koi pond boat dock
+const ICE_ONLY_LANDMARK_IDS = new Set(['sleigh','sledrun','snowbuild','slalom','balloon']); // ice island gimmicks
+const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw','skydragon','zipline']); // koi pond boat dock
 const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
 fireworksPadLandmark = landmarks.find(l => l.id === 'fireworks') || null;
@@ -10017,6 +10639,9 @@ function animate(){
   updateSleigh(dt);
   updateSled(dt);
   updateAuroraFlight(dt);
+  updateSlalom(dt);
+  updateBalloon(dt);
+  updateZip(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -10065,6 +10690,18 @@ function animate(){
     desiredCamPos = af.camPos.clone();
     lookTarget = af.camLook.clone();
     camLerp = 1 - Math.pow(0.00001, dt);
+  } else if(slalomRide.state.active){
+    desiredCamPos = slalomRide.state.camPos.clone();
+    lookTarget = slalomRide.state.camLook.clone();
+    camLerp = 1 - Math.pow(0.00001, dt);
+  } else if(bal.active){
+    desiredCamPos = bal.camPos.clone();
+    lookTarget = bal.camLook.clone();
+    camLerp = 1 - Math.pow(0.004, dt);
+  } else if(zip.active && zip.cam){
+    desiredCamPos = zip.camPos.clone();
+    lookTarget = zip.camLook.clone();
+    camLerp = 1 - Math.pow(0.00005, dt);
   }
   camera.position.lerp(desiredCamPos, camLerp);
   camera.lookAt(lookTarget);
@@ -10871,6 +11508,9 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   else if(closest.type === 'sleigh') boardSleigh(closest);
   else if(closest.type === 'sledrun') boardSled(closest);
   else if(closest.type === 'auroraflight') boardAuroraFlight(closest);
+  else if(closest.type === 'slalom') boardSlalom(closest);
+  else if(closest.type === 'balloon') boardBalloon(closest);
+  else if(closest.type === 'zipline') boardZip(closest);
   else if(closest.type === 'snowbuild') openSnowmanBuild();
   else if(closest.type === 'coasterride') boardCoasterRide(closest);
   else if(closest.type === 'sasuketower') boardSasukeTower(closest);
