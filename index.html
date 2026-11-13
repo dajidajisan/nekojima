@@ -2740,12 +2740,13 @@ const IMPORTED_VOCAB = [
 
 const VOCAB = [...CURATED_VOCAB, ...IMPORTED_VOCAB];
 
-const WORLD_IDS = ['meadow','city','themepark','sakura'];
+const WORLD_IDS = ['meadow','city','themepark','sakura','ice'];
 const NPCS_PER_WORLD = 10;
 const NPC_NAME_POOL = ['ここちゃん','くうた','ふくろう先生','もこ','みけ','そら','つき','まる','ぽん','りん',
   'はな','くる','とと','ちゃこ','ふく','なな','ここあ','きなこ','もも','あんず',
   'さくら','ゆず','みつき','こむぎ','あずき','まろん','ぴのこ','たると','しろ','くろ',
-  'こはる','かりん','ちとせ','みやび','しずく','ことは','ひなた','あかり','うらら','はるな'];
+  'こはる','かりん','ちとせ','みやび','しずく','ことは','ひなた','あかり','うらら','はるな',
+  'ゆきな','こゆき','ふゆは','つらら','きらり','みぞれ','あられ','こおり','ひょうか','すのう'];
 const NPC_TYPE_POOL = ['cat'];
 const NPC_PERSONALITY_POOL = ['げんき','のんびり','クール','やさしい'];
 const NPC_COLOR_POOL = [
@@ -2753,7 +2754,7 @@ const NPC_COLOR_POOL = [
   [0x8FC7FF,0x5FA3E8],[0xFFB870,0xF2965B],[0xC9A96E,0x9A7C4A],[0xFFFFFF,0xE5DDF5],
   [0xFFB3D9,0xFF7FB8],
 ];
-const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク', sakura:'さくら和風ねこ島' };
+const WORLD_LABELS = { meadow:'はじまりの島', city:'みらいシティ', themepark:'テーマパーク', sakura:'さくら和風ねこ島', ice:'こおりのくに' };
 const EMOJI_BY_TYPE = { cat:'🐱', bear:'🐻', owl:'🦉', rabbit:'🐰' };
 const NPC_BREED_POOL = ['三毛猫','黒猫','白猫','キジトラ','茶トラ','サビ猫','ハチワレ','グレー猫','ポインテッド柄','しま猫'];
 const NPC_LIKES_POOL = ['ひなたぼっこ','魚','マタタビ','段ボール箱','毛糸玉','おひるね','ちゅ〜る','高いところ','くしゃくしゃの紙','あたたかい毛布'];
@@ -3086,10 +3087,15 @@ const ISLANDS = [
     theme:{ groundDay:0xEFE6D2, groundNight:0x3B3A4F, path:0xB9B2A6, wall:0xFFF8EE, roofs:[0x4A5568,0x5B4A4A,0x3E4C5C], buildingScaleY:1, natureVisible:false },
     landmarkPos:{ comedy:[-14,6], fortune:[12,-10], praise:[-4,-6], future:[11,13], robot:[-12,15], essay:[6,4] },
   },
+  {
+    id:'ice', name:'こおりのくに', emoji:'❄️', unlockAt:1100, status:'ready',
+    theme:{ groundDay:0xE8F3FF, groundNight:0x2C3E63, path:0xBFD6EE, wall:0xF4FAFF, roofs:[0x6BB5E8,0x8FD0F0,0xA9C7F5], buildingScaleY:1, natureVisible:false },
+    landmarkPos:{ comedy:[-14,6], fortune:[12,-10], praise:[-4,-6], future:[11,13], robot:[-12,15], essay:[6,4] },
+  },
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.24.1';
+const GAME_VERSION = 'v1.30.3';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -3115,6 +3121,12 @@ function travelToIsland(id){
   cancelBoatRide();
   cancelRickshaw();
   cancelDragonRide();
+  cancelSleigh();
+  cancelSled();
+  cancelAuroraFlight();
+  cancelSlalom();
+  cancelBalloon();
+  cancelZip();
   currentIslandId = id;
   inMazeMode = false; // switching islands via the menu always counts as leaving the maze
   const theme = island.theme;
@@ -3137,10 +3149,12 @@ function travelToIsland(id){
   mazeGateLandmark.group.visible = (id === 'themepark');
   themeparkDecorGroup.visible = (id === 'themepark');
   sakuraDecorGroup.visible = (id === 'sakura');
+  iceDecorGroup.visible = (id === 'ice');
   landmarks.forEach(l=>{
     if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'city');
     if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'themepark');
     if(SAKURA_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'sakura');
+    if(ICE_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (id === 'ice');
     if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (id !== 'meadow');
   });
 
@@ -6127,8 +6141,10 @@ function updateRickshaw(dt){
 ========================================================= */
 var fireworksPadLandmark = null;
 function updateFireworksPad(){
-  if(!fireworksPadLandmark) return;
-  fireworksPadLandmark.group.visible = (currentIslandId === 'sakura' && isNight);
+  if(fireworksPadLandmark) fireworksPadLandmark.group.visible = (currentIslandId === 'sakura' && isNight);
+  const iceNight = (currentIslandId === 'ice' && isNight);
+  if(auroraPadLandmark) auroraPadLandmark.group.visible = iceNight;
+  if(auroraCraft && !af.active) auroraCraft.visible = iceNight;
 }
 function makeFireworkPad(x,z){
   const g = new THREE.Group();
@@ -6589,10 +6605,28 @@ function setRingLabel(sp, text){
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#4A3B5C';
-  ctx.font = '800 ' + (text.length > 8 ? 34 : 46) + 'px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, c.width/2, c.height/2+2);
+  const fit = fitLabelText(ctx, text, c.width - 40);
+  ctx.font = '800 ' + fit.size + 'px sans-serif';
+  if(fit.lines.length === 1){
+    ctx.fillText(fit.lines[0], c.width/2, c.height/2+2);
+  } else {
+    const lh = fit.size*1.15, y0 = c.height/2 + 2 - lh/2;
+    ctx.fillText(fit.lines[0], c.width/2, y0);
+    ctx.fillText(fit.lines[1], c.width/2, y0 + lh);
+  }
   sp.userData.tex.needsUpdate = true;
+}
+// choose a font size (and a two-line split if needed) so the text always stays inside the label frame
+function fitLabelText(ctx, text, maxW){
+  const width = (str, size) => { ctx.font = '800 ' + size + 'px sans-serif'; return ctx.measureText(str).width; };
+  for(let size=46; size>=34; size-=2){ if(width(text,size) <= maxW) return { lines:[text], size }; }
+  let cut = Math.ceil(text.length/2);
+  const sp = text.indexOf(' ', Math.floor(text.length/2) - 3);
+  if(sp > 0 && sp < text.length-1 && Math.abs(sp - text.length/2) <= 3) cut = sp;
+  const l1 = text.slice(0,cut).trim(), l2 = text.slice(cut).trim();
+  for(let size=38; size>=16; size-=2){ if(Math.max(width(l1,size), width(l2,size)) <= maxW) return { lines:[l1,l2], size }; }
+  return { lines:[l1,l2], size:16 };
 }
 DRAGON_GATES.forEach(g=>{
   const f = dragonFrameAt(g.s);
@@ -6843,6 +6877,2330 @@ function updateDragonRide(dt){
   const rp = player.position;
   dragon.camPos.set(rp.x - dragon.camDir.x*8.5, rp.y + 3.6, rp.z - dragon.camDir.z*8.5);
   dragon.camLook.set(rp.x + dragon.camDir.x*2.5, rp.y + 0.8, rp.z + dragon.camDir.z*2.5);
+}
+
+
+/* =========================================================
+   ❄️ こおりのくに DECORATIONS — snow pines, friendly snowmen, igloos,
+   ice crystals, ice lanterns, a frozen pond, a sparkling ice palace,
+   falling snow and (at night) an aurora. Purely visual; shown only on
+   the ice island. The mood is "winter fairy tale" — all characters and
+   shapes here are original/generic.
+========================================================= */
+const iceDecorGroup = new THREE.Group();
+iceDecorGroup.visible = false;
+scene.add(iceDecorGroup);
+
+function makeSnowPine(x,z,scale){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.24,0.9,8), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+  trunk.position.y = 0.45;
+  g.add(trunk);
+  const green = new THREE.MeshLambertMaterial({color:0x3F7F72});
+  const white = new THREE.MeshLambertMaterial({color:0xFFFFFF});
+  [[1.5,1.7,1.5],[1.15,1.5,2.5],[0.8,1.3,3.45]].forEach(([r,h,y])=>{
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(r,h,10), green);
+    cone.position.y = y;
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(r*0.78,h*0.62,10), white);
+    cap.position.y = y + h*0.2;
+    g.add(cone, cap);
+  });
+  const star = new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6), new THREE.MeshBasicMaterial({color:0xBFE9FF}));
+  star.position.y = 4.3;
+  g.add(star, makeBlobShadow(1.6));
+  g.position.set(x,0,z);
+  g.scale.setScalar(scale);
+  g.rotation.y = Math.random()*Math.PI*2;
+  return g;
+}
+const ICE_PINES = [[-8, 2], [13, 3], [-13, -4], [4, 17], [15, 9], [18, -12], [-20, -2], [21, 4], [-9, 10], [7, -14], [-14, 19], [0, -22], [-21, -12]];
+ICE_PINES.forEach(([x,z],i) => iceDecorGroup.add(makeSnowPine(x,z,0.95 + (i%3)*0.12)));
+
+function makeSnowman(x,z,rotY,scarfColor,hatColor){
+  const g = new THREE.Group();
+  const white = new THREE.MeshLambertMaterial({color:0xFFFFFF});
+  const black = new THREE.MeshBasicMaterial({color:0x222222});
+  const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.8,14,10), white); b1.position.y = 0.8;
+  const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.58,14,10), white); b2.position.y = 1.9;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42,14,10), white); head.position.y = 2.75;
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.07,0.4,8), new THREE.MeshLambertMaterial({color:0xFF8A3D}));
+  nose.rotation.x = Math.PI/2; nose.position.set(0,2.72,0.5);
+  g.add(b1,b2,head,nose);
+  [-0.15,0.15].forEach(ex=>{
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05,6,5), black);
+    eye.position.set(ex,2.86,0.37); g.add(eye);
+  });
+  [2.08,1.88,1.68].forEach(by=>{
+    const btn = new THREE.Mesh(new THREE.SphereGeometry(0.06,6,5), black);
+    btn.position.set(0,by,0.56); g.add(btn);
+  });
+  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.09,8,18), new THREE.MeshLambertMaterial({color:scarfColor}));
+  scarf.rotation.x = Math.PI/2; scarf.position.y = 2.35;
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.5,0.06), new THREE.MeshLambertMaterial({color:scarfColor}));
+  tail.position.set(0.3,2.1,0.4);
+  g.add(scarf, tail);
+  [-1,1].forEach(side=>{
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1.0,5), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+    arm.position.set(side*0.78,2.15,0); arm.rotation.z = side*1.0;
+    g.add(arm);
+  });
+  if(hatColor){
+    const hm = new THREE.MeshLambertMaterial({color:hatColor});
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.06,14), hm); brim.position.y = 3.12;
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.45,14), hm); top.position.y = 3.37;
+    g.add(brim, top);
+  }
+  g.add(makeBlobShadow(1.2));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+const SNOWMAN_SCARVES = [0xD9453D,0x4F8FE0,0x6BCB8F,0xFF8FB6,0xFFD873,0x9A7BE0,0xFF9F5A];
+[[-3, -14], [-16, 1], [21, 9], [2, -8], [1, 12], [14, -15]].forEach(([x,z],i) => iceDecorGroup.add(makeSnowman(x,z, Math.atan2(-x,-z)+ (i%3-1)*0.3, SNOWMAN_SCARVES[i%7], i%2===0 ? 0x2A2A3A : 0)));
+
+function makeIgloo(x,z,rotY){
+  const g = new THREE.Group();
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.0,22,12,0,Math.PI*2,0,Math.PI/2), new THREE.MeshPhongMaterial({color:0xF2FAFF, shininess:40}));
+  g.add(dome);
+  [[0.5,1.94],[1.0,1.73],[1.5,1.32]].forEach(([y,r])=>{
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r,0.03,6,26), new THREE.MeshLambertMaterial({color:0xD0E4F2}));
+    ring.rotation.x = Math.PI/2; ring.position.y = y; g.add(ring);
+  });
+  const tunnel = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.15,1.3), new THREE.MeshPhongMaterial({color:0xE8F4FC, shininess:30}));
+  tunnel.position.set(0,0.57,2.0);
+  const door = new THREE.Mesh(new THREE.CircleGeometry(0.46,16), new THREE.MeshBasicMaterial({color:0x1F2D4A}));
+  door.position.set(0,0.5,2.66);
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.3,14), new THREE.MeshBasicMaterial({color:0xFFD9A0}));
+  glow.position.set(0,0.46,2.67);
+  g.add(tunnel, door, glow, makeBlobShadow(2.4));
+  g.position.set(x,0,z);
+  g.rotation.y = rotY;
+  return g;
+}
+[[11, -21], [-20, 5], [9, 21]].forEach(([x,z]) => iceDecorGroup.add(makeIgloo(x,z, Math.atan2(-x,-z))));
+
+function makeIceCrystals(x,z){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshPhongMaterial({color:0xBFE6FF, transparent:true, opacity:0.82, shininess:120, emissive:0x2A7FC0, emissiveIntensity:0.35});
+  [[0,0,2.0,0.32],[0.5,0.25,1.4,0.26],[-0.45,0.2,1.1,0.22],[0.1,-0.5,1.6,0.25]].forEach(([dx,dz,h,r])=>{
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r,h,5), mat);
+    c.position.set(dx,h/2,dz);
+    c.rotation.z = -dx*0.25; c.rotation.x = dz*0.25;
+    g.add(c);
+  });
+  g.position.set(x,0,z);
+  return g;
+}
+[[15, 17], [-25, -6], [-1, -26], [-15, 10], [21, -16], [-4, 13]].forEach(([x,z]) => iceDecorGroup.add(makeIceCrystals(x,z)));
+
+function makeIceLantern(x,z){
+  const g = new THREE.Group();
+  const ice = new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:80});
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.38,0.9,8), ice); base.position.y = 0.45;
+  const lamp = new THREE.Mesh(new THREE.OctahedronGeometry(0.42), new THREE.MeshBasicMaterial({color:0xB8F0FF}));
+  lamp.position.y = 1.3;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.34,0.5,6), ice); cap.position.y = 1.9;
+  g.add(base, lamp, cap, makeBlobShadow(0.55));
+  g.position.set(x,0,z);
+  return g;
+}
+[[-2.8,9],[2.8,9],[-2.8,6.5],[2.8,6.5],[-6,-2],[8,-8],[-12,0],[12,6]].forEach(([x,z]) => iceDecorGroup.add(makeIceLantern(x,z)));
+
+// frozen pond with a snow bank
+{
+  const pond = new THREE.Mesh(new THREE.CircleGeometry(4.2,48), new THREE.MeshPhongMaterial({color:0xBFE6FF, shininess:150, specular:0xffffff}));
+  pond.rotation.x = -Math.PI/2;
+  pond.position.set(-12,0.04,-17);
+  iceDecorGroup.add(pond);
+  const bank = new THREE.MeshLambertMaterial({color:0xFFFFFF});
+  for(let i=0;i<18;i++){
+    const a = (i/18)*Math.PI*2;
+    const r = 0.45 + (i%3)*0.12;
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(r,1), bank);
+    b.scale.set(1,0.6,1);
+    b.position.set(-12 + 4.4*Math.cos(a), 0.2, -17 + 4.4*Math.sin(a));
+    iceDecorGroup.add(b);
+  }
+}
+
+// the ice palace at the north end of the island
+let icePalaceFlake = null;
+function makeIcePalace(x,z){
+  const g = new THREE.Group();
+  const ice = new THREE.MeshPhongMaterial({color:0xCFEFFF, transparent:true, opacity:0.92, shininess:110, specular:0xffffff, emissive:0x3A8FD0, emissiveIntensity:0.25});
+  const frost = new THREE.MeshPhongMaterial({color:0xFFFFFF, shininess:80, emissive:0x9FD6FF, emissiveIntensity:0.2});
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(5.8,6.2,0.6,8), frost); base.position.y = 0.3;
+  const keep = new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.7,8,8), ice); keep.position.y = 4.6;
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(2.5,5,8), ice); spire.position.y = 11.7;
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.32,10,8), new THREE.MeshBasicMaterial({color:0xFFFFFF})); orb.position.y = 14.4;
+  g.add(base, keep, spire, orb);
+  for(let i=0;i<6;i++){
+    const a = (i/6)*Math.PI*2 + 0.3;
+    const h = 5 + (i%2)*2;
+    const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.1,h,6), ice);
+    tw.position.set(Math.cos(a)*3.9, 0.6+h/2, Math.sin(a)*3.9);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.15,2.6,6), ice);
+    roof.position.set(Math.cos(a)*3.9, 0.6+h+1.3, Math.sin(a)*3.9);
+    g.add(tw, roof);
+  }
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(2.4,3.2,0.6), new THREE.MeshPhongMaterial({color:0x3A5F9A, shininess:60}));
+  gate.position.set(0,2.2,-2.6);
+  g.add(gate);
+  // a big six-armed snowflake above the gate
+  const flake = new THREE.Group();
+  [0,Math.PI/3,Math.PI*2/3].forEach(a=>{
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.16,0.12), new THREE.MeshBasicMaterial({color:0xE6F7FF}));
+    arm.rotation.z = a;
+    flake.add(arm);
+  });
+  flake.position.set(0,6.6,-2.75);
+  g.add(flake);
+  icePalaceFlake = flake;
+  g.add(makeBlobShadow(6));
+  g.position.set(x,0,z);
+  return g;
+}
+iceDecorGroup.add(makeIcePalace(0,27));
+
+// falling snow (one Points cloud, recycled at the ground)
+const ICE_SNOW_COUNT = 260;
+let iceSnow = null;
+const iceSnowPhase = [];
+(function(){
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  let ctx = null;
+  try{ ctx = c.getContext('2d'); }catch(e){}
+  if(ctx){
+    const grd = ctx.createRadialGradient(16,16,1,16,16,15);
+    grd.addColorStop(0,'rgba(255,255,255,1)');
+    grd.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0,0,32,32);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  const pos = new Float32Array(ICE_SNOW_COUNT*3);
+  for(let i=0;i<ICE_SNOW_COUNT;i++){
+    pos[i*3]   = (Math.random()-0.5)*60;
+    pos[i*3+1] = Math.random()*12;
+    pos[i*3+2] = (Math.random()-0.5)*60;
+    iceSnowPhase.push(Math.random()*Math.PI*2);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  iceSnow = new THREE.Points(geo, new THREE.PointsMaterial({ map:tex, size:0.5, transparent:true, depthWrite:false, sizeAttenuation:true }));
+  iceSnow.frustumCulled = false;
+  iceDecorGroup.add(iceSnow);
+})();
+
+// aurora: a ring of glowing curtains around the island, visible only at night
+let iceAuroraMat = null;
+let iceAuroraTex = null;
+let iceAuroraLevel = 0;
+let iceAuroraBoost = false;      // forced bright while the aurora flight is running
+(function(){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  let ctx = null;
+  try{ ctx = c.getContext('2d'); }catch(e){}
+  if(ctx){
+    const palette = ['80,255,190','90,220,255','170,140,255','110,255,160'];
+    for(let i=0;i<70;i++){
+      const x = Math.random()*512, w = 4 + Math.random()*16;
+      const col = palette[i % palette.length];
+      const grd = ctx.createLinearGradient(0,0,0,256);
+      grd.addColorStop(0,'rgba('+col+',0)');
+      grd.addColorStop(0.55,'rgba('+col+','+(0.25+Math.random()*0.4).toFixed(2)+')');
+      grd.addColorStop(1,'rgba('+col+',0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(x,0,w,256);
+    }
+  }
+  iceAuroraTex = new THREE.CanvasTexture(c);
+  iceAuroraTex.wrapS = THREE.RepeatWrapping;
+  iceAuroraTex.repeat.set(2,1);
+  iceAuroraMat = new THREE.MeshBasicMaterial({ map:iceAuroraTex, transparent:true, side:THREE.BackSide, blending:THREE.AdditiveBlending, depthWrite:false, fog:false, opacity:0 });
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(52,52,24,72,1,true), iceAuroraMat);
+  ring.position.y = 14;
+  iceDecorGroup.add(ring);
+})();
+
+function updateIceDecor(dt,t){
+  if(!iceDecorGroup.visible) return;
+  if(iceSnow){
+    const arr = iceSnow.geometry.attributes.position.array;
+    for(let i=0;i<ICE_SNOW_COUNT;i++){
+      arr[i*3]   += Math.sin(t*0.6 + iceSnowPhase[i]) * 0.35 * dt;
+      arr[i*3+1] -= (0.9 + 0.3*Math.sin(iceSnowPhase[i])) * dt;
+      arr[i*3+2] += Math.cos(t*0.5 + iceSnowPhase[i]) * 0.3 * dt;
+      if(arr[i*3+1] < 0.05){
+        arr[i*3]   = (Math.random()-0.5)*60;
+        arr[i*3+1] = 11 + Math.random()*2;
+        arr[i*3+2] = (Math.random()-0.5)*60;
+      }
+    }
+    iceSnow.geometry.attributes.position.needsUpdate = true;
+  }
+  if(icePalaceFlake) icePalaceFlake.rotation.z = t*0.4;
+  if(iceAuroraMat){
+    const target = iceAuroraBoost ? 1.0 : (isNight ? 0.85 : 0);
+    iceAuroraLevel += (target - iceAuroraLevel) * (1 - Math.exp(-dt*1.5));
+    iceAuroraTex.offset.x = (t*0.01) % 1;
+    iceAuroraMat.opacity = iceAuroraLevel * (0.85 + 0.15*Math.sin(t*0.7));   // slow shimmer (does not feed back into the level)
+  }
+}
+
+
+/* =========================================================
+   ❄️ ICE ISLAND, PART 2 — "winter fairy tale" touches: a stair up to the
+   ice palace with a snow queen on it, a snowflake in the courtyard, a big
+   friendly snowman with his own little flurry, and three gimmick stands
+   (reindeer sleigh tour, sled coaster, snowman workshop).
+========================================================= */
+let iceQueenFlake = null;
+let iceFlurry = null;
+
+function makeSnowQueen(x,y,z){
+  const g = new THREE.Group();
+  const gown = new THREE.MeshPhongMaterial({color:0x9FD8F5, shininess:120, specular:0xffffff, emissive:0x3A8FD0, emissiveIntensity:0.25});
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.95,1.7,18), gown); skirt.position.y = 0.85;
+  const bodice = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.42,0.7,14), gown); bodice.position.y = 2.0;
+  const skinM = new THREE.MeshLambertMaterial({color:0xFFE3CF});
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34,16,12), skinM); head.position.y = 2.75;
+  const hairM = new THREE.MeshLambertMaterial({color:0xF4EEDC});
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.37,16,12,0,Math.PI*2,0,Math.PI*0.62), hairM);
+  hair.position.set(0,2.8,-0.04); hair.rotation.x = -0.35;
+  g.add(skirt, bodice, head, hair);
+  for(let i=0;i<6;i++){                      // long braid over one shoulder
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.15-i*0.01,8,6), hairM);
+    b.position.set(0.22+i*0.03, 2.55-i*0.21, 0.12+i*0.05);
+    g.add(b);
+  }
+  const tie = new THREE.Mesh(new THREE.SphereGeometry(0.09,8,6), new THREE.MeshBasicMaterial({color:0x8FD0F0}));
+  tie.position.set(0.4,1.25,0.4); g.add(tie);
+  [-0.12,0.12].forEach(ex=>{
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6), new THREE.MeshBasicMaterial({color:0x3A6FB0}));
+    eye.position.set(ex,2.78,0.31); g.add(eye);
+  });
+  const cape = new THREE.Mesh(new THREE.PlaneGeometry(1.7,2.9), new THREE.MeshPhongMaterial({color:0xBDE6FF, transparent:true, opacity:0.55, side:THREE.DoubleSide, shininess:90}));
+  cape.position.set(0,1.55,-0.5); cape.rotation.x = 0.12; g.add(cape);
+  const armM = gown;
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.06,0.9,8), armM);
+  armL.position.set(-0.45,1.95,0.1); armL.rotation.z = 0.35;
+  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.06,0.9,8), armM);
+  armR.position.set(0.5,2.3,0.25); armR.rotation.set(-0.9,0,-0.9);
+  g.add(armL, armR);
+  const flake = new THREE.Group();            // the little snowflake of magic floating above her hand
+  [0,Math.PI/3,Math.PI*2/3].forEach(a=>{
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.05,0.04), new THREE.MeshBasicMaterial({color:0xE6F7FF}));
+    arm.rotation.z = a; flake.add(arm);
+  });
+  flake.position.set(0.85,2.75,0.55);
+  g.add(flake);
+  iceQueenFlake = flake;
+  g.add(makeBlobShadow(1.3));
+  g.position.set(x,y,z);
+  g.rotation.y = Math.PI;                     // faces the visitors coming up from the start
+  return g;
+}
+
+// stairs up to the palace gate, a snowflake in the courtyard, and a ring of ice spikes on the keep
+for(let i=0;i<7;i++){
+  const step = new THREE.Mesh(new THREE.BoxGeometry(3.8-i*0.12,0.14+i*0.1,0.6), new THREE.MeshPhongMaterial({color:0xDDF1FF, shininess:100, emissive:0x6BB5E8, emissiveIntensity:0.15}));
+  step.position.set(0,(0.14+i*0.1)/2, 18.7 + i*0.5);
+  iceDecorGroup.add(step);
+}
+{
+  const flakeFloor = new THREE.Group();
+  [0,Math.PI/3,Math.PI*2/3].forEach(a=>{
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.05,0.28), new THREE.MeshBasicMaterial({color:0xBFE6FF}));
+    arm.rotation.y = a; flakeFloor.add(arm);
+  });
+  flakeFloor.position.set(0,0.05,15.2);
+  iceDecorGroup.add(flakeFloor);
+  const spikeM = new THREE.MeshPhongMaterial({color:0xCFEFFF, transparent:true, opacity:0.92, shininess:110, emissive:0x3A8FD0, emissiveIntensity:0.3});
+  for(let i=0;i<8;i++){
+    const a = (i/8)*Math.PI*2;
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.28,2.6,5), spikeM);
+    sp.position.set(Math.cos(a)*1.5, 9.2, 27+Math.sin(a)*1.5);
+    sp.rotation.z = -Math.cos(a)*0.35; sp.rotation.x = Math.sin(a)*0.35;
+    iceDecorGroup.add(sp);
+  }
+}
+iceDecorGroup.add(makeSnowQueen(0,0.65,22.6));
+
+// the big friendly snowman near the start (with twig hair and a little flurry above)
+{
+  const big = makeSnowman(-7,6, Math.atan2(7,-2), 0xD9453D, 0);
+  [-0.18,0,0.18].forEach(dx=>{
+    const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.4,4), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+    tw.position.set(dx,3.2,0); tw.rotation.z = -dx*2.2; big.add(tw);
+  });
+  const n = 36, pos = new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, r = Math.random()*0.9;
+    pos[i*3] = Math.cos(a)*r; pos[i*3+1] = 0.2 + Math.random()*0.5; pos[i*3+2] = Math.sin(a)*r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  iceFlurry = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xFFFFFF, size:0.16, transparent:true, opacity:0.9, depthWrite:false }));
+  iceFlurry.position.set(0,3.9,0);
+  big.add(iceFlurry);
+  big.scale.setScalar(1.9);
+  iceDecorGroup.add(big);
+}
+function updateIceDecor2(dt,t){
+  if(!iceDecorGroup.visible) return;
+  if(iceQueenFlake){ iceQueenFlake.rotation.z = t*0.9; iceQueenFlake.position.y = 2.75 + Math.sin(t*1.6)*0.08; }
+  if(iceFlurry){ iceFlurry.rotation.y = t*0.7; iceFlurry.position.y = 3.9 + Math.sin(t*1.2)*0.1; }
+}
+
+// --- gimmick stands (landmarks) ---
+function makeSleighStand(x,z){
+  const g = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), wood); post.position.y = 0.85;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.5,0.08), new THREE.MeshLambertMaterial({color:0xDDEFFB})); board.position.y = 1.6;
+  const bell = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,6), new THREE.MeshBasicMaterial({color:0xFFD873})); bell.position.set(0.5,1.3,0.06);
+  g.add(post, board, bell);
+  const marker = makeFloatingMarker('🦌', 2.7);
+  g.add(marker, makeBlobShadow(0.9));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+function makeSnowWorkshop(x,z){
+  const g = new THREE.Group();
+  const mound = new THREE.Mesh(new THREE.SphereGeometry(1.2,16,10), new THREE.MeshLambertMaterial({color:0xFFFFFF}));
+  mound.scale.set(1,0.5,1); mound.position.y = 0.1;
+  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.22,0.4,10), new THREE.MeshLambertMaterial({color:0x4F8FE0})); bucket.position.set(0.5,0.55,0.2);
+  const carrot = new THREE.Mesh(new THREE.ConeGeometry(0.07,0.4,8), new THREE.MeshLambertMaterial({color:0xFF8A3D})); carrot.position.set(0.5,0.9,0.2); carrot.rotation.z = 0.3;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.9,6), new THREE.MeshLambertMaterial({color:0x7A5C4A})); pole.position.set(-0.55,0.7,0.1);
+  const hatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.3,12), new THREE.MeshLambertMaterial({color:0x2A2A3A})); hatTop.position.set(-0.55,1.3,0.1);
+  const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.04,12), new THREE.MeshLambertMaterial({color:0x2A2A3A})); hatBrim.position.set(-0.55,1.15,0.1);
+  g.add(mound, bucket, carrot, pole, hatTop, hatBrim);
+  const marker = makeFloatingMarker('⛄', 2.6);
+  g.add(marker, makeBlobShadow(1.5));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+/* =========================================================
+   🦌 トナカイそりツアー (reindeer sleigh tour) — a ground tour like the
+   rickshaw one, built from a generic "tour ride" factory: scripted route
+   (computed offline around the props), four stops where the guide tells
+   you about the place in English, then asks one easy 2-choice question.
+========================================================= */
+function createTourRide(cfg){
+  const T = { active:false, phase:'idle', s:0, stopIdx:0, correct:0, heading:cfg.parkHeading, answered:false, spin:0, hideTimer:0 };
+  const route = cfg.route, stops = cfg.stops;
+  const cum = [0];
+  for(let i=1;i<route.length;i++) cum.push(cum[i-1] + Math.hypot(route[i][0]-route[i-1][0], route[i][1]-route[i-1][1]));
+  const total = cum[cum.length-1];
+  function pointAt(s){
+    s = Math.max(0, Math.min(total, s));
+    let i = 1;
+    while(i < cum.length-1 && cum[i] < s) i++;
+    const a = route[i-1], b = route[i];
+    const k = (s-cum[i-1]) / ((cum[i]-cum[i-1]) || 1);
+    return { x:a[0]+(b[0]-a[0])*k, z:a[1]+(b[1]-a[1])*k, heading:Math.atan2(b[0]-a[0], b[1]-a[1]) };
+  }
+  function hudEl(){
+    let el = document.getElementById(cfg.hudId);
+    if(el) return el;
+    el = document.createElement('div');
+    el.id = cfg.hudId;
+    el.style.cssText = 'position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,250,244,0.97); border-radius:22px; padding:14px 14px 16px; box-shadow:0 12px 34px rgba(0,0,0,0.28); text-align:center; display:none; color:#4A3B5C;';
+    document.body.appendChild(el);
+    return el;
+  }
+  function hideHud(){ const el = document.getElementById(cfg.hudId); if(el) el.style.display = 'none'; }
+  function btn(text, bg, onClick){
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.style.cssText = 'flex:1; min-height:54px; padding:10px 8px; font-size:17px; font-weight:800; border:0; border-radius:16px; background:' + bg + '; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function header(idx, stop){
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:12px; font-weight:800; opacity:.7;';
+    h.textContent = cfg.emoji + ' ' + (idx+1) + '/' + stops.length + '　' + stop.name;
+    return h;
+  }
+  function showNarration(stop, idx){
+    const cap = document.getElementById('rideCaption'); if(cap) cap.style.opacity = '0';
+    const el = hudEl(); el.innerHTML = '';
+    const en = document.createElement('div');
+    en.style.cssText = 'font-size:19px; font-weight:800; line-height:1.45; margin:8px 0 6px;';
+    en.textContent = stop.en;
+    const ja = document.createElement('div');
+    ja.style.cssText = 'font-size:13px; font-weight:700; opacity:.8; line-height:1.5; margin-bottom:12px;';
+    ja.textContent = stop.ja;
+    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:10px;';
+    row.append(btn('🔊 きく','#EFE7F5',()=>{ try{ speakEnglish(stop.en); }catch(e){} }), btn('もんだいへ ▶','#DDEFFB',()=> showQuestion(stop, idx)));
+    el.append(header(idx, stop), en, ja, row);
+    el.style.display = 'block';
+    try{ speakEnglish(stop.en); }catch(e){}
+  }
+  function showQuestion(stop, idx){
+    if(!T.active || T.phase !== 'narrate') return;
+    T.phase = 'ask'; T.answered = false;
+    const el = hudEl(); el.innerHTML = '';
+    const q = document.createElement('div');
+    q.style.cssText = 'font-size:19px; font-weight:800; line-height:1.4; margin:8px 0 12px;';
+    q.textContent = stop.q.en;
+    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:10px;';
+    const opts = [{t:stop.q.good, ok:true},{t:stop.q.bad, ok:false}];
+    if(Math.random() < 0.5) opts.reverse();
+    const msg = document.createElement('div');
+    msg.style.cssText = 'min-height:18px; margin-top:10px; font-size:13px; font-weight:800;';
+    const btns = opts.map(o=>{ const b = btn(o.t,'#DDEFFB',()=> answer(o.ok,b,btns,msg,stop)); row.appendChild(b); return b; });
+    el.append(header(idx, stop), q, row, msg);
+  }
+  function answer(ok, b, btns, msg, stop){
+    if(!T.active || T.phase !== 'ask' || T.answered) return;
+    T.answered = true;
+    btns.forEach(x => x.disabled = true);
+    if(ok){ b.style.background = '#B8F0C8'; T.correct++; addCoins(1); playCorrectSound(); msg.textContent = '⭕ せいかい！ ' + stop.q.ja; }
+    else { b.style.background = '#FFC1C1'; playWrongSound(); msg.textContent = '❌ ざんねん… ' + stop.q.ja; }
+    T.phase = 'feedback';
+    clearTimeout(T.hideTimer);
+    T.hideTimer = setTimeout(()=>{ if(!T.active || T.phase !== 'feedback') return; hideHud(); T.stopIdx++; T.phase = 'move'; }, 2200);
+  }
+  function park(){
+    cfg.vehicle.position.set(cfg.station.x, 0, cfg.station.z);
+    cfg.vehicle.rotation.set(0, cfg.parkHeading, 0);
+  }
+  function board(){
+    if(rideActive) return;
+    if(cfg.onBoard) cfg.onBoard();
+    rideActive = true;
+    Object.assign(T, { active:true, phase:'move', s:0, stopIdx:0, correct:0, heading:cfg.parkHeading, answered:false, spin:0 });
+    moveTarget = null;
+    interactBtn.classList.remove('show');
+    playCorrectSound();
+    rideCaption(cfg.startCaption);
+  }
+  function cancel(){
+    if(!T.active) return;
+    clearTimeout(T.hideTimer);
+    T.active = false; T.phase = 'idle'; rideActive = false;
+    park();
+    player.rotation.z = 0; player.position.y = 0;
+    hideHud();
+    const cap = document.getElementById('rideCaption'); if(cap) cap.style.opacity = '0';
+  }
+  function finish(){
+    const n = stops.length, bonus = (T.correct === n) ? 1 : 0;
+    if(bonus) addCoins(1);
+    clearTimeout(T.hideTimer);
+    T.active = false; T.phase = 'idle'; rideActive = false;
+    park();
+    player.position.set(cfg.landing.x, 0, cfg.landing.z);
+    player.rotation.set(0,0,0);
+    hideHud();
+    const cap = document.getElementById('rideCaption'); if(cap) cap.style.opacity = '0';
+    saveProgress();
+    showToast(cfg.emoji + ' ' + cfg.name + '、おつかれさま！ ' + n + 'もん中' + T.correct + 'もん せいかい　+' + (T.correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+  }
+  function update(dt){
+    if(!T.active) return;
+    const nowS = performance.now()/1000;
+    let moving = false, ds = 0;
+    if(T.phase === 'move'){
+      const p0 = pointAt(T.s);
+      let diff = p0.heading - T.heading;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      if(Math.abs(diff) > 0.9){
+        T.heading += Math.sign(diff) * Math.min(Math.abs(diff), 3.2*dt);   // sharp corner: turn on the spot
+      } else {
+        const prev = T.s;
+        T.s += cfg.speed*dt;
+        const next = stops[T.stopIdx];
+        if(next && T.s >= next.d){ T.s = next.d; T.phase = 'narrate'; showNarration(next, T.stopIdx); }
+        else if(T.s >= total){ T.s = total; finish(); return; }
+        ds = T.s - prev; moving = ds > 0;
+        T.spin += ds;
+        T.heading += Math.sign(diff) * Math.min(Math.abs(diff), 3.2*dt);
+      }
+    }
+    const p = pointAt(T.s);
+    const bob = Math.sin(nowS*5)*(T.phase === 'move' ? 0.03 : 0.01);
+    cfg.vehicle.position.set(p.x, bob, p.z);
+    cfg.vehicle.rotation.set(0, T.heading, 0);
+    if(cfg.animate) cfg.animate(moving, T.spin, nowS);
+    player.position.set(p.x, cfg.seatY + bob, p.z);
+    player.rotation.set(0, T.heading, 0);
+  }
+  return { board, update, cancel, state:T, total };
+}
+
+// --- the sleigh and its reindeer ---
+const sleighMesh = new THREE.Group();
+const reindeerLegs = [];
+{
+  const red = new THREE.MeshLambertMaterial({color:0xC23B3B});
+  const gold = new THREE.MeshLambertMaterial({color:0xFFD873});
+  const wood = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.5,2.0), red); body.position.y = 0.7;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.9,0.14), red); back.position.set(0,1.2,-0.93);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(1.56,0.08,2.06), gold); trim.position.y = 0.97;
+  const curl = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.5,0.12), red); curl.position.set(0,0.95,1.05); curl.rotation.x = -0.5;
+  sleighMesh.add(body, back, trim, curl);
+  [-0.75,0.75].forEach(x=>{
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,2.8), wood); runner.position.set(x,0.18,0.1);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.12,0.5), wood); tip.position.set(x,0.38,1.65); tip.rotation.x = -0.6;
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.4,0.08), wood); strut.position.set(x,0.4,0.5);
+    const strut2 = strut.clone(); strut2.position.z = -0.6;
+    sleighMesh.add(runner, tip, strut, strut2);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,2.6,6), wood); shaft.rotation.x = Math.PI/2; shaft.position.set(x*0.6,0.8,2.2);
+    sleighMesh.add(shaft);
+  });
+  // reindeer
+  const deer = new THREE.Group();
+  const fur = new THREE.MeshLambertMaterial({color:0x9A6B4A});
+  const cream = new THREE.MeshLambertMaterial({color:0xF3E6D0});
+  const dark = new THREE.MeshLambertMaterial({color:0x2A2A2A});
+  const horn = new THREE.MeshLambertMaterial({color:0xD9C7A8});
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.55,16,12), fur); torso.scale.set(0.8,0.75,1.5); torso.position.y = 1.15;
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.34,12,10), cream); chest.position.set(0,1.1,0.65);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.28,0.8,10), fur); neck.position.set(0,1.6,0.85); neck.rotation.x = 0.7;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3,14,10), fur); head.scale.set(0.9,0.9,1.2); head.position.set(0,1.95,1.2);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.17,10,8), cream); snout.position.set(0,1.85,1.5);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,6), dark); nose.position.set(0,1.88,1.65);
+  deer.add(torso, chest, neck, head, snout, nose);
+  [-1,1].forEach(side=>{
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04,6,5), dark); eye.position.set(side*0.16,2.0,1.45); deer.add(eye);
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.28,6), fur); ear.position.set(side*0.3,2.15,1.1); ear.rotation.z = -side*0.9; deer.add(ear);
+    const main = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.04,0.8,5), horn); main.position.set(side*0.22,2.5,1.05); main.rotation.z = -side*0.4; deer.add(main);
+    [[0.15,2.65,0.9],[0.3,2.8,1.1]].forEach(([dx,dy,dz])=>{
+      const br = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.03,0.4,5), horn); br.position.set(side*(0.22+dx*0.4),dy,dz); br.rotation.z = -side*0.9; deer.add(br);
+    });
+    [[0.3,0.75],[-0.3,-0.65]].forEach(([lx,lz],k)=>{
+      const leg = new THREE.Group();
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.07,0.8,8), fur); upper.position.y = -0.4;
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.09,0.12,8), dark); hoof.position.y = -0.84;
+      leg.add(upper, hoof);
+      leg.position.set(side*0.3, 0.85, lz);
+      deer.add(leg);
+      reindeerLegs.push({ leg, phase:(side>0 ? 0 : Math.PI) + (k ? Math.PI : 0) });
+    });
+  });
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6), cream); tail.position.set(0,1.25,-0.85); deer.add(tail);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.28,0.05,6,14), new THREE.MeshLambertMaterial({color:0xC23B3B})); collar.position.set(0,1.45,0.75); collar.rotation.x = 0.7; deer.add(collar);
+  const bell = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,6), new THREE.MeshBasicMaterial({color:0xFFD873})); bell.position.set(0,1.2,0.98); deer.add(bell);
+  deer.position.z = 3.4;
+  deer.scale.setScalar(1.15);
+  sleighMesh.add(deer, makeBlobShadow(1.8));
+}
+const SLEIGH_ROUTE = [[-4.0, 4.25], [-2.0, 4.75], [-1.0, 5.75], [-1.0, 9.75], [-2.0, 10.75], [-3.0, 11.0], [-4.25, 10.25], [-4.75, 9.0], [-4.25, 7.75], [-7.0, 11.75], [-8.0, 12.5], [-9.5, 12.75], [-10.75, 12.0], [-11.75, 10.75], [-11.0, 5.5], [-11.75, 4.25], [-12.75, 3.25], [-14.5, 3.0], [-15.75, 3.75], [-16.25, 4.25], [-15.0, 3.0], [-12.75, 3.25], [-11.25, 4.75], [-11.0, 8.25], [-11.75, 9.5], [-11.5, 11.25], [-10.25, 12.5], [-8.5, 12.75], [-4.25, 11.0], [-2.0, 10.75], [-1.0, 9.75], [0.25, 1.0], [-1.25, -7.25], [-6.5, -12.5], [-8.0, -12.75], [-6.5, -12.5], [-1.25, -7.25], [0.25, 1.0], [-1.25, 12.0], [-1.0, 13.5], [0.0, 16.0], [-1.25, 12.25], [-0.75, 6.5], [-1.25, 5.5], [-2.0, 4.75], [-4.0, 4.25]];
+const SLEIGH_PARK_HEADING = Math.atan2(SLEIGH_ROUTE[1][0]-SLEIGH_ROUTE[0][0], SLEIGH_ROUTE[1][1]-SLEIGH_ROUTE[0][1]);
+sleighMesh.position.set(SLEIGH_ROUTE[0][0], 0, SLEIGH_ROUTE[0][1]);
+sleighMesh.rotation.y = SLEIGH_PARK_HEADING;
+iceDecorGroup.add(sleighMesh);
+const sleighRide = createTourRide({
+  id:'sleigh', hudId:'sleighHud', emoji:'🦌', name:'トナカイそりツアー',
+  route:SLEIGH_ROUTE, vehicle:sleighMesh, station:{ x:SLEIGH_ROUTE[0][0], z:SLEIGH_ROUTE[0][1] }, parkHeading:SLEIGH_PARK_HEADING,
+  landing:{ x:-2.5, z:2.4 }, speed:3.6, seatY:0.45,
+  startCaption:'<span style="font-size:14px;">Jingle, jingle! Let\'s ride through the snow.</span><br><span style="font-size:12px; opacity:.85;">のってね！雪の島を めぐろう。</span>',
+  animate:(moving, spin, nowS)=>{ reindeerLegs.forEach(l => { l.leg.rotation.x = moving ? Math.sin(spin*4 + l.phase)*0.6 : 0; }); },
+  stops:[
+    { d:14.07, name:'雪だるまの友だち',
+      en:"This is our snow friend. He loves warm hugs!",
+      ja:"これは雪だるまの友だち。あたたかいハグが大好きです！",
+      q:{ en:"What does he love?", good:"Warm hugs", bad:"Hot baths", ja:"彼は「あたたかいハグ」が大好きだよ。" } },
+    { d:36.86, name:'かまくらの村',
+      en:"These are igloos. They are little houses made of snow.",
+      ja:"これはかまくら。雪でできた小さな家です。",
+      q:{ en:"What are igloos made of?", good:"Snow", bad:"Wood", ja:"かまくらは「雪」でできているよ。" } },
+    { d:87.73, name:'こおった池',
+      en:"The pond is frozen. You can skate on the ice!",
+      ja:"池がこおっています。氷の上でスケートができるよ！",
+      q:{ en:"What can you do on the ice?", good:"Skate", bad:"Swim", ja:"氷の上では「スケート」ができるよ。" } },
+    { d:120.37, name:'氷のお城',
+      en:"Look! The ice palace shines in the sunlight. The snow queen lives there.",
+      ja:"見て！氷のお城が光っているよ。雪の女王が住んでいます。",
+      q:{ en:"Who lives in the palace?", good:"The snow queen", bad:"A pirate", ja:"お城には「雪の女王」が住んでいるよ。" } },
+  ],
+});
+function boardSleigh(l){ sleighRide.board(); }
+function cancelSleigh(){ sleighRide.cancel(); }
+function updateSleigh(dt){ sleighRide.update(dt); }
+
+
+/* =========================================================
+   🛷 そりコースター (sled coaster) — ice island. A glowing ice ribbon
+   lifts the sled up beside the start, then spirals down around the island
+   in a long banked helix and glides home. Four times the sled slows in
+   front of a pair of rings: the Japanese meaning is shown, the rings carry
+   English words, tap left or right and the sled steers through the ring you
+   chose. (Same engine idea as the sky dragon: scripted track, banking
+   frames, chase camera.)
+========================================================= */
+const SLED_STEP = 0.25;
+const SLED_GATE_LAT = 3.0;
+const SLED_RING_R = 2.0;
+const SLED_ASK_DIST = 14;
+const SLED_STATION = { x:18, z:-7 };
+const SLED_LANDING = { x:18, z:-10.3 };
+
+const SLED_PATH = (function(){
+  const pts = [];
+  const add = (x,y,z) => pts.push(new THREE.Vector3(x,y,z));
+  add(18,0.9,-7); add(21,1.6,-7.5); add(24.5,5,-5.5); add(26.5,10,-0.5); add(25.5,15,6);   // chain lift
+  const N = 60;                                                                             // banked helix, 1.8 turns
+  for(let k=1;k<=N;k++){
+    const f = k/N, th = (13 + 657*f)*Math.PI/180, r = 26 - 11*f;
+    add(r*Math.cos(th), 15 - 9*f, r*Math.sin(th));
+  }
+  add(14.5,5,-9.8); add(17.5,2.6,-8.5); add(18,0.9,-7);                                      // swoop home
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/SLED_STEP));
+  const step = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], U = [], Q = [], raw = [];
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  const worldUp = new THREE.Vector3(0,1,0);
+  for(let i=0;i<=n;i++){
+    U.push(worldUp.clone().sub(T[i].clone().multiplyScalar(worldUp.dot(T[i]))).normalize());
+    const left = U[i].clone().cross(T[i]).normalize();   // seen from behind the sled (the chase camera) this points LEFT
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, U[i], T[i])));
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const rate = Math.atan2(Math.sin(d), Math.cos(d)) / (2*step);
+    raw.push(Math.max(-0.9, Math.min(0.9, -rate*9.0*Math.hypot(T[i].x, T[i].z))));
+  }
+  const bank = raw.map((_,i)=>{ let sum = 0, c = 0; for(let j=Math.max(0,i-10); j<=Math.min(n,i+10); j++){ sum += raw[j]; c++; } return sum/c; });
+  let crest = 0, bd = 1e9;
+  for(let i=0;i<=n;i++){ const q = P[i]; const d = (q.x-25.5)**2 + (q.y-15)**2 + (q.z-6)**2; if(d < bd){ bd = d; crest = i; } }
+  return { pts:P, T, U, Q, bank, total, step, n, liftEnd: crest*step };
+})();
+
+const _sfTmpQ = new THREE.Quaternion();
+const _sfAxisZ = new THREE.Vector3(0,0,1);
+function sledFrameAt(s, out){
+  out = out || { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  const P = SLED_PATH;
+  let bank = 0;
+  if(s <= 0){ out.pos.copy(P.pts[0]).addScaledVector(P.T[0], s); out.q.copy(P.Q[0]); }
+  else if(s >= P.total){ out.pos.copy(P.pts[P.n]).addScaledVector(P.T[P.n], s - P.total); out.q.copy(P.Q[P.n]); }
+  else {
+    const f = s / P.step, i = Math.min(P.n-1, Math.floor(f)), k = f - i;
+    out.pos.copy(P.pts[i]).lerp(P.pts[i+1], k);
+    out.q.copy(P.Q[i]).slerp(P.Q[i+1], k);
+    bank = P.bank[i]*(1-k) + P.bank[i+1]*k;
+  }
+  _sfTmpQ.setFromAxisAngle(_sfAxisZ, bank);
+  out.q.multiply(_sfTmpQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+
+// ring pairs: spaced along the helix
+const SLED_GATES = [12,26,40,54].map(k=>{
+  const f = k/60, th = (13 + 657*f)*Math.PI/180, r = 26 - 11*f;
+  const tx = r*Math.cos(th), ty = 15 - 9*f, tz = r*Math.sin(th);
+  let best = 0, bd = 1e9;
+  for(let i=0;i<=SLED_PATH.n;i++){
+    const q = SLED_PATH.pts[i]; const d = (q.x-tx)**2 + (q.y-ty)**2 + (q.z-tz)**2;
+    if(d < bd){ bd = d; best = i; }
+  }
+  return { s: best*SLED_PATH.step, answered:false, latCur:0, latTarget:0, ok:null, q:null, rings:[], labels:[] };
+});
+function sledLatAt(s){
+  let sum = 0;
+  for(let gi=0; gi<SLED_GATES.length; gi++){
+    const g = SLED_GATES[gi];
+    if(!g.latCur) continue;
+    const d = s - g.s;
+    let w = 0;
+    if(d > -4 && d < 8){
+      if(d < -0.3) w = dragonSstep((d+4)/3.7);
+      else if(d <= 0.3) w = 1;
+      else w = 1 - dragonSstep((d-0.3)/7.7);
+    }
+    sum += g.latCur * w;
+  }
+  return sum;
+}
+
+// --- the visible ice ribbon (channel), pillars for the lift and the landing ---
+{
+  const P = SLED_PATH, fr = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  const verts = [], idx = [];
+  const m = Math.floor(P.total/0.5);                 // one cross-section every 0.5 m
+  for(let i=0;i<=m;i++){
+    sledFrameAt(Math.min(P.total, i*0.5), fr);
+    const c = fr.pos, L = fr.left, U = fr.up;
+    [[0.95,0.4],[0.8,-0.02],[-0.8,-0.02],[-0.95,0.4]].forEach(([lx,uy])=>{
+      verts.push(c.x + L.x*lx + U.x*uy, c.y + L.y*lx + U.y*uy, c.z + L.z*lx + U.z*uy);
+    });
+    if(i > 0){
+      for(let k=0;k<3;k++){
+        const a = (i-1)*4 + k, b = a + 1, c2 = i*4 + k, d = c2 + 1;
+        idx.push(a,b,c2, b,d,c2);
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts,3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const ribbon = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color:0x9FD8F5, transparent:true, opacity:0.88, side:THREE.DoubleSide, shininess:100, emissive:0x2A6FA0, emissiveIntensity:0.3 }));
+  iceDecorGroup.add(ribbon);
+  const pillarM = new THREE.MeshPhongMaterial({ color:0xDDEFFB, shininess:80 });
+  for(let s=3; s<P.total; s+=6){
+    if(!(s < P.liftEnd || s > P.total - 10)) continue;
+    sledFrameAt(s, fr);
+    if(fr.pos.y < 1.3) continue;
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,fr.pos.y-0.15,8), pillarM);
+    pil.position.set(fr.pos.x, (fr.pos.y-0.15)/2, fr.pos.z);
+    iceDecorGroup.add(pil);
+  }
+}
+
+// --- the sled ---
+const sledMesh = new THREE.Group();
+{
+  const wood = new THREE.MeshLambertMaterial({color:0xB5835A});
+  const red = new THREE.MeshLambertMaterial({color:0xC23B3B});
+  const dark = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.14,2.0), wood); base.position.y = 0.2;
+  const seatBack = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.55,0.1), red); seatBack.position.set(0,0.55,-0.5);
+  const front = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.3,0.1), red); front.position.set(0,0.4,0.95); front.rotation.x = -0.4;
+  sledMesh.add(base, seatBack, front);
+  [-0.5,0.5].forEach(x=>{
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,2.3), dark); runner.position.set(x,0.07,0.05);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.5), dark); tip.position.set(x,0.22,1.25); tip.rotation.x = -0.6;
+    sledMesh.add(runner, tip);
+  });
+  const buddy = makeSnowman(0,-0.95,0,0x4F8FE0,0);    // a little snowman rides along at the back
+  buddy.scale.setScalar(0.38);
+  buddy.position.y = 0.3;
+  sledMesh.add(buddy);
+}
+sledMesh.position.copy(SLED_PATH.pts[0]);
+sledMesh.quaternion.copy(SLED_PATH.Q[0]);
+iceDecorGroup.add(sledMesh);
+
+// --- ring pairs (always visible in the sky as a teaser; labels only while asking) ---
+SLED_GATES.forEach(g=>{
+  const f = sledFrameAt(g.s);
+  [1,-1].forEach((side,idx)=>{
+    const color = idx === 0 ? 0xFF8FB6 : 0x6BCBFF;
+    const grp = new THREE.Group();
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(SLED_RING_R,0.18,10,36), new THREE.MeshBasicMaterial({color}));
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(SLED_RING_R-0.1,28), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.16, side:THREE.DoubleSide, depthWrite:false}));
+    grp.add(torus, disc);
+    grp.position.copy(f.pos).addScaledVector(f.left, side*SLED_GATE_LAT).addScaledVector(f.up, 0.9);
+    grp.quaternion.copy(f.q);
+    iceDecorGroup.add(grp);
+    const label = makeRingLabel();
+    label.position.copy(grp.position).addScaledVector(f.up, SLED_RING_R + 1.1);
+    iceDecorGroup.add(label);
+    g.rings.push({ grp, torus, disc, color, pulse:0 });
+    g.labels.push(label);
+  });
+});
+
+// --- station: a sign next to the start of the lift ---
+function makeSledStation(x,z){
+  const g = new THREE.Group();
+  const ice = new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:90});
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.15,18), ice); pad.position.y = 0.08;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), new THREE.MeshLambertMaterial({color:0x7A5C4A})); post.position.y = 0.85;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04), new THREE.MeshLambertMaterial({color:0xD9453D})); flag.position.set(0.4,1.5,0);
+  g.add(pad, post, flag);
+  const marker = makeFloatingMarker('🛷', 2.7);
+  g.add(marker, makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// --- ride state, HUD, questions ---
+const sled = { active:false, s:0, t:0, gateIdx:0, asking:false, correct:0, hideTimer:0,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(0,0,1) };
+const _sfA = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+
+function pickSledQuestion(){
+  const pool = VOCAB.filter(v => v.en.length <= 12 && v.ja.length <= 14);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  let other = target, guard = 0;
+  while((other.en === target.en || other.ja === target.ja) && guard++ < 200) other = pool[Math.floor(Math.random()*pool.length)];
+  const options = Math.random() < 0.5 ? [target, other] : [other, target];
+  return { target, options };
+}
+function getSledHud(){
+  let el = document.getElementById('sledHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'sledHud';
+  el.style.cssText = 'position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:520; width:min(94vw,480px); background:rgba(255,250,244,0.94); border-radius:22px; padding:12px 12px 14px; box-shadow:0 12px 34px rgba(0,0,0,.3); text-align:center; display:none; color:#4A3B5C;';
+  const btn = 'flex:1; min-height:62px; padding:8px 6px; font-size:19px; font-weight:800; border:0; border-radius:16px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+  el.innerHTML =
+    '<div id="sledHudHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+    '<div id="sledHudJa" style="font-size:22px; font-weight:800; margin:6px 0 10px; line-height:1.3;"></div>' +
+    '<div style="display:flex; gap:10px;">' +
+      '<button id="sledOpt0" style="'+btn+' background:#FFD1E3;"></button>' +
+      '<button id="sledOpt1" style="'+btn+' background:#CBEBFF;"></button>' +
+    '</div>' +
+    '<div id="sledHudMsg" style="min-height:18px; margin-top:8px; font-size:13px; font-weight:800;"></div>';
+  document.body.appendChild(el);
+  [0,1].forEach(i => el.querySelector('#sledOpt'+i).addEventListener('click', ()=> answerSled(i)));
+  return el;
+}
+function hideSledHud(){ const el = document.getElementById('sledHud'); if(el) el.style.display = 'none'; }
+function askSledQuestion(g){
+  clearTimeout(sled.hideTimer);
+  g.q = pickSledQuestion();
+  const el = getSledHud();
+  const cap = document.getElementById('rideCaption'); if(cap) cap.style.opacity = '0';
+  el.querySelector('#sledHudHead').textContent = '🛷 リング ' + (sled.gateIdx+1) + '/' + SLED_GATES.length + '　いみに あう えいごを えらぼう！';
+  el.querySelector('#sledHudJa').textContent = '「' + g.q.target.ja + '」';
+  [0,1].forEach(i=>{
+    const b = el.querySelector('#sledOpt'+i);
+    const en = g.q.options[i].en;
+    b.textContent = (i === 0 ? '◀ ' : '') + en + (i === 1 ? ' ▶' : '');
+    b.disabled = false; b.style.outline = 'none';
+    setRingLabel(g.labels[i], en);
+    g.labels[i].visible = true;
+  });
+  el.querySelector('#sledHudMsg').textContent = '';
+  el.style.display = 'block';
+}
+function answerSled(side){
+  if(!sled.active || !sled.asking) return;
+  const g = SLED_GATES[sled.gateIdx];
+  if(!g || g.answered) return;
+  g.answered = true;
+  sled.asking = false;
+  g.latTarget = (side === 0 ? 1 : -1) * SLED_GATE_LAT;
+  g.ok = (g.q.options[side].en === g.q.target.en);
+  const el = getSledHud(), msg = el.querySelector('#sledHudMsg');
+  [0,1].forEach(i=>{
+    const b = el.querySelector('#sledOpt'+i);
+    b.disabled = true;
+    if(g.q.options[i].en === g.q.target.en) b.style.outline = '4px solid #6BD48A';
+  });
+  g.rings[side].pulse = 0.7;
+  if(g.ok){
+    sled.correct++; addCoins(1); playCorrectSound();
+    g.rings[side].torus.material.color.set(0xFFD873);
+    msg.textContent = '⭕ せいかい！ ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+    try{ speakEnglish(g.q.target.en); }catch(e){}
+  } else {
+    playWrongSound();
+    g.rings[side].torus.material.color.set(0x9A9AA8);
+    msg.textContent = '❌ ざんねん… ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+  }
+  clearTimeout(sled.hideTimer);
+  sled.hideTimer = setTimeout(()=>{ if(sled.active && !sled.asking) hideSledHud(); }, 2000);
+}
+function resetSledGates(){
+  SLED_GATES.forEach(g=>{
+    g.answered = false; g.latCur = 0; g.latTarget = 0; g.ok = null; g.q = null;
+    g.rings.forEach(r => { r.torus.material.color.set(r.color); r.pulse = 0; r.grp.scale.set(1,1,1); });
+    g.labels.forEach(l => { l.visible = false; });
+  });
+}
+function parkSled(){
+  sledMesh.position.copy(SLED_PATH.pts[0]);
+  sledMesh.quaternion.copy(SLED_PATH.Q[0]);
+  player.quaternion.identity();
+}
+function boardSled(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  resetSledGates();
+  Object.assign(sled, { active:true, s:0, t:0, gateIdx:0, asking:false, correct:0 });
+  sled.camDir.set(1,0,0);
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  rideCaption('<span style="font-size:14px;">Hold on! Up we go!</span><br><span style="font-size:12px; opacity:.85;">つかまってね！のぼるよ！</span>');
+}
+function endSledRide(){
+  clearTimeout(sled.hideTimer);
+  sled.active = false;
+  rideActive = false;
+  hideSledHud();
+  resetSledGates();
+  const cap = document.getElementById('rideCaption'); if(cap) cap.style.opacity = '0';
+  parkSled();
+  player.position.set(SLED_LANDING.x, 0, SLED_LANDING.z);
+  player.rotation.set(0, 0, 0);
+  camera.position.set(SLED_LANDING.x, 2.6, SLED_LANDING.z - 6.8);
+}
+function cancelSled(){ if(sled.active) endSledRide(); }
+function finishSledRide(){
+  const total = SLED_GATES.length, correct = sled.correct;
+  const bonus = (correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endSledRide();
+  saveProgress();
+  showToast('🛷 そりコースター、おつかれさま！ ' + total + 'もん中' + correct + 'もん せいかい　+' + (correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+function sledSpeedAt(s, y){
+  if(s < SLED_PATH.liftEnd) return 4.5;                                   // chain lift
+  return Math.max(5, Math.min(14, 5 + 1.6*Math.sqrt(Math.max(0, 16 - y))));
+}
+function layoutSled(s, bobY){
+  sledFrameAt(s, _sfA);
+  const lat = sledLatAt(s);
+  sledMesh.position.copy(_sfA.pos).addScaledVector(_sfA.left, lat);
+  sledMesh.position.y += bobY;
+  sledMesh.quaternion.copy(_sfA.q);
+  player.position.copy(sledMesh.position).addScaledVector(_sfA.up, 0.42).addScaledVector(_sfA.fwd, 0.25);
+  player.quaternion.copy(_sfA.q);
+}
+function updateSled(dt){
+  if(!sled.active) return;
+  const nowS = performance.now()/1000;
+  sled.t += dt;
+  const g = SLED_GATES[sled.gateIdx];
+  sledFrameAt(sled.s, _sfA);
+  let v = sledSpeedAt(sled.s, _sfA.pos.y) * Math.min(1, 0.4 + sled.t/2.5);
+  let hovering = false;
+  if(g && !g.answered){
+    const dist = g.s - sled.s;
+    if(dist < SLED_ASK_DIST && !sled.asking){ sled.asking = true; askSledQuestion(g); }
+    if(sled.asking){
+      const hud = document.getElementById('sledHud');
+      if(hud && hud.style.display === 'none') hud.style.display = 'block';
+      if(dist > 2.4) v *= 0.3; else { v = 0; hovering = true; }
+    }
+  }
+  sled.s += v*dt;
+  if(g && g.answered && sled.s > g.s + 10){ g.labels.forEach(l => { l.visible = false; }); sled.gateIdx++; }
+  const k = 1 - Math.exp(-dt*3.2);
+  SLED_GATES.forEach(gg=>{
+    gg.latCur += (gg.latTarget - gg.latCur)*k;
+    gg.rings.forEach(r=>{
+      if(r.pulse > 0){ r.pulse = Math.max(0, r.pulse - dt); const sc = 1 + Math.sin((r.pulse/0.7)*Math.PI)*0.35; r.grp.scale.set(sc,sc,sc); }
+    });
+  });
+  if(sled.s >= SLED_PATH.total - 0.05){ finishSledRide(); return; }
+  layoutSled(sled.s, hovering ? Math.sin(nowS*4)*0.1 : 0);
+  // chase camera: behind along the smoothed heading, a bit above
+  const hl = Math.hypot(_sfA.fwd.x, _sfA.fwd.z);
+  if(hl > 0.35){
+    const kk = 1 - Math.exp(-dt*2.2);
+    sled.camDir.x += (_sfA.fwd.x/hl - sled.camDir.x)*kk;
+    sled.camDir.z += (_sfA.fwd.z/hl - sled.camDir.z)*kk;
+    const L = Math.hypot(sled.camDir.x, sled.camDir.z) || 1;
+    sled.camDir.x /= L; sled.camDir.z /= L;
+  }
+  const rp = player.position;
+  sled.camPos.set(rp.x - sled.camDir.x*8, rp.y + 3.4, rp.z - sled.camDir.z*8);
+  sled.camLook.set(rp.x + sled.camDir.x*2.5, rp.y + 0.8, rp.z + sled.camDir.z*2.5);
+}
+
+/* =========================================================
+   ⛄ ゆきだるまづくり (snowman workshop) — a listening game. The guide
+   says (and shows) an English instruction; tap the right item and it is
+   added to the snowman: sizes, counting, colours, body parts. Nine steps.
+   +1 coin for each step answered correctly on the first try.
+========================================================= */
+const SNOW_COLORS = [
+  { id:'red',    en:'red',    ja:'赤い',   hex:'#D9453D' },
+  { id:'blue',   en:'blue',   ja:'青い',   hex:'#4F8FE0' },
+  { id:'green',  en:'green',  ja:'緑の',   hex:'#4CAF6E' },
+  { id:'yellow', en:'yellow', ja:'黄色い', hex:'#F2C230' },
+];
+function snowmanSvg(st, w){
+  let g = '<svg viewBox="0 0 200 270" width="' + w + '" height="' + Math.round(w*1.35) + '" xmlns="http://www.w3.org/2000/svg">';
+  g += '<ellipse cx="100" cy="258" rx="72" ry="9" fill="rgba(120,160,200,0.35)"/>';
+  if(st.bottom) g += '<circle cx="100" cy="208" r="46" fill="#fff" stroke="#BFD6EE" stroke-width="3"/>';
+  if(st.arms){
+    g += '<g stroke="#7A5C4A" stroke-width="5" stroke-linecap="round"><line x1="66" y1="146" x2="26" y2="116"/><line x1="134" y1="146" x2="174" y2="116"/>' +
+         '<line x1="40" y1="126" x2="30" y2="136"/><line x1="160" y1="126" x2="170" y2="136"/></g>';
+  }
+  if(st.middle) g += '<circle cx="100" cy="144" r="34" fill="#fff" stroke="#BFD6EE" stroke-width="3"/>';
+  if(st.head) g += '<circle cx="100" cy="94" r="25" fill="#fff" stroke="#BFD6EE" stroke-width="3"/>';
+  for(let i=0;i<(st.eyes||0);i++) g += '<circle cx="' + (100 + (i-(st.eyes-1)/2)*16) + '" cy="88" r="3.5" fill="#222"/>';
+  if(st.nose) g += '<polygon points="100,95 130,100 100,105" fill="#FF8A3D"/>';
+  for(let i=0;i<(st.buttons||0);i++) g += '<circle cx="100" cy="' + (144 + (i-(st.buttons-1)/2)*14) + '" r="3.8" fill="#222"/>';
+  if(st.scarf) g += '<rect x="70" y="114" width="60" height="11" rx="5" fill="' + st.scarf + '"/><rect x="108" y="118" width="11" height="28" rx="4" fill="' + st.scarf + '"/>';
+  if(st.hat) g += '<rect x="74" y="66" width="52" height="7" rx="3" fill="' + st.hat + '"/><rect x="83" y="40" width="34" height="28" rx="3" fill="' + st.hat + '"/>';
+  return g + '</svg>';
+}
+const SNOW_ICON_OPEN = '<svg viewBox="0 0 64 64" width="56" height="56" xmlns="http://www.w3.org/2000/svg">';
+function snowIcon(kind, v){
+  let g = SNOW_ICON_OPEN;
+  if(kind === 'size'){
+    const r = v === 'big' ? 26 : v === 'medium' ? 18 : 11;
+    g += '<circle cx="32" cy="32" r="' + r + '" fill="#fff" stroke="#9BB8D6" stroke-width="3"/>';
+  } else if(kind === 'count'){
+    const n = +v;
+    for(let i=0;i<n;i++) g += '<circle cx="' + (32 + (i-(n-1)/2)*12) + '" cy="32" r="4.5" fill="#222"/>';
+  } else if(kind === 'countv'){
+    const n = +v;
+    for(let i=0;i<n;i++) g += '<circle cx="32" cy="' + (32 + (i-(n-1)/2)*12) + '" r="4.5" fill="#222"/>';
+  } else if(kind === 'item'){
+    if(v === 'carrot') g += '<polygon points="12,26 52,32 12,38" fill="#FF8A3D"/>';
+    else if(v === 'stick') g += '<g stroke="#7A5C4A" stroke-width="5" stroke-linecap="round"><line x1="12" y1="50" x2="52" y2="14"/><line x1="34" y1="30" x2="48" y2="36"/></g>';
+    else if(v === 'button') g += '<circle cx="32" cy="32" r="9" fill="#222"/>';
+    else if(v === 'hat') g += '<rect x="14" y="40" width="36" height="6" fill="#222"/><rect x="21" y="16" width="22" height="26" fill="#222"/>';
+    else if(v === 'sticks') g += '<g stroke="#7A5C4A" stroke-width="5" stroke-linecap="round"><line x1="10" y1="52" x2="30" y2="12"/><line x1="34" y1="52" x2="54" y2="12"/></g>';
+    else if(v === 'carrots') g += '<polygon points="8,20 30,26 8,32" fill="#FF8A3D"/><polygon points="8,40 30,46 8,52" fill="#FF8A3D"/>';
+    else if(v === 'scarves') g += '<rect x="8" y="22" width="48" height="10" rx="5" fill="#D9453D"/><rect x="38" y="28" width="10" height="24" rx="4" fill="#D9453D"/>';
+    else if(v === 'hats') g += '<rect x="8" y="30" width="22" height="4" fill="#222"/><rect x="12" y="12" width="14" height="20" fill="#222"/><rect x="34" y="30" width="22" height="4" fill="#222"/><rect x="38" y="12" width="14" height="20" fill="#222"/>';
+  } else if(kind === 'scarf'){
+    g += '<rect x="8" y="22" width="48" height="12" rx="6" fill="' + v + '"/><rect x="38" y="30" width="11" height="26" rx="4" fill="' + v + '"/>';
+  } else if(kind === 'hat'){
+    g += '<rect x="12" y="42" width="40" height="7" rx="3" fill="' + v + '"/><rect x="20" y="14" width="24" height="30" rx="3" fill="' + v + '"/>';
+  }
+  return g + '</svg>';
+}
+function snowStepsForRun(){
+  const cs = SNOW_COLORS.slice().sort(()=>Math.random()-0.5);
+  const scarf = cs[0], hat = cs[1];
+  const nb = Math.random() < 0.5 ? 2 : 3;
+  return [
+    { key:'bottom',  en:'First, roll the BIG snowball for the bottom.', ja:'まず、いちばん下に 大きな雪玉を おこう。', kind:'size', opts:['big','medium','small'], answer:'big' },
+    { key:'middle',  en:'Next, put the MEDIUM snowball on top.', ja:'つぎに、まん中の大きさの雪玉を のせよう。', kind:'size', opts:['big','medium','small'], answer:'medium' },
+    { key:'head',    en:'Then, add the SMALL snowball for his head.', ja:'それから、小さな雪玉を あたまに のせよう。', kind:'size', opts:['big','medium','small'], answer:'small' },
+    { key:'eyes',    en:'Give him two eyes.', ja:'目を 2つ つけよう。', kind:'count', opts:['1','2','3','4'], answer:'2' },
+    { key:'nose',    en:'Put a carrot on his face for a nose.', ja:'にんじんを 鼻に つけよう。', kind:'item', opts:['carrot','stick','button','hat'], answer:'carrot' },
+    { key:'buttons', en:'Add ' + (nb === 2 ? 'two' : 'three') + ' buttons.', ja:'ボタンを ' + nb + 'こ つけよう。', kind:'countv', opts:['1','2','3','4'], answer:String(nb) },
+    { key:'scarf',   en:'Wrap a ' + scarf.en + ' scarf around his neck.', ja:scarf.ja + 'マフラーを 首に まこう。', kind:'scarf', opts:SNOW_COLORS.map(c=>c.hex), answer:scarf.hex, hex:scarf.hex },
+    { key:'hat',     en:'Put a ' + hat.en + ' hat on his head.', ja:hat.ja + 'ぼうしを あたまに かぶせよう。', kind:'hat', opts:SNOW_COLORS.map(c=>c.hex), answer:hat.hex, hex:hat.hex },
+    { key:'arms',    en:'Finally, give him two stick arms.', ja:'さいごに、木の枝の うでを 2本 つけよう。', kind:'item', opts:['sticks','carrots','scarves','hats'], answer:'sticks' },
+  ];
+}
+function openSnowmanBuild(){
+  let stopped = false, steps = [], idx = 0, perfect = 0, answeredFirst = true, locked = false;
+  const state = {};
+  const ui = makeFestivalOverlay('⛄ ゆきだるまづくり', ()=>{ stopped = true; });
+  if(!ui) return;
+  ui.root.style.background = 'linear-gradient(#DDEFFB,#F6FBFF)';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff; border-radius:20px; padding:12px 14px; text-align:center; box-shadow:0 4px 14px rgba(0,0,0,.12); display:flex; flex-direction:column; gap:4px;';
+  const enEl = document.createElement('div'); enEl.style.cssText = 'font-size:20px; line-height:1.35;';
+  const jaEl = document.createElement('div'); jaEl.style.cssText = 'font-size:13px; opacity:.75; font-weight:700;';
+  const soundBtn = document.createElement('button');
+  soundBtn.textContent = '🔊 もういちど きく';
+  soundBtn.style.cssText = 'margin:4px auto 0; padding:8px 14px; border:0; border-radius:16px; background:#EFE7F5; color:#4A3B5C; font-size:14px; font-weight:800; cursor:pointer;';
+  soundBtn.addEventListener('click', ()=>{ if(steps[idx]) try{ speakEnglish(steps[idx].en); }catch(e){} });
+  card.append(enEl, jaEl, soundBtn);
+  const stage = document.createElement('div');
+  stage.style.cssText = 'flex:1; min-height:0; display:flex; align-items:center; justify-content:center;';
+  const optRow = document.createElement('div');
+  optRow.style.cssText = 'display:flex; justify-content:center; gap:10px; flex-wrap:wrap;';
+  const msg = document.createElement('div'); msg.style.cssText = 'min-height:20px; text-align:center; font-size:14px;';
+
+  function drawStage(){
+    const w = Math.max(120, Math.min(200, Math.floor((ui.body.clientHeight || 520) * 0.3)));
+    stage.innerHTML = snowmanSvg(state, w);
+  }
+  function showStep(){
+    if(stopped) return;
+    if(idx >= steps.length){ finish(); return; }
+    const st = steps[idx];
+    locked = false; answeredFirst = true; msg.textContent = '';
+    enEl.textContent = st.en;
+    jaEl.textContent = st.ja;
+    ui.statusEl.textContent = 'ステップ ' + (idx+1) + '/' + steps.length;
+    optRow.innerHTML = '';
+    st.opts.slice().sort(()=>Math.random()-0.5).forEach(o=>{
+      const b = document.createElement('button');
+      b.innerHTML = snowIcon(st.kind, o);
+      b.dataset.id = o;
+      b.style.cssText = 'width:76px; height:76px; border:0; border-radius:18px; background:#fff; box-shadow:0 3px 0 #BFD6EE; cursor:pointer; -webkit-tap-highlight-color:transparent;';
+      b.addEventListener('click', ()=> onPick(b, o));
+      optRow.appendChild(b);
+    });
+    try{ speakEnglish(st.en); }catch(e){}
+  }
+  function applyStep(st){
+    if(st.key === 'bottom') state.bottom = true;
+    else if(st.key === 'middle') state.middle = true;
+    else if(st.key === 'head') state.head = true;
+    else if(st.key === 'eyes') state.eyes = 2;
+    else if(st.key === 'nose') state.nose = true;
+    else if(st.key === 'buttons') state.buttons = +st.answer;
+    else if(st.key === 'scarf') state.scarf = st.hex;
+    else if(st.key === 'hat') state.hat = st.hex;
+    else if(st.key === 'arms') state.arms = true;
+  }
+  function onPick(b, o){
+    if(stopped || locked) return;
+    const st = steps[idx];
+    if(o === st.answer){
+      locked = true;
+      b.style.background = '#B8F0C8';
+      if(answeredFirst){ perfect++; addCoins(1); }
+      playCorrectSound();
+      applyStep(st);
+      drawStage();
+      msg.textContent = answeredFirst ? '⭕ いいね！' : '⭕ できた！';
+      idx++;
+      setTimeout(showStep, 900);
+    } else {
+      answeredFirst = false;
+      playWrongSound();
+      festivalShake(b);
+      b.style.background = '#FFC1C1';
+      msg.textContent = '🔊 もういちど よく きいてみよう';
+    }
+  }
+  function finish(){
+    if(stopped) return;
+    const allPerfect = (perfect === steps.length);
+    if(allPerfect) addCoins(1);
+    saveProgress();
+    festivalEndPanel(ui, '⛄', snowmanSvg(state, 110) + '<br>' + steps.length + 'ステップ中 ' + perfect + 'こ いっぱつで せいかい！' + (allPerfect ? '<br>🎉 ぜんぶ せいかいボーナス +1🪙' : ''), startGame);
+  }
+  function startGame(){
+    Object.keys(state).forEach(k => delete state[k]);
+    steps = snowStepsForRun(); idx = 0; perfect = 0;
+    ui.body.innerHTML = '';
+    ui.body.append(card, stage, optRow, msg);
+    drawStage();
+    showStep();
+  }
+  startGame();
+}
+
+
+
+/* =========================================================
+   🌌 オーロラ飛行 (aurora flight) — ice island, night only. The player
+   stands on a glowing snowflake and sweeps twice around the island, up
+   among the aurora, at speed (the camera's field of view widens as it
+   accelerates). Six times a row of three glowing orbs is waiting: the
+   guide says an English word (the HUD shows it), the orbs carry Japanese
+   meanings, and you have a few seconds to slide into the right lane
+   (tap ◀ ▲ ▶). Real-time: no waiting, the flight never stops.
+========================================================= */
+var auroraCraft = null;
+var auroraPadLandmark = null;
+const AF_STATION = { x:-18, z:-7 };
+const AF_LANDING = { x:-18, z:-10 };
+const AF_STEP = 0.5;
+const AF_LANE = 3.6;
+const AF_SPEED = 11;
+const AF_ASK_DIST = 40;
+
+const AF_PATH = (function(){
+  const pts = [];
+  const add = (x,y,z) => pts.push(new THREE.Vector3(x,y,z));
+  const x0 = AF_STATION.x, z0 = AF_STATION.z, r0 = Math.hypot(x0,z0), th0 = Math.atan2(z0,x0);
+  const M = 120, sweep = Math.PI*4;                          // two laps, counter-clockwise
+  add(x0, 0.9, z0);
+  for(let k=1;k<=M;k++){
+    const f = k/M, th = th0 + sweep*f;
+    const ramp = dragonSstep(Math.min(1, f/0.2));
+    let r = r0 + (36 - r0)*ramp + 4*Math.sin(6*Math.PI*f)*ramp;
+    let y = 0.9 + 24*dragonSstep(Math.min(1, f/0.22)) + 4*Math.sin(8*Math.PI*f)*ramp;
+    if(f > 0.88){ const g = (f-0.88)/0.12; r = r*(1-g) + r0*g; y = y*(1-g*g) + 0.9*g*g; }
+    add(r*Math.cos(th), y, r*Math.sin(th));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/AF_STEP));
+  const step = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], Q = [], raw = [];
+  const worldUp = new THREE.Vector3(0,1,0);
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  for(let i=0;i<=n;i++){
+    const u = worldUp.clone().sub(T[i].clone().multiplyScalar(worldUp.dot(T[i]))).normalize();
+    const left = u.clone().cross(T[i]).normalize();
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, u, T[i])));
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const rate = Math.atan2(Math.sin(d), Math.cos(d)) / (2*step);
+    raw.push(Math.max(-0.7, Math.min(0.7, -rate*9.0*Math.hypot(T[i].x, T[i].z))));
+  }
+  const bank = raw.map((_,i)=>{ let sum = 0, c = 0; for(let j=Math.max(0,i-8); j<=Math.min(n,i+8); j++){ sum += raw[j]; c++; } return sum/c; });
+  return { pts:P, T, Q, bank, total, step, n };
+})();
+
+const _afTmpQ = new THREE.Quaternion();
+const _afAxisZ = new THREE.Vector3(0,0,1);
+function afFrameAt(s, out){
+  out = out || { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  const P = AF_PATH;
+  let bank = 0;
+  if(s <= 0){ out.pos.copy(P.pts[0]).addScaledVector(P.T[0], s); out.q.copy(P.Q[0]); }
+  else if(s >= P.total){ out.pos.copy(P.pts[P.n]).addScaledVector(P.T[P.n], s - P.total); out.q.copy(P.Q[P.n]); }
+  else {
+    const f = s / P.step, i = Math.min(P.n-1, Math.floor(f)), k = f - i;
+    out.pos.copy(P.pts[i]).lerp(P.pts[i+1], k);
+    out.q.copy(P.Q[i]).slerp(P.Q[i+1], k);
+    bank = P.bank[i]*(1-k) + P.bank[i+1]*k;
+  }
+  _afTmpQ.setFromAxisAngle(_afAxisZ, bank);
+  out.q.multiply(_afTmpQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+
+// --- the glowing snowflake the player rides ---
+auroraCraft = new THREE.Group();
+{
+  const glow = new THREE.MeshPhongMaterial({ color:0xBFE9FF, shininess:120, emissive:0x6FC3FF, emissiveIntensity:0.6 });
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,0.14,24), glow); disc.position.y = 0.07;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.35,0.07,8,28), new THREE.MeshBasicMaterial({color:0xFFFFFF})); ring.rotation.x = Math.PI/2; ring.position.y = 0.1;
+  auroraCraft.add(disc, ring);
+  [0,Math.PI/3,Math.PI*2/3].forEach(a=>{
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.09,0.2), new THREE.MeshBasicMaterial({color:0xE6F7FF}));
+    arm.rotation.y = a; arm.position.y = 0.06; auroraCraft.add(arm);
+  });
+}
+auroraCraft.position.set(AF_STATION.x, 1.1, AF_STATION.z);
+auroraCraft.quaternion.copy(AF_PATH.Q[0]);
+auroraCraft.visible = false;
+iceDecorGroup.add(auroraCraft);
+
+// sparkle dust scattered along the flight path + a glittering trail behind the craft
+const afDust = (function(){
+  const n = 360, pos = new Float32Array(n*3);
+  const fr = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+  for(let i=0;i<n;i++){
+    afFrameAt(Math.random()*AF_PATH.total, fr);
+    pos[i*3]   = fr.pos.x + (Math.random()-0.5)*16;
+    pos[i*3+1] = fr.pos.y + (Math.random()-0.5)*10;
+    pos[i*3+2] = fr.pos.z + (Math.random()-0.5)*16;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xCFF3FF, size:0.45, transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.visible = false;
+  iceDecorGroup.add(pts);
+  return pts;
+})();
+const AF_TRAIL_N = 44;
+const afTrail = (function(){
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(AF_TRAIL_N*3),3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xBFE9FF, size:0.5, transparent:true, opacity:0.9, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.visible = false;
+  iceDecorGroup.add(pts);
+  return pts;
+})();
+
+// --- the six rows of glowing orbs ---
+const AF_GATES = [0.22,0.34,0.46,0.58,0.70,0.82].map(f=>({ s:f*AF_PATH.total, asked:false, done:false, q:null, orbs:[], labels:[] }));
+const AF_ORB_COLORS = [0xFF8FB6, 0xFFE08A, 0x6BCBFF];     // left, centre, right
+AF_GATES.forEach(g=>{
+  const fr = afFrameAt(g.s);
+  for(let lane=0; lane<3; lane++){
+    const grp = new THREE.Group();
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.9,16,12), new THREE.MeshBasicMaterial({ color:AF_ORB_COLORS[lane] }));
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.55,0.12,8,30), new THREE.MeshBasicMaterial({ color:AF_ORB_COLORS[lane] }));
+    grp.add(orb, halo);
+    grp.position.copy(fr.pos).addScaledVector(fr.left, (1-lane)*AF_LANE).addScaledVector(fr.up, 1.2);
+    grp.quaternion.copy(fr.q);
+    grp.visible = false;
+    iceDecorGroup.add(grp);
+    const label = makeRingLabel();
+    label.position.copy(grp.position).addScaledVector(fr.up, 2.9);
+    iceDecorGroup.add(label);
+    g.orbs.push({ grp, orb, halo, color:AF_ORB_COLORS[lane], pulse:0 });
+    g.labels.push(label);
+  }
+});
+
+// --- launch pad (landmark; only appears at night) ---
+function makeAuroraPad(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.2,2.4,0.16,24), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:100, emissive:0x3A8FD0, emissiveIntensity:0.3}));
+  pad.position.y = 0.08;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.9,0.06,6,32), new THREE.MeshBasicMaterial({color:0x9FE8FF})); ring.rotation.x = -Math.PI/2; ring.position.y = 0.2;
+  g.add(pad, ring);
+  const marker = makeFloatingMarker('🌌', 3.0);
+  g.add(marker, makeBlobShadow(1.8));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+// --- ride state + HUD (always on screen during the flight, so nothing can hide a question) ---
+const af = { active:false, s:0, t:0, lat:0, laneTarget:1, gateIdx:0, correct:0, shake:0, fovBase:52,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(1,0,0), feedbackUntil:0 };
+const _afA = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+const _afT = { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 };
+
+function getAfHud(){
+  let el = document.getElementById('afHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'afHud';
+  el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+  const laneCss = 'flex:1; min-width:0; min-height:68px; line-height:1.2; overflow-wrap:anywhere; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+  el.innerHTML =
+    '<div id="afTop" style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+      '<div id="afHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+      '<div style="display:flex; align-items:center; justify-content:center; gap:10px;">' +
+        '<div id="afWord" style="font-size:26px; font-weight:800;"></div>' +
+        '<button id="afSound" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button>' +
+      '</div>' +
+      '<div id="afMsg" style="min-height:18px; font-size:13px; font-weight:800;"></div>' +
+    '</div>' +
+    '<div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; gap:8px;">' +
+      '<button id="afLane0" style="'+laneCss+' background:#FFD1E3;"></button>' +
+      '<button id="afLane1" style="'+laneCss+' background:#FFF0B8;"></button>' +
+      '<button id="afLane2" style="'+laneCss+' background:#CBEBFF;"></button>' +
+    '</div>';
+  document.body.appendChild(el);
+  [0,1,2].forEach(i => el.querySelector('#afLane'+i).addEventListener('pointerdown', (e)=>{ e.preventDefault(); af.laneTarget = i; refreshAfLaneButtons(); }));
+  el.querySelector('#afSound').addEventListener('click', ()=>{
+    const g = AF_GATES.find(x => x.asked && !x.done) || AF_GATES[af.gateIdx];
+    if(g && g.q){ try{ speakEnglish(g.q.target.en); }catch(e){} }
+  });
+  return el;
+}
+function refreshAfLaneButtons(){
+  const el = document.getElementById('afHud'); if(!el) return;
+  [0,1,2].forEach(i => { el.querySelector('#afLane'+i).style.outline = (af.laneTarget === i) ? '4px solid #4A3B5C' : 'none'; });
+}
+function hideAfHud(){ const el = document.getElementById('afHud'); if(el) el.style.display = 'none'; }
+function pickAfQuestion(){
+  const pool = VOCAB.filter(v => v.en.length <= 12 && v.ja.length <= 9);
+  const target = pool[Math.floor(Math.random()*pool.length)];
+  const opts = [target];
+  let guard = 0;
+  while(opts.length < 3 && guard++ < 300){
+    const c = pool[Math.floor(Math.random()*pool.length)];
+    if(opts.some(o => o.en === c.en || o.ja === c.ja)) continue;
+    opts.push(c);
+  }
+  for(let i=opts.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [opts[i],opts[j]] = [opts[j],opts[i]]; }
+  return { target, options:opts };
+}
+function setAfLaneLabels(opts){
+  const el = getAfHud();
+  const arrows = ['◀ ','▲ ','▶ '];
+  [0,1,2].forEach(i=>{
+    const b = el.querySelector('#afLane'+i);
+    b.textContent = opts ? (arrows[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i];
+    const n = opts ? opts[i].ja.length : 0;
+    b.style.fontSize = n > 6 ? '13px' : n > 4 ? '15px' : '17px';
+  });
+}
+function askAfQuestion(g, idx){
+  g.asked = true;
+  g.q = pickAfQuestion();
+  const el = getAfHud();
+  el.querySelector('#afHead').textContent = '🌌 ' + (idx+1) + '/' + AF_GATES.length + '　この えいごの いみの レーンへ！';
+  el.querySelector('#afWord').textContent = g.q.target.en;
+  el.querySelector('#afMsg').textContent = '';
+  setAfLaneLabels(g.q.options);
+  for(let lane=0; lane<3; lane++){ setRingLabel(g.labels[lane], g.q.options[lane].ja); g.labels[lane].visible = true; g.orbs[lane].grp.visible = true; }
+  try{ speakEnglish(g.q.target.en); }catch(e){}
+}
+function resolveAfGate(g){
+  g.done = true;
+  const lane = Math.max(0, Math.min(2, 1 - Math.round(af.lat/AF_LANE)));
+  const ok = (g.q.options[lane].en === g.q.target.en);
+  const el = getAfHud(), msg = el.querySelector('#afMsg');
+  g.orbs[lane].pulse = 0.8;
+  if(ok){
+    af.correct++; addCoins(1); playCorrectSound();
+    g.orbs[lane].orb.material.color.set(0xFFFFFF);
+    msg.textContent = '⭕ ' + g.q.target.en + ' ＝ ' + g.q.target.ja;
+    try{ speakEnglish(g.q.target.en); }catch(e){}
+  } else {
+    playWrongSound(); af.shake = 0.5;
+    g.orbs[lane].orb.material.color.set(0x7C7C8C);
+    msg.textContent = '❌ こたえは「' + g.q.target.ja + '」';
+  }
+  setAfLaneLabels(null);
+  setTimeout(()=>{ g.labels.forEach(l => { l.visible = false; }); g.orbs.forEach(o => { o.grp.visible = false; }); }, 900);
+}
+function resetAfGates(){
+  AF_GATES.forEach(g=>{
+    g.asked = false; g.done = false; g.q = null;
+    g.labels.forEach(l => { l.visible = false; });
+    g.orbs.forEach(o => { o.grp.visible = false; o.orb.material.color.set(o.color); o.pulse = 0; o.grp.scale.set(1,1,1); });
+  });
+}
+function parkAuroraCraft(){
+  auroraCraft.position.set(AF_STATION.x, 1.1, AF_STATION.z);
+  auroraCraft.quaternion.copy(AF_PATH.Q[0]);
+  player.quaternion.identity();
+}
+function boardAuroraFlight(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  resetAfGates();
+  Object.assign(af, { active:true, s:0, t:0, lat:0, laneTarget:1, gateIdx:0, correct:0, shake:0 });
+  af.camDir.set(AF_PATH.T[0].x, 0, AF_PATH.T[0].z).normalize();
+  iceAuroraBoost = true;
+  afDust.visible = true; afTrail.visible = true;
+  moveTarget = null;
+  interactBtn.classList.remove('show');
+  playCorrectSound();
+  const el = getAfHud();
+  el.querySelector('#afHead').textContent = '🌌 オーロラ飛行';
+  el.querySelector('#afWord').textContent = 'Ready…';
+  el.querySelector('#afMsg').textContent = 'つぎの もんだいを まっていてね';
+  setAfLaneLabels(null);
+  refreshAfLaneButtons();
+  el.style.display = 'block';
+}
+function endAuroraFlight(){
+  af.active = false;
+  rideActive = false;
+  iceAuroraBoost = false;
+  afDust.visible = false; afTrail.visible = false;
+  hideAfHud();
+  resetAfGates();
+  parkAuroraCraft();
+  player.position.set(AF_LANDING.x, 0, AF_LANDING.z);
+  player.rotation.set(0, 0, 0);
+  camera.fov = af.fovBase; camera.updateProjectionMatrix();
+  camera.position.set(AF_LANDING.x, 2.6, AF_LANDING.z - 6.8);
+}
+function cancelAuroraFlight(){ if(af.active) endAuroraFlight(); }
+function finishAuroraFlight(){
+  const total = AF_GATES.length, correct = af.correct;
+  const bonus = (correct === total) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endAuroraFlight();
+  saveProgress();
+  showToast('🌌 オーロラ飛行、おつかれさま！ ' + total + 'もん中' + correct + 'もん せいかい　+' + (correct + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+function updateAuroraFlight(dt){
+  const nowS = performance.now()/1000;
+  if(!af.active){
+    if(auroraCraft.visible){ auroraCraft.position.y = 1.1 + Math.sin(nowS*1.8)*0.12; auroraCraft.rotation.y += dt*0.4; }
+    return;
+  }
+  af.t += dt;
+  // speed: accelerate off the pad, brake for the landing
+  let v = AF_SPEED * Math.min(1, 0.25 + af.t/3);
+  const left = AF_PATH.total - af.s;
+  if(left < 30) v *= Math.max(0.35, left/30);
+  af.s += v*dt;
+  if(af.s >= AF_PATH.total - 0.05){ finishAuroraFlight(); return; }
+  // lane steering
+  const latTarget = (1 - af.laneTarget) * AF_LANE;
+  af.lat += (latTarget - af.lat) * (1 - Math.exp(-dt*5));
+  // ask / resolve the orb rows
+  AF_GATES.forEach((g,i)=>{
+    if(!g.asked && g.s - af.s < AF_ASK_DIST && g.s - af.s > 0){ askAfQuestion(g, i); af.gateIdx = i; }
+    if(g.asked && !g.done && af.s >= g.s) resolveAfGate(g);
+    g.orbs.forEach(o=>{
+      if(o.pulse > 0){ o.pulse = Math.max(0, o.pulse - dt); const sc = 1 + Math.sin((o.pulse/0.8)*Math.PI)*0.6; o.grp.scale.set(sc,sc,sc); }
+      if(o.grp.visible) o.halo.rotation.z += dt*1.5;
+    });
+  });
+  // pose the craft and the rider
+  afFrameAt(af.s, _afA);
+  auroraCraft.position.copy(_afA.pos).addScaledVector(_afA.left, af.lat);
+  auroraCraft.quaternion.copy(_afA.q);
+  player.position.copy(auroraCraft.position).addScaledVector(_afA.up, 0.15);
+  player.quaternion.copy(_afA.q);
+  // glittering trail
+  const tp = afTrail.geometry.attributes.position.array;
+  for(let i=0;i<AF_TRAIL_N;i++){
+    afFrameAt(af.s - 0.5 - i*0.45, _afT);
+    tp[i*3]   = _afT.pos.x + _afT.left.x*af.lat + (Math.random()-0.5)*0.3;
+    tp[i*3+1] = _afT.pos.y + _afT.left.y*af.lat + (Math.random()-0.5)*0.3;
+    tp[i*3+2] = _afT.pos.z + _afT.left.z*af.lat + (Math.random()-0.5)*0.3;
+  }
+  afTrail.geometry.attributes.position.needsUpdate = true;
+  // chase camera: close behind, field of view widens with speed
+  const hl = Math.hypot(_afA.fwd.x, _afA.fwd.z);
+  if(hl > 0.35){
+    const kk = 1 - Math.exp(-dt*3);
+    af.camDir.x += (_afA.fwd.x/hl - af.camDir.x)*kk;
+    af.camDir.z += (_afA.fwd.z/hl - af.camDir.z)*kk;
+    const L = Math.hypot(af.camDir.x, af.camDir.z) || 1;
+    af.camDir.x /= L; af.camDir.z /= L;
+  }
+  const rp = player.position;
+  af.camPos.set(rp.x - af.camDir.x*7.5, rp.y + 2.8, rp.z - af.camDir.z*7.5);
+  af.camLook.set(rp.x + af.camDir.x*3 + _afA.fwd.x*2, rp.y + 0.9 + _afA.fwd.y*2.5, rp.z + af.camDir.z*3 + _afA.fwd.z*2);
+  if(af.shake > 0){
+    af.shake = Math.max(0, af.shake - dt);
+    af.camPos.x += (Math.random()-0.5)*0.5*af.shake*2; af.camPos.y += (Math.random()-0.5)*0.5*af.shake*2;
+  }
+  const speedFrac = Math.min(1, v/AF_SPEED);
+  camera.fov += ((af.fovBase + 16*speedFrac) - camera.fov) * (1 - Math.exp(-dt*4));
+  camera.updateProjectionMatrix();
+}
+
+
+/* =========================================================
+   NEW RIDES, PART A — shared track utilities, a generic "lane ride"
+   (real-time: slide into the lane that holds the right answer) and the
+   ⛷️ スラローム around the ice palace.
+========================================================= */
+function makeTrackPath(pts, step, bankGain, bankClamp){
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  curve.arcLengthDivisions = 4000;
+  const total = curve.getLength();
+  const n = Math.max(4, Math.round(total/step));
+  const st = total/n;
+  const P = curve.getSpacedPoints(n);
+  const T = [], Q = [], raw = [];
+  const wu = new THREE.Vector3(0,1,0);
+  for(let i=0;i<=n;i++){
+    const a = P[Math.max(0,i-1)], b = P[Math.min(n,i+1)];
+    T.push(b.clone().sub(a).normalize());
+  }
+  for(let i=0;i<=n;i++){
+    const u = wu.clone().sub(T[i].clone().multiplyScalar(wu.dot(T[i]))).normalize();
+    const left = u.clone().cross(T[i]).normalize();
+    Q.push(new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(left, u, T[i])));
+    const a = T[Math.max(0,i-1)], b = T[Math.min(n,i+1)];
+    const d = Math.atan2(b.x,b.z) - Math.atan2(a.x,a.z);
+    const rate = Math.atan2(Math.sin(d), Math.cos(d)) / (2*st);
+    raw.push(Math.max(-bankClamp, Math.min(bankClamp, -rate*bankGain*Math.hypot(T[i].x, T[i].z))));
+  }
+  const bank = raw.map((_,i)=>{ let sum = 0, c = 0; for(let j=Math.max(0,i-8); j<=Math.min(n,i+8); j++){ sum += raw[j]; c++; } return sum/c; });
+  return { pts:P, T, Q, bank, total, step:st, n };
+}
+const _tfQ = new THREE.Quaternion();
+const _tfZ = new THREE.Vector3(0,0,1);
+function newFrame(){ return { pos:new THREE.Vector3(), q:new THREE.Quaternion(), left:new THREE.Vector3(), up:new THREE.Vector3(), fwd:new THREE.Vector3(), bank:0 }; }
+function trackFrameAt(path, s, out){
+  out = out || newFrame();
+  let bank = 0;
+  if(s <= 0){ out.pos.copy(path.pts[0]).addScaledVector(path.T[0], s); out.q.copy(path.Q[0]); }
+  else if(s >= path.total){ out.pos.copy(path.pts[path.n]).addScaledVector(path.T[path.n], s - path.total); out.q.copy(path.Q[path.n]); }
+  else {
+    const f = s / path.step, i = Math.min(path.n-1, Math.floor(f)), k = f - i;
+    out.pos.copy(path.pts[i]).lerp(path.pts[i+1], k);
+    out.q.copy(path.Q[i]).slerp(path.Q[i+1], k);
+    bank = path.bank[i]*(1-k) + path.bank[i+1]*k;
+  }
+  _tfQ.setFromAxisAngle(_tfZ, bank);
+  out.q.multiply(_tfQ);
+  out.left.set(1,0,0).applyQuaternion(out.q);
+  out.up.set(0,1,0).applyQuaternion(out.q);
+  out.fwd.set(0,0,1).applyQuaternion(out.q);
+  out.bank = bank;
+  return out;
+}
+// a visible ribbon (channel) along a path, plus pillars where wanted
+function buildTrackRibbon(path, group, color, emissive, pillarWhere){
+  const fr = newFrame(), verts = [], idx = [];
+  const m = Math.floor(path.total/0.5);
+  for(let i=0;i<=m;i++){
+    trackFrameAt(path, Math.min(path.total, i*0.5), fr);
+    [[0.95,0.4],[0.8,-0.02],[-0.8,-0.02],[-0.95,0.4]].forEach(([lx,uy])=>{
+      verts.push(fr.pos.x + fr.left.x*lx + fr.up.x*uy, fr.pos.y + fr.left.y*lx + fr.up.y*uy, fr.pos.z + fr.left.z*lx + fr.up.z*uy);
+    });
+    if(i > 0) for(let k=0;k<3;k++){ const a = (i-1)*4+k, b = a+1, c = i*4+k, d = c+1; idx.push(a,b,c, b,d,c); }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts,3));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  group.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, transparent:true, opacity:0.88, side:THREE.DoubleSide, shininess:100, emissive, emissiveIntensity:0.3 })));
+  const pm = new THREE.MeshPhongMaterial({ color:0xDDEFFB, shininess:80 });
+  for(let s=3; s<path.total; s+=6){
+    if(!pillarWhere(s)) continue;
+    trackFrameAt(path, s, fr);
+    if(fr.pos.y < 1.3) continue;
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,fr.pos.y-0.15,8), pm);
+    pil.position.set(fr.pos.x, (fr.pos.y-0.15)/2, fr.pos.z);
+    group.add(pil);
+  }
+}
+
+function createLaneRide(cfg){
+  const S = { active:false, s:0, t:0, lat:0, laneTarget:1, correct:0, shake:0,
+    camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(1,0,0) };
+  const path = cfg.path, fa = newFrame(), ft = newFrame();
+  const gates = cfg.gateS.map(s => ({ s, asked:false, done:false, q:null, marks:[], labels:[] }));
+  gates.forEach(g=>{
+    const fr = trackFrameAt(path, g.s);
+    for(let lane=0; lane<3; lane++){
+      const mk = cfg.buildMarker(lane, cfg.colors[lane]);
+      mk.position.copy(fr.pos).addScaledVector(fr.left, (1-lane)*cfg.laneW).addScaledVector(fr.up, cfg.markerUp);
+      mk.quaternion.copy(fr.q);
+      mk.visible = false;
+      cfg.group.add(mk);
+      const label = makeRingLabel();
+      label.position.copy(mk.position).addScaledVector(fr.up, cfg.labelUp);
+      cfg.group.add(label);
+      g.marks.push({ grp:mk, pulse:0 });
+      g.labels.push(label);
+    }
+  });
+  let trail = null;
+  if(cfg.trail){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(40*3),3));
+    trail = new THREE.Points(geo, new THREE.PointsMaterial({ color:cfg.trailColor, size:0.45, transparent:true, opacity:0.9, depthWrite:false }));
+    trail.frustumCulled = false; trail.visible = false;
+    cfg.group.add(trail);
+  }
+  function hud(){
+    let el = document.getElementById(cfg.hudId);
+    if(el) return el;
+    el = document.createElement('div');
+    el.id = cfg.hudId;
+    el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+    const lc = 'flex:1; min-width:0; min-height:68px; line-height:1.2; overflow-wrap:anywhere; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+    el.innerHTML =
+      '<div style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+        '<div class="h" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+        '<div style="display:flex; align-items:center; justify-content:center; gap:10px;"><div class="w" style="font-size:26px; font-weight:800;"></div>' +
+        '<button class="snd" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button></div>' +
+        '<div class="m" style="min-height:18px; font-size:13px; font-weight:800;"></div></div>' +
+      '<div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; gap:8px;">' +
+        '<button class="l0" style="'+lc+' background:#FFD1E3;"></button><button class="l1" style="'+lc+' background:#FFF0B8;"></button><button class="l2" style="'+lc+' background:#CBEBFF;"></button></div>';
+    document.body.appendChild(el);
+    [0,1,2].forEach(i => el.querySelector('.l'+i).addEventListener('pointerdown', (e)=>{ e.preventDefault(); S.laneTarget = i; refreshBtns(); }));
+    el.querySelector('.snd').addEventListener('click', ()=>{ const g = gates.find(x => x.asked && !x.done); if(g && g.q){ try{ speakEnglish(g.q.target.en); }catch(e){} } });
+    return el;
+  }
+  function refreshBtns(){ const el = document.getElementById(cfg.hudId); if(!el) return; [0,1,2].forEach(i => { el.querySelector('.l'+i).style.outline = (S.laneTarget === i) ? '4px solid #4A3B5C' : 'none'; }); }
+  function setLaneLabels(opts){
+    const el = hud(); const ar = ['◀ ','▲ ','▶ '];
+    [0,1,2].forEach(i=>{ const b = el.querySelector('.l'+i); b.textContent = opts ? (ar[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i]; const n = opts ? opts[i].ja.length : 0; b.style.fontSize = n > 6 ? '13px' : n > 4 ? '15px' : '17px'; });
+  }
+  function ask(g, i){
+    g.asked = true; g.q = pickAfQuestion();
+    const el = hud();
+    el.querySelector('.h').textContent = cfg.emoji + ' ' + (i+1) + '/' + gates.length + '　この えいごの いみの レーンへ！';
+    el.querySelector('.w').textContent = g.q.target.en;
+    el.querySelector('.m').textContent = '';
+    setLaneLabels(g.q.options);
+    for(let lane=0; lane<3; lane++){ setRingLabel(g.labels[lane], g.q.options[lane].ja); g.labels[lane].visible = true; g.marks[lane].grp.visible = true; }
+    try{ speakEnglish(g.q.target.en); }catch(e){}
+  }
+  function resolve(g){
+    g.done = true;
+    const lane = Math.max(0, Math.min(2, 1 - Math.round(S.lat/cfg.laneW)));
+    const ok = (g.q.options[lane].en === g.q.target.en);
+    const msg = hud().querySelector('.m');
+    g.marks[lane].pulse = 0.8;
+    if(ok){ S.correct++; addCoins(1); playCorrectSound(); msg.textContent = '⭕ ' + g.q.target.en + ' ＝ ' + g.q.target.ja; try{ speakEnglish(g.q.target.en); }catch(e){} }
+    else { playWrongSound(); S.shake = 0.5; msg.textContent = '❌ こたえは「' + g.q.target.ja + '」'; }
+    setLaneLabels(null);
+    setTimeout(()=>{ g.labels.forEach(l => { l.visible = false; }); g.marks.forEach(m => { m.grp.visible = false; }); }, 900);
+  }
+  function reset(){
+    gates.forEach(g=>{ g.asked = false; g.done = false; g.q = null; g.labels.forEach(l => { l.visible = false; }); g.marks.forEach(m => { m.grp.visible = false; m.pulse = 0; m.grp.scale.set(1,1,1); }); });
+  }
+  function pose(s, lat){
+    trackFrameAt(path, s, fa);
+    cfg.vehicle.position.copy(fa.pos).addScaledVector(fa.left, lat);
+    cfg.vehicle.quaternion.copy(fa.q);
+    player.position.copy(cfg.vehicle.position).addScaledVector(fa.up, cfg.playerUp);
+    player.quaternion.copy(fa.q);
+  }
+  function park(){ cfg.vehicle.position.copy(path.pts[0]); cfg.vehicle.quaternion.copy(path.Q[0]); player.quaternion.identity(); }
+  function board(){
+    if(rideActive) return;
+    if(cfg.onBoard) cfg.onBoard();
+    rideActive = true; reset();
+    Object.assign(S, { active:true, s:0, t:0, lat:0, laneTarget:1, correct:0, shake:0 });
+    S.camDir.set(path.T[0].x, 0, path.T[0].z).normalize();
+    if(trail) trail.visible = true;
+    moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+    const el = hud(); el.querySelector('.h').textContent = cfg.emoji + ' ' + cfg.name; el.querySelector('.w').textContent = 'Ready…'; el.querySelector('.m').textContent = 'つぎの もんだいを まっていてね';
+    setLaneLabels(null); refreshBtns(); el.style.display = 'block';
+  }
+  function end(){
+    S.active = false; rideActive = false;
+    if(trail) trail.visible = false;
+    const el = document.getElementById(cfg.hudId); if(el) el.style.display = 'none';
+    reset(); park();
+    if(cfg.onEnd) cfg.onEnd();
+    player.position.set(cfg.landing.x, 0, cfg.landing.z); player.rotation.set(0,0,0);
+    camera.fov = 52; camera.updateProjectionMatrix();
+    camera.position.set(cfg.landing.x, 2.6, cfg.landing.z - 6.8);
+  }
+  function cancel(){ if(S.active) end(); }
+  function finish(){
+    const n = gates.length, bonus = (S.correct === n) ? 1 : 0;
+    if(bonus) addCoins(1);
+    const c = S.correct;
+    end(); saveProgress();
+    showToast(cfg.emoji + ' ' + cfg.name + '、おつかれさま！ ' + n + 'もん中' + c + 'もん せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+  }
+  function update(dt){
+    const nowS = performance.now()/1000;
+    if(!S.active){ if(cfg.idle) cfg.idle(dt, nowS); return; }
+    S.t += dt;
+    let v = cfg.speedAt(S.s, path) * Math.min(1, 0.3 + S.t/2.5);
+    const left = path.total - S.s;
+    if(left < 30) v *= Math.max(0.35, left/30);
+    S.s += v*dt;
+    if(S.s >= path.total - 0.05){ finish(); return; }
+    S.lat += ((1 - S.laneTarget)*cfg.laneW - S.lat) * (1 - Math.exp(-dt*5));
+    gates.forEach((g,i)=>{
+      if(!g.asked && g.s - S.s < cfg.askDist && g.s - S.s > 0) ask(g, i);
+      if(g.asked && !g.done && S.s >= g.s) resolve(g);
+      g.marks.forEach(m=>{ if(m.pulse > 0){ m.pulse = Math.max(0, m.pulse - dt); const sc = 1 + Math.sin((m.pulse/0.8)*Math.PI)*0.5; m.grp.scale.set(sc,sc,sc); } });
+    });
+    pose(S.s, S.lat);
+    if(trail){
+      const tp = trail.geometry.attributes.position.array;
+      for(let i=0;i<40;i++){
+        trackFrameAt(path, S.s - 0.4 - i*0.4, ft);
+        tp[i*3] = ft.pos.x + ft.left.x*S.lat + (Math.random()-0.5)*0.35;
+        tp[i*3+1] = ft.pos.y + ft.left.y*S.lat + 0.2 + (Math.random()-0.5)*0.35;
+        tp[i*3+2] = ft.pos.z + ft.left.z*S.lat + (Math.random()-0.5)*0.35;
+      }
+      trail.geometry.attributes.position.needsUpdate = true;
+    }
+    trackFrameAt(path, S.s, fa);
+    const hl = Math.hypot(fa.fwd.x, fa.fwd.z);
+    if(hl > 0.35){
+      const kk = 1 - Math.exp(-dt*3);
+      S.camDir.x += (fa.fwd.x/hl - S.camDir.x)*kk; S.camDir.z += (fa.fwd.z/hl - S.camDir.z)*kk;
+      const L = Math.hypot(S.camDir.x, S.camDir.z) || 1; S.camDir.x /= L; S.camDir.z /= L;
+    }
+    const rp = player.position;
+    S.camPos.set(rp.x - S.camDir.x*cfg.camBack, rp.y + cfg.camUp, rp.z - S.camDir.z*cfg.camBack);
+    S.camLook.set(rp.x + S.camDir.x*3, rp.y + 1.0, rp.z + S.camDir.z*3);
+    if(S.shake > 0){ S.shake = Math.max(0, S.shake - dt); S.camPos.x += (Math.random()-0.5)*S.shake; S.camPos.y += (Math.random()-0.5)*S.shake; }
+    camera.fov += ((52 + cfg.fovExtra*Math.min(1, v/cfg.speedRef)) - camera.fov) * (1 - Math.exp(-dt*4));
+    camera.updateProjectionMatrix();
+  }
+  return { board, update, cancel, state:S, gates, path, park };
+}
+
+// ---------- ⛷️ スラローム: a spiral run around the ice palace ----------
+const SL_TH0 = 190*Math.PI/180;                      // start on the west side of the palace
+const SL_STATION = { x:12*Math.cos(SL_TH0), z:27 + 12*Math.sin(SL_TH0) };
+const SL_PATH = (function(){
+  const pts = [];
+  const M = 190;
+  for(let k=0;k<=M;k++){
+    const f = k/M;
+    const th = SL_TH0 + (f < 0.16 ? Math.PI*(f/0.16) : Math.PI + 5*Math.PI*((f-0.16)/0.84));   // 180° lift, then 2.5 turns down
+    let y;
+    if(f < 0.16) y = 0.9 + 13.1*dragonSstep(f/0.16);
+    else if(f < 0.93) y = 14 - 9*dragonSstep((f-0.16)/0.77);
+    else y = 5 - 4.1*dragonSstep((f-0.93)/0.07);
+    const r = 12.5 + 1.5*Math.sin(14*Math.PI*f);
+    pts.push(new THREE.Vector3(r*Math.cos(th), y, 27 + r*Math.sin(th)));
+  }
+  pts[0].set(SL_STATION.x, 0.9, SL_STATION.z);
+  pts[M].set(SL_STATION.x, 0.9, SL_STATION.z);
+  return makeTrackPath(pts, 0.5, 8.0, 0.8);
+})();
+const slalomGroup = new THREE.Group();
+iceDecorGroup.add(slalomGroup);
+buildTrackRibbon(SL_PATH, slalomGroup, 0xE6F3FF, 0x4A90D0, s => s < 30 || s > SL_PATH.total - 12);
+const slalomSkis = new THREE.Group();
+{
+  const m = new THREE.MeshLambertMaterial({color:0xD9453D});
+  [-0.32,0.32].forEach(x=>{ const ski = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.06,1.7), m); ski.position.set(x,0.04,0.1); slalomSkis.add(ski); });
+  slalomGroup.add(slalomSkis);
+}
+slalomSkis.position.copy(SL_PATH.pts[0]);
+function makeSlalomFlag(lane, color){
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,3.2,6), new THREE.MeshLambertMaterial({color:0xEFEFEF})); pole.position.y = 1.6;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(1.5,0.9,0.05), new THREE.MeshLambertMaterial({color})); flag.position.set(0.75,2.8,0);
+  g.add(pole, flag);
+  return g;
+}
+const slalomRide = createLaneRide({
+  hudId:'slalomHud', emoji:'⛷️', name:'スラローム', group:slalomGroup, path:SL_PATH, vehicle:slalomSkis, playerUp:0.08,
+  gateS:[0.32,0.46,0.60,0.74,0.88].map(f => f*SL_PATH.total),
+  colors:[0xD9453D,0xF2C230,0x4F8FE0], buildMarker:makeSlalomFlag, laneW:3.0, markerUp:0.0, labelUp:4.2,
+  askDist:30, trail:true, trailColor:0xFFFFFF, camBack:7, camUp:2.8, fovExtra:16, speedRef:9.5,
+  landing:{ x:SL_STATION.x + 1.8, z:SL_STATION.z - 2.0 },
+  speedAt:(s,p)=> (s < 30 ? 4.5 : 9.5),
+});
+function boardSlalom(l){ slalomRide.board(); }
+function cancelSlalom(){ slalomRide.cancel(); }
+function updateSlalom(dt){ slalomRide.update(dt); }
+function makeSlalomStation(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.15,18), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:90})); pad.position.y = 0.08;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), new THREE.MeshLambertMaterial({color:0x7A5C4A})); post.position.y = 0.85;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04), new THREE.MeshLambertMaterial({color:0x4F8FE0})); flag.position.set(0.4,1.5,0);
+  g.add(pad, post, flag);
+  const marker = makeFloatingMarker('⛷️', 2.7);
+  g.add(marker, makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+
+
+/* =========================================================
+   NEW RIDES, PART B — 🪂 ジップライン (sakura island: from a tower behind
+   the shrine, over the torii, down to the boat dock; the guide talks while
+   you fly, then asks questions at the landing) and 🎈 熱気球 (ice island: a
+   hot-air balloon you steer by English commands — up, down, left, right,
+   north, south, east, west).
+========================================================= */
+// ---------- 🪂 ジップライン ----------
+const ZIP_A = new THREE.Vector3(0,20,32), ZIP_B = new THREE.Vector3(-3,2.8,-18.5);
+const ZIP_PATH = (function(){
+  const pts = [];
+  for(let k=0;k<=12;k++){
+    const t = k/12;
+    const p = ZIP_A.clone().lerp(ZIP_B, t);
+    p.y -= 2.5*4*t*(1-t);                          // a little sag in the cable
+    pts.push(p);
+  }
+  return makeTrackPath(pts, 0.5, 0, 0.1);
+})();
+const zipGroup = new THREE.Group();
+sakuraDecorGroup.add(zipGroup);
+const zipTrolley = new THREE.Group();
+{
+  const wood = new THREE.MeshLambertMaterial({color:0x7A5C4A});
+  const red = new THREE.MeshPhongMaterial({color:0xD9453D, shininess:40});
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.45,19.4,10), wood); post.position.set(ZIP_A.x, 9.7, ZIP_A.z);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3,0.25,3), wood); deck.position.set(ZIP_A.x, 19.5, ZIP_A.z);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.2,0.3), red); beam.position.set(ZIP_A.x, 22.4, ZIP_A.z);
+  [-1.5,1.5].forEach(dx=>{ const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,2.9,6), red); pil.position.set(ZIP_A.x+dx, 20.95, ZIP_A.z); zipGroup.add(pil); });
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(2.6,1.0,4), new THREE.MeshLambertMaterial({color:0x4A5568})); roof.rotation.y = Math.PI/4; roof.position.set(ZIP_A.x, 23.1, ZIP_A.z);
+  zipGroup.add(post, deck, beam, roof);
+  const endPost = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.25,3.5,8), wood); endPost.position.set(-1.6,1.75,-18.3);
+  const endFlag = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.45,0.05), red); endFlag.position.set(-1.2,3.2,-18.3);
+  zipGroup.add(endPost, endFlag);
+  const curve = new THREE.CatmullRomCurve3(ZIP_PATH.pts.filter((_,i)=> i % 40 === 0 || i === ZIP_PATH.n));
+  zipGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.05, 6, false), new THREE.MeshLambertMaterial({color:0x2A2A2A})));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.35), new THREE.MeshLambertMaterial({color:0x2A2A2A}));
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,1.9,5), new THREE.MeshLambertMaterial({color:0xD9453D})); rope.position.y = -1.0;
+  zipTrolley.add(body, rope);
+  zipGroup.add(zipTrolley);
+}
+zipTrolley.position.copy(ZIP_A).setY(ZIP_A.y + 0.4);
+function makeZipStation(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.7,0.15,18), new THREE.MeshLambertMaterial({color:0xB9B2A6})); pad.position.y = 0.08;
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.09,1.7,8), new THREE.MeshLambertMaterial({color:0x7A5C4A})); post.position.y = 0.85;
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.4,0.04), new THREE.MeshLambertMaterial({color:0xD9453D})); flag.position.set(0.4,1.5,0);
+  g.add(pad, post, flag);
+  const marker = makeFloatingMarker('🪂', 2.7);
+  g.add(marker, makeBlobShadow(1.4));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+const ZIP_LINES = [
+  { at:0.08, en:"We are very high up! The whole island looks tiny.", ja:"とても高いところに いるよ！島ぜんぶが ちいさく 見えるね。" },
+  { at:0.42, en:"Look! We are flying over the big red torii gate.", ja:"見て！大きな赤い鳥居の上を とんでいるよ。" },
+  { at:0.84, en:"Here is the koi lake. Let's land near the water!", ja:"こいの池だよ。水のそばに おりよう！" },
+];
+const ZIP_QUIZ = [
+  { en:"How does the island look from the sky?", good:"Tiny", bad:"Huge", ja:"空から見ると、島は「ちいさく」見えたね。" },
+  { en:"What did we fly over?", good:"A torii gate", bad:"A bridge", ja:"「鳥居」の上を とんだよ。" },
+  { en:"Where did we land?", good:"Near the lake", bad:"On a mountain", ja:"「池のそば」に おりたよ。" },
+];
+const zip = { active:false, cam:false, phase:'idle', s:0, t:0, subIdx:0, qIdx:0, correct:0, hideTimer:0,
+  camPos:new THREE.Vector3(), camLook:new THREE.Vector3(), camDir:new THREE.Vector3(0,0,-1) };
+const _zA = newFrame();
+function zipSub(){
+  let el = document.getElementById('zipSub');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'zipSub';
+  el.style.cssText = 'position:fixed; left:50%; top:14px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,255,255,0.93); border-radius:18px; padding:10px 14px; text-align:center; box-shadow:0 6px 20px rgba(0,0,0,.25); color:#4A3B5C; display:none;';
+  el.innerHTML = '<div class="e" style="font-size:19px; font-weight:800; line-height:1.4;"></div><div class="j" style="font-size:12px; font-weight:700; opacity:.8; margin-top:4px;"></div>';
+  document.body.appendChild(el);
+  return el;
+}
+function zipQuizHud(){
+  let el = document.getElementById('zipQuiz');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'zipQuiz';
+  el.style.cssText = 'position:fixed; left:50%; bottom:92px; transform:translateX(-50%); z-index:520; width:min(92vw,460px); background:rgba(255,250,244,0.97); border-radius:22px; padding:14px; box-shadow:0 12px 34px rgba(0,0,0,.28); text-align:center; display:none; color:#4A3B5C;';
+  document.body.appendChild(el);
+  return el;
+}
+function showZipQuestion(){
+  const q = ZIP_QUIZ[zip.qIdx];
+  const el = zipQuizHud(); el.innerHTML = '';
+  const head = document.createElement('div'); head.style.cssText = 'font-size:12px; font-weight:800; opacity:.7;'; head.textContent = '🪂 ' + (zip.qIdx+1) + '/' + ZIP_QUIZ.length;
+  const qe = document.createElement('div'); qe.style.cssText = 'font-size:19px; font-weight:800; margin:8px 0 12px;'; qe.textContent = q.en;
+  const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:10px;';
+  const msg = document.createElement('div'); msg.style.cssText = 'min-height:18px; margin-top:10px; font-size:13px; font-weight:800;';
+  const opts = [{t:q.good, ok:true},{t:q.bad, ok:false}]; if(Math.random() < 0.5) opts.reverse();
+  let answered = false;
+  const btns = opts.map(o=>{
+    const b = document.createElement('button'); b.textContent = o.t;
+    b.style.cssText = 'flex:1; min-height:54px; font-size:17px; font-weight:800; border:0; border-radius:16px; background:#FFE1EC; color:#4A3B5C; cursor:pointer;';
+    b.addEventListener('click', ()=>{
+      if(answered || !zip.active) return; answered = true;
+      btns.forEach(x => x.disabled = true);
+      if(o.ok){ b.style.background = '#B8F0C8'; zip.correct++; addCoins(1); playCorrectSound(); msg.textContent = '⭕ せいかい！ ' + q.ja; }
+      else { b.style.background = '#FFC1C1'; playWrongSound(); msg.textContent = '❌ ざんねん… ' + q.ja; }
+      clearTimeout(zip.hideTimer);
+      zip.hideTimer = setTimeout(()=>{ if(!zip.active) return; zip.qIdx++; if(zip.qIdx < ZIP_QUIZ.length) showZipQuestion(); else finishZip(); }, 2000);
+    });
+    row.appendChild(b); return b;
+  });
+  el.append(head, qe, row, msg); el.style.display = 'block';
+}
+function boardZip(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  Object.assign(zip, { active:true, cam:true, phase:'ride', s:0, t:0, subIdx:0, qIdx:0, correct:0 });
+  zip.camDir.set(ZIP_PATH.T[0].x, 0, ZIP_PATH.T[0].z).normalize();
+  moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+  const sub = zipSub(); sub.style.display = 'none';
+}
+function endZip(){
+  clearTimeout(zip.hideTimer);
+  zip.active = false; zip.cam = false; zip.phase = 'idle'; rideActive = false;
+  const sub = document.getElementById('zipSub'); if(sub) sub.style.display = 'none';
+  const qh = document.getElementById('zipQuiz'); if(qh) qh.style.display = 'none';
+  zipTrolley.position.copy(ZIP_A).setY(ZIP_A.y + 0.4);
+  player.rotation.set(0,0,0);
+  player.position.set(0, 0, 29.2);
+  camera.fov = 52; camera.updateProjectionMatrix();
+  camera.position.set(0, 2.6, 29.2 - 6.8);
+}
+function cancelZip(){ if(zip.active) endZip(); }
+function finishZip(){
+  const n = ZIP_QUIZ.length, c = zip.correct, bonus = (c === n) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endZip(); saveProgress();
+  showToast('🪂 ジップライン、おつかれさま！ ' + n + 'もん中' + c + 'もん せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : '') + '　かえりは ケーブルカーで もどったよ');
+}
+function updateZip(dt){
+  if(!zip.active) return;
+  zip.t += dt;
+  if(zip.phase === 'ride'){
+    const left = ZIP_PATH.total - zip.s;
+    let v = 3 + 9*Math.min(1, zip.s/20);
+    if(left < 14) v *= Math.max(0.22, left/14);
+    zip.s += v*dt;
+    const frac = zip.s / ZIP_PATH.total;
+    if(zip.subIdx < ZIP_LINES.length && frac >= ZIP_LINES[zip.subIdx].at){
+      const L = ZIP_LINES[zip.subIdx++]; const sub = zipSub();
+      sub.querySelector('.e').textContent = L.en; sub.querySelector('.j').textContent = L.ja; sub.style.display = 'block';
+      try{ speakEnglish(L.en); }catch(e){}
+      setTimeout(()=>{ if(zip.active && zip.phase === 'ride' && sub.querySelector('.e').textContent === L.en) sub.style.display = 'none'; }, 4200);
+    }
+    trackFrameAt(ZIP_PATH, Math.min(zip.s, ZIP_PATH.total), _zA);
+    zipTrolley.position.copy(_zA.pos).setY(_zA.pos.y + 0.4);
+    const yaw = Math.atan2(_zA.fwd.x, _zA.fwd.z);
+    player.position.set(_zA.pos.x, _zA.pos.y - 2.3, _zA.pos.z);
+    player.rotation.set(0, yaw, 0);
+    const hl = Math.hypot(_zA.fwd.x, _zA.fwd.z);
+    if(hl > 0.3){ const kk = 1 - Math.exp(-dt*3); zip.camDir.x += (_zA.fwd.x/hl - zip.camDir.x)*kk; zip.camDir.z += (_zA.fwd.z/hl - zip.camDir.z)*kk; const L2 = Math.hypot(zip.camDir.x, zip.camDir.z) || 1; zip.camDir.x /= L2; zip.camDir.z /= L2; }
+    zip.camPos.set(player.position.x - zip.camDir.x*7, player.position.y + 3.6, player.position.z - zip.camDir.z*7);
+    zip.camLook.set(player.position.x + zip.camDir.x*4, player.position.y + 0.4, player.position.z + zip.camDir.z*4);
+    camera.fov += ((52 + 12*Math.min(1, v/12)) - camera.fov) * (1 - Math.exp(-dt*4));
+    camera.updateProjectionMatrix();
+    if(zip.s >= ZIP_PATH.total - 0.05){
+      zip.phase = 'quiz'; zip.cam = false;
+      camera.fov = 52; camera.updateProjectionMatrix();
+      const sub = document.getElementById('zipSub'); if(sub) sub.style.display = 'none';
+      player.position.set(ZIP_B.x, 0.2, ZIP_B.z + 0.6); player.rotation.set(0, Math.PI, 0);
+      showZipQuestion();
+    }
+  }
+}
+
+// ---------- 🎈 熱気球 ----------
+// Each correct command sends the balloon on a long, sweeping flight (26 m sideways, 14 m up or down)
+// towards a glowing star, through a sky full of clouds and sparkles. The commands come in opposite
+// pairs (north/south, east/west, up/down, left/right) so the balloon keeps travelling across the
+// whole island instead of drifting off it.
+const BAL_PAD = { x:14, z:-3 };
+const BAL_H = 26, BAL_V = 14, BAL_MAXR = 44, BAL_HOME = { x:0, y:24, z:0 };
+const BAL_BEARING_NAME = { 0:'北', 90:'東', 180:'南', 270:'西' };
+const BAL_CMDS = [
+  { id:'up',    kind:'v',   dy:BAL_V,  en:'Go up!',      ja:'上へ ゆこう！',   label:'⬆ up' },
+  { id:'down',  kind:'v',   dy:-BAL_V, en:'Go down!',    ja:'下へ おりよう！', label:'⬇ down' },
+  { id:'left',  kind:'rel', turn:-90,   en:'Turn left!',  ja:'ふうせんの 左へ まがって すすもう！', label:'⬅ left' },
+  { id:'right', kind:'rel', turn:90,    en:'Turn right!', ja:'ふうせんの 右へ まがって すすもう！', label:'➡ right' },
+  { id:'north', kind:'abs', brg:0,      en:'Go north!',   ja:'北へ すすもう！（おしろの ほう）', label:'N north' },
+  { id:'south', kind:'abs', brg:180,    en:'Go south!',   ja:'南へ すすもう！', label:'S south' },
+  { id:'east',  kind:'abs', brg:90,     en:'Go east!',    ja:'東へ すすもう！', label:'E east' },
+  { id:'west',  kind:'abs', brg:270,    en:'Go west!',    ja:'西へ すすもう！', label:'W west' },
+];
+// compass bearing -> world direction (north = +z, east = -x, so that east is on the right when you face north)
+function balDir(brgDeg){ const r = brgDeg*Math.PI/180; return { x:-Math.sin(r), z:Math.cos(r) }; }
+const BAL_PAIRS = [['up','down'],['north','south'],['east','west'],['left','right']];
+function balPlanOrder(){
+  const byId = {}; BAL_CMDS.forEach(c => byId[c.id] = c);
+  let best = null, bestR = 1e9;
+  for(let tries=0; tries<400; tries++){
+    const seq = BAL_PAIRS.slice().sort(()=>Math.random()-0.5).map(p => Math.random() < 0.5 ? p : [p[1],p[0]]).reduce((a,p)=>a.concat(p.map(id => byId[id])), []);
+    let x = BAL_HOME.x, z = BAL_HOME.z, brg = 0, maxR = 0;
+    seq.forEach(c=>{
+      if(c.kind === 'v') return;
+      brg = c.kind === 'abs' ? c.brg : (((brg + c.turn) % 360) + 360) % 360;
+      const d = balDir(brg); x += d.x*BAL_H; z += d.z*BAL_H;
+      maxR = Math.max(maxR, Math.hypot(x,z));
+    });
+    if(maxR < bestR){ bestR = maxR; best = seq; }
+    if(maxR <= BAL_MAXR) break;
+  }
+  return best;
+}
+const balloonMesh = new THREE.Group();
+let balFlame = null;
+{
+  const g = new THREE.SphereGeometry(3.1,28,18);
+  const col = new THREE.Color(), pos = g.attributes.position, colors = [];
+  const sectors = [0xFF6B6B,0xFFF0C8,0x6BB5E8,0xFFF0C8];
+  for(let i=0;i<pos.count;i++){
+    const ang = Math.atan2(pos.getZ(i), pos.getX(i)) + Math.PI;
+    col.set(sectors[Math.floor(ang/(Math.PI*2)*8) % 4]);
+    colors.push(col.r, col.g, col.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+  const env = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors:true }));
+  env.scale.set(1,1.2,1); env.position.y = 5.2;
+  const basket = new THREE.Mesh(new THREE.BoxGeometry(1.7,1.0,1.7), new THREE.MeshLambertMaterial({color:0xB5835A})); basket.position.y = 0.5;
+  balloonMesh.add(env, basket);
+  [[-0.8,-0.8],[0.8,-0.8],[-0.8,0.8],[0.8,0.8]].forEach(([dx,dz])=>{
+    const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,2.7,4), new THREE.MeshLambertMaterial({color:0x7A5C4A}));
+    rope.position.set(dx*0.85, 2.3, dz*0.85); rope.rotation.z = -dx*0.12; rope.rotation.x = dz*0.12;
+    balloonMesh.add(rope);
+  });
+  balFlame = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,8), new THREE.MeshBasicMaterial({color:0xFFB04A})); balFlame.position.y = 2.6;
+  balloonMesh.add(balFlame, makeBlobShadow(1.6));
+}
+balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z);
+iceDecorGroup.add(balloonMesh);
+function makeBalloonPad(x,z){
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.6,0.15,22), new THREE.MeshPhongMaterial({color:0xDDEFFB, shininess:90})); pad.position.y = 0.08;
+  g.add(pad);
+  const marker = makeFloatingMarker('🎈', 3.2);
+  g.add(marker, makeBlobShadow(2));
+  g.position.set(x,0,z);
+  return { group:g, marker };
+}
+// the sky the balloon flies through: sparkles, soft clouds, and the star it is flying to
+const balSky = new THREE.Group();
+balSky.visible = false;
+iceDecorGroup.add(balSky);
+{
+  const n = 520, pos = new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, r = Math.sqrt(Math.random())*46;
+    pos[i*3] = Math.cos(a)*r; pos[i*3+1] = 4 + Math.random()*44; pos[i*3+2] = Math.sin(a)*r;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xE6F7FF, size:0.5, transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; balSky.add(pts);
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  let cx = null; try{ cx = c.getContext('2d'); }catch(e){}
+  if(cx){ const gr = cx.createRadialGradient(32,32,2,32,32,30); gr.addColorStop(0,'rgba(255,255,255,0.9)'); gr.addColorStop(1,'rgba(255,255,255,0)'); cx.fillStyle = gr; cx.fillRect(0,0,64,64); }
+  const tex = new THREE.CanvasTexture(c);
+  for(let i=0;i<34;i++){
+    const a = Math.random()*Math.PI*2, r = Math.sqrt(Math.random())*44;
+    for(let k=0;k<4;k++){
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, opacity:0.5, depthWrite:false }));
+      const s = 9 + Math.random()*8;
+      sp.scale.set(s, s*0.6, 1);
+      sp.position.set(Math.cos(a)*r + (k-1.5)*5, 11 + (i%7)*5 + Math.random()*3, Math.sin(a)*r + (Math.random()-0.5)*4);
+      balSky.add(sp);
+    }
+  }
+}
+function makeCompassSign(letter, jp, color){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  let cx = null; try{ cx = c.getContext('2d'); }catch(e){}
+  if(cx){
+    cx.fillStyle = 'rgba(255,255,255,0.92)'; cx.beginPath(); cx.arc(128,128,120,0,Math.PI*2); cx.fill();
+    cx.lineWidth = 12; cx.strokeStyle = color; cx.stroke();
+    cx.fillStyle = color; cx.font = '800 120px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(letter, 128, 105);
+    cx.fillStyle = '#4A3B5C'; cx.font = '800 54px sans-serif'; cx.fillText(jp, 128, 190);
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, fog:false }));
+  sp.scale.set(14,14,1);
+  return sp;
+}
+[['N','北',0xD9453D,0,1],['E','東',0x4F8FE0,-1,0],['S','南',0x4CAF6E,0,-1],['W','西',0xF2A530,1,0]].forEach(([l,jp,col,dx,dz])=>{
+  const sp = makeCompassSign(l, jp, '#' + col.toString(16).padStart(6,'0'));
+  sp.position.set(dx*58, 26, dz*58);          // north is the palace side (+z); east is -x
+  balSky.add(sp);
+});
+const balStar = new THREE.Group();
+{
+  const m = new THREE.MeshBasicMaterial({ color:0xFFE08A });
+  const a = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), m);
+  const b = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), m); b.rotation.set(0.8,0.5,0.3);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2,0.1,8,28), new THREE.MeshBasicMaterial({ color:0xFFF3B8 }));
+  balStar.add(a, b, ring);
+  balStar.visible = false;
+  balSky.add(balStar);
+}
+const balBurst = new THREE.Mesh(new THREE.TorusGeometry(1,0.12,8,32), new THREE.MeshBasicMaterial({ color:0xFFE08A, transparent:true, opacity:0 }));
+balBurst.visible = false;
+balSky.add(balBurst);
+
+const bal = { active:false, phase:'idle', t:0, pos:new THREE.Vector3(BAL_PAD.x,0,BAL_PAD.z), from:new THREE.Vector3(), to:new THREE.Vector3(),
+  order:[], idx:0, firstTry:true, correct:0, speedFrac:0, burstT:0, bearing:0, dispBearing:0, camSide:1, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
+function balHud(){
+  let el = document.getElementById('balHud');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'balHud';
+  el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
+  const bc = 'flex:1; min-width:0; min-height:52px; font-size:16px; font-weight:800; border:0; border-radius:16px; background:#FFF; color:#4A3B5C; cursor:pointer; pointer-events:auto; box-shadow:0 3px 0 #BFD6EE; -webkit-tap-highlight-color:transparent;';
+  let rows = '';
+  for(let r=0;r<2;r++){ rows += '<div style="display:flex; gap:8px;">'; for(let c=0;c<4;c++) rows += '<button class="b'+(r*4+c)+'" style="'+bc+'">'+BAL_CMDS[r*4+c].label+'</button>'; rows += '</div>'; }
+  el.innerHTML =
+    '<div style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.93); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
+      '<div class="h" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
+      '<div style="display:flex; align-items:center; justify-content:center; gap:10px;"><div class="e" style="font-size:26px; font-weight:800;"></div>' +
+      '<button class="snd" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button></div>' +
+      '<div class="j" style="font-size:13px; font-weight:700; opacity:.8;"></div><div class="m" style="min-height:18px; font-size:13px; font-weight:800;"></div></div>' +
+    '<div style="position:absolute; top:116px; right:10px; width:66px; height:66px; border-radius:50%; background:rgba(255,255,255,0.9); box-shadow:0 4px 14px rgba(0,0,0,.25); pointer-events:none;">' +
+      '<div class="dial" style="position:absolute; inset:0; font-size:13px; font-weight:800;">' +
+        '<div style="position:absolute; top:2px; left:0; right:0; text-align:center; color:#D9453D;">N</div>' +
+        '<div style="position:absolute; bottom:2px; left:0; right:0; text-align:center;">S</div>' +
+        '<div style="position:absolute; right:5px; top:23px;">E</div>' +
+        '<div style="position:absolute; left:5px; top:23px;">W</div>' +
+      '</div>' +
+      '<div style="position:absolute; left:50%; top:-6px; width:0; height:0; margin-left:-5px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:10px solid #4A3B5C;"></div>' +
+    '</div>' +
+    '<div style="position:absolute; bottom:18px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; flex-direction:column; gap:8px;">' + rows + '</div>';
+  document.body.appendChild(el);
+  BAL_CMDS.forEach((c,i)=> el.querySelector('.b'+i).addEventListener('click', ()=> balTap(c.id)));
+  el.querySelector('.snd').addEventListener('click', ()=>{ const c = bal.order[bal.idx]; if(c){ try{ speakEnglish(c.en); }catch(e){} } });
+  return el;
+}
+function balShowCommand(){
+  const c = bal.order[bal.idx]; const el = balHud();
+  bal.phase = 'wait'; bal.firstTry = true;
+  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　⭐ ' + bal.correct + '　いまの むき：' + BAL_BEARING_NAME[((Math.round(bal.bearing/90)*90)%360+360)%360];
+  el.querySelector('.e').textContent = c.en; el.querySelector('.j').textContent = c.ja; el.querySelector('.m').textContent = '';
+  try{ speakEnglish(c.en); }catch(e){}
+}
+function balTap(id){
+  if(!bal.active || bal.phase !== 'wait') return;
+  const c = bal.order[bal.idx], msg = balHud().querySelector('.m');
+  if(id === c.id){
+    if(bal.firstTry){ bal.correct++; addCoins(1); }
+    playCorrectSound(); msg.textContent = '⭕ ' + c.en + '　⭐を めざして とぶよ！';
+    bal.from.copy(bal.pos);
+    let mx = 0, my = 0, mz = 0;
+    if(c.kind === 'v') my = c.dy;
+    else {
+      bal.bearing = c.kind === 'abs' ? c.brg : (((bal.bearing + c.turn) % 360) + 360) % 360;     // turn left/right from the balloon's own heading
+      const d = balDir(bal.bearing); mx = d.x*BAL_H; mz = d.z*BAL_H;
+    }
+    bal.to.set(bal.pos.x + mx, bal.pos.y + my, bal.pos.z + mz);
+    { let tt = 1; while(tt > 0.3 && Math.hypot(bal.from.x + mx*tt, bal.from.z + mz*tt) > BAL_MAXR) tt -= 0.05; bal.to.x = bal.from.x + mx*tt; bal.to.z = bal.from.z + mz*tt; }
+    bal.camSide = -bal.camSide;
+    bal.to.y = Math.max(8, Math.min(44, bal.to.y));
+    balStar.position.copy(bal.to); balStar.visible = true;
+    bal.phase = 'move'; bal.t = 0;
+  } else {
+    bal.firstTry = false; playWrongSound(); msg.textContent = '🔊 もういちど よく きいてみよう';
+  }
+}
+function boardBalloon(landmark){
+  if(rideActive) return;
+  rideActive = true;
+  // opposite pairs, in random order and random direction within each pair
+  bal.order = balPlanOrder();
+  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0, speedFrac:0, bearing:0, dispBearing:0 });
+  bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
+  balSky.visible = true; balStar.visible = false;
+  moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
+  const el = balHud(); el.querySelector('.h').textContent = '🎈 ねつききゅう'; el.querySelector('.e').textContent = 'Up we go…'; el.querySelector('.j').textContent = '雲の上まで のぼっていくよ'; el.querySelector('.m').textContent = '';
+  el.style.display = 'block';
+}
+function endBalloon(){
+  bal.active = false; bal.phase = 'idle'; rideActive = false;
+  const el = document.getElementById('balHud'); if(el) el.style.display = 'none';
+  balSky.visible = false; balStar.visible = false; balBurst.visible = false;
+  bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
+  balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z); balloonMesh.rotation.set(0,0,0);
+  player.position.set(BAL_PAD.x - 3.2, 0, BAL_PAD.z); player.rotation.set(0,0,0);
+  const dd = document.getElementById('balHud'); if(dd && dd.querySelector('.dial')) dd.querySelector('.dial').style.transform = 'rotate(0deg)';
+  camera.fov = 52; camera.updateProjectionMatrix();
+  camera.position.set(BAL_PAD.x - 3.2, 2.6, BAL_PAD.z - 6.8);
+}
+function cancelBalloon(){ if(bal.active) endBalloon(); }
+function finishBalloon(){
+  const n = bal.order.length, c = bal.correct, bonus = (c === n) ? 1 : 0;
+  if(bonus) addCoins(1);
+  endBalloon(); saveProgress();
+  showToast('🎈 熱気球、おつかれさま！ ' + n + 'こ中' + c + 'こ いっぱつで せいかい　+' + (c + bonus) + '🪙' + (bonus ? '（ぜんぶ正解ボーナス！）' : ''));
+}
+function updateBalloon(dt){
+  const nowS = performance.now()/1000;
+  if(!bal.active){
+    if(iceDecorGroup.visible) balloonMesh.rotation.z = Math.sin(nowS*0.9)*0.02;
+    return;
+  }
+  bal.t += dt;
+  const ease = x => x*x*(3-2*x);
+  let speedFrac = 0;
+  if(bal.phase === 'rise'){
+    const k = Math.min(1, bal.t/6), e = ease(k);
+    bal.pos.set(BAL_PAD.x*(1-e) + BAL_HOME.x*e, BAL_HOME.y*e, BAL_PAD.z*(1-e) + BAL_HOME.z*e);
+    speedFrac = Math.sin(k*Math.PI);
+    if(k >= 1) balShowCommand();
+  } else if(bal.phase === 'move'){
+    const k = Math.min(1, bal.t/3.8);
+    bal.pos.lerpVectors(bal.from, bal.to, ease(k));
+    speedFrac = Math.sin(k*Math.PI);
+    if(k >= 1){
+      balStar.visible = false;
+      balBurst.position.copy(bal.to); balBurst.visible = true; bal.burstT = 0.8;
+      bal.idx++;
+      if(bal.idx >= bal.order.length){
+        bal.phase = 'descend'; bal.t = 0; bal.from.copy(bal.pos);
+        const el = balHud(); el.querySelector('.e').textContent = 'Going home…'; el.querySelector('.j').textContent = 'おりていくよ'; el.querySelector('.m').textContent = '';
+      } else {
+        bal.phase = 'pause';
+        setTimeout(()=>{ if(bal.active && bal.phase === 'pause') balShowCommand(); }, 500);
+      }
+    }
+  } else if(bal.phase === 'descend'){
+    const k = Math.min(1, bal.t/7), e = ease(k);
+    const swirl = Math.sin(e*Math.PI*2)*8*(1-e);
+    bal.pos.set(bal.from.x + (BAL_PAD.x - bal.from.x)*e + swirl, bal.from.y*(1-e), bal.from.z + (BAL_PAD.z - bal.from.z)*e + swirl*0.6);
+    speedFrac = Math.sin(k*Math.PI)*0.6;
+    if(k >= 1){ finishBalloon(); return; }
+  }
+  bal.speedFrac = speedFrac;
+  // the balloon is never perfectly still: it drifts and bobs a little while it waits
+  const wob = (bal.phase === 'wait' || bal.phase === 'pause') ? 1 : 0.4;
+  const dx = Math.sin(nowS*0.7)*1.3*wob, dy = Math.sin(nowS*1.1)*0.5*wob, dz = Math.cos(nowS*0.6)*1.3*wob;
+  balloonMesh.position.set(bal.pos.x + dx, bal.pos.y + dy, bal.pos.z + dz);
+  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05 + speedFrac*0.04; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;   // (yaw is set below)
+  if(balFlame) balFlame.scale.set(1, 0.8 + 0.5*Math.abs(Math.sin(nowS*9)) + speedFrac*0.4, 1);
+  player.position.set(balloonMesh.position.x, balloonMesh.position.y + 0.5, balloonMesh.position.z);
+  // the star spins, and a ring bursts outward when it is reached
+  if(balStar.visible){ balStar.rotation.y = nowS*2.2; const sc = 1 + Math.sin(nowS*6)*0.1; balStar.scale.set(sc,sc,sc); }
+  if(bal.burstT > 0){
+    bal.burstT = Math.max(0, bal.burstT - dt);
+    const k = 1 - bal.burstT/0.8;
+    balBurst.scale.setScalar(1 + k*9); balBurst.material.opacity = 0.9*(1-k); balBurst.rotation.x = Math.PI/2;
+    if(bal.burstT === 0) balBurst.visible = false;
+  }
+  // camera: behind the balloon along its heading (smoothed), pulling back while it flies; the compass dial turns with the view
+  let dBrg = bal.bearing - bal.dispBearing; dBrg = ((dBrg + 540) % 360) - 180;
+  bal.dispBearing += dBrg * (1 - Math.exp(-dt*2.2));
+  const fd = balDir(bal.dispBearing);
+  balloonMesh.rotation.y = -bal.dispBearing*Math.PI/180;
+  player.rotation.y = balloonMesh.rotation.y;
+  const mk = (bal.phase === 'move') ? Math.min(1, bal.t/3.8) : 0, mw = Math.sin(mk*Math.PI);
+  const back = 14 + 7*speedFrac;
+  const ang = Math.atan2(fd.x, fd.z) + Math.PI + mw*0.5*bal.camSide;            // the camera swings round the balloon during a flight
+  const bp = balloonMesh.position;
+  bal.camPos.set(bp.x + Math.sin(ang)*back, bp.y + 4.5 + 2*speedFrac + mw*((bal.to.y - bal.from.y)/BAL_V)*3, bp.z + Math.cos(ang)*back);
+  bal.camLook.set(bp.x + fd.x*8, bp.y + 2.8, bp.z + fd.z*8);
+  if(bal.phase === 'move'){ bal.camLook.lerp(bal.to, 0.4*mw); }                    // and keeps the star in view
+  const dial = document.getElementById('balHud'); if(dial){ const dd = dial.querySelector('.dial'); if(dd) dd.style.transform = 'rotate(' + (-bal.dispBearing) + 'deg)'; }
+  camera.fov += ((52 + 10*speedFrac) - camera.fov) * (1 - Math.exp(-dt*4));
+  camera.updateProjectionMatrix();
 }
 
 /* =========================================================
@@ -7628,15 +9986,24 @@ const landmarks = [
   { ...makeRickshawStand(-1.5,1.25), id:'rickshaw', type:'rickshaw', title:'人力車ツアー', sub:'英語ガイドと島をめぐろう', emoji:'🛺', bg:'FFB7C9', label:'🛺 のりこむ' },
   { ...makeFireworkPad(-9.5,-16), id:'fireworks', type:'fireworks', title:'花火台', sub:'つづりを ならべて 花火を打ち上げよう', emoji:'🎆', bg:'2A2F6B', label:'🎆 打ち上げる' },
   { ...makeDragonShrine(0,24.5), id:'skydragon', type:'skydragon', title:'空とぶ龍コースター', sub:'龍にのって そらを とぼう', emoji:'🐉', bg:'FF8FB6', label:'🐉 のりこむ' },
+  { ...makeSleighStand(-4,1), id:'sleigh', type:'sleigh', title:'トナカイそりツアー', sub:'英語ガイドと雪の島をめぐろう', emoji:'🦌', bg:'9FD8F5', label:'🦌 のりこむ' },
+  { ...makeSnowWorkshop(4,1), id:'snowbuild', type:'snowbuild', title:'ゆきだるまづくり', sub:'英語を聞いて ゆきだるまを つくろう', emoji:'⛄', bg:'DDEFFB', label:'⛄ あそぶ' },
+  { ...makeSledStation(18,-9.2), id:'sledrun', type:'sledrun', title:'そりコースター', sub:'雪の空を すべりおりよう', emoji:'🛷', bg:'6BB5E8', label:'🛷 のりこむ' },
+  { ...makeAuroraPad(-18,-7), id:'auroraflight', type:'auroraflight', title:'オーロラ飛行', sub:'雪の結晶にのって オーロラの空へ', emoji:'🌌', bg:'2A2F6B', label:'🌌 とびたつ' },
+  { ...makeSlalomStation(SL_STATION.x, SL_STATION.z-2.3), id:'slalom', type:'slalom', title:'スラローム', sub:'氷のお城のまわりを すべりおりよう', emoji:'⛷️', bg:'4F8FE0', label:'⛷️ のりこむ' },
+  { ...makeBalloonPad(BAL_PAD.x, BAL_PAD.z), id:'balloon', type:'balloon', title:'熱気球', sub:'えいごの めいれいで ふうせんを うごかそう', emoji:'🎈', bg:'FF8FA3', label:'🎈 のりこむ' },
+  { ...makeZipStation(0,29.2), id:'zipline', type:'zipline', title:'ジップライン', sub:'神社の塔から 池まで 空をすべろう', emoji:'🪂', bg:'D9453D', label:'🪂 のりこむ' },
 ];
 // these three only make sense in みらいシティ — hidden elsewhere, toggled in travelToIsland
 const CITY_ONLY_LANDMARK_IDS = new Set(['robotcafe','news','smarthome','skypod']);
 // these are themepark-only, alongside the maze gate
 const THEMEPARK_ONLY_LANDMARK_IDS = new Set(['coaster','horror','panda','coasterride','sasuketower']);
-const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw','skydragon']); // koi pond boat dock
+const ICE_ONLY_LANDMARK_IDS = new Set(['sleigh','sledrun','snowbuild','slalom','balloon']); // ice island gimmicks
+const SAKURA_ONLY_LANDMARK_IDS = new Set(['boatride','goldfish','shooting','rickshaw','skydragon','zipline']); // koi pond boat dock
 const MEADOW_EXCLUDED_LANDMARK_IDS = new Set(['future']); // shown in city + themepark, but not the starter island
 landmarks.forEach(l => scene.add(l.group));
 fireworksPadLandmark = landmarks.find(l => l.id === 'fireworks') || null;
+auroraPadLandmark = landmarks.find(l => l.id === 'auroraflight') || null;
 updateFireworksPad();
 
 /* =========================================================
@@ -8431,9 +10798,17 @@ function animate(){
   updateSasukeTowerRide(dt);
   updateSakuraPetals(dt,t);
   updateSakuraPond(dt,t);
+  updateIceDecor(dt,t);
+  updateIceDecor2(dt,t);
   updateBoatRide(dt);
   updateRickshaw(dt);
   updateDragonRide(dt);
+  updateSleigh(dt);
+  updateSled(dt);
+  updateAuroraFlight(dt);
+  updateSlalom(dt);
+  updateBalloon(dt);
+  updateZip(dt);
   if(themeparkDecorGroup.visible){
     if(ferrisWheel) ferrisWheel.rotation.z = t*0.15;
     if(carouselGroup){
@@ -8472,6 +10847,28 @@ function animate(){
     desiredCamPos = dragon.camPos.clone();
     lookTarget = dragon.camLook.clone();
     camLerp = 1 - Math.pow(0.00002, dt);
+  } else if(sled.active){
+    // sled coaster: chase camera computed by updateSled
+    desiredCamPos = sled.camPos.clone();
+    lookTarget = sled.camLook.clone();
+    camLerp = 1 - Math.pow(0.00002, dt);
+  } else if(af.active){
+    // aurora flight: close chase camera computed by updateAuroraFlight
+    desiredCamPos = af.camPos.clone();
+    lookTarget = af.camLook.clone();
+    camLerp = 1 - Math.pow(0.00001, dt);
+  } else if(slalomRide.state.active){
+    desiredCamPos = slalomRide.state.camPos.clone();
+    lookTarget = slalomRide.state.camLook.clone();
+    camLerp = 1 - Math.pow(0.00001, dt);
+  } else if(bal.active){
+    desiredCamPos = bal.camPos.clone();
+    lookTarget = bal.camLook.clone();
+    camLerp = 1 - Math.pow(0.004, dt);
+  } else if(zip.active && zip.cam){
+    desiredCamPos = zip.camPos.clone();
+    lookTarget = zip.camLook.clone();
+    camLerp = 1 - Math.pow(0.00005, dt);
   }
   camera.position.lerp(desiredCamPos, camLerp);
   camera.lookAt(lookTarget);
@@ -9275,6 +11672,13 @@ interactBtn.addEventListener('pointerdown', (e)=>{
   else if(closest.type === 'rickshaw') boardRickshaw(closest);
   else if(closest.type === 'fireworks') openFireworks();
   else if(closest.type === 'skydragon') boardDragonRide(closest);
+  else if(closest.type === 'sleigh') boardSleigh(closest);
+  else if(closest.type === 'sledrun') boardSled(closest);
+  else if(closest.type === 'auroraflight') boardAuroraFlight(closest);
+  else if(closest.type === 'slalom') boardSlalom(closest);
+  else if(closest.type === 'balloon') boardBalloon(closest);
+  else if(closest.type === 'zipline') boardZip(closest);
+  else if(closest.type === 'snowbuild') openSnowmanBuild();
   else if(closest.type === 'coasterride') boardCoasterRide(closest);
   else if(closest.type === 'sasuketower') boardSasukeTower(closest);
   else openLandmark(closest);
@@ -12018,10 +14422,12 @@ npcs.forEach(n=>{ n.mesh.visible = (n.def.world === currentIslandId); });
 mazeGateLandmark.group.visible = (currentIslandId === 'themepark');
 themeparkDecorGroup.visible = (currentIslandId === 'themepark');
 sakuraDecorGroup.visible = (currentIslandId === 'sakura');
+iceDecorGroup.visible = (currentIslandId === 'ice');
 landmarks.forEach(l=>{
   if(CITY_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'city');
   if(THEMEPARK_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'themepark');
   if(SAKURA_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'sakura');
+  if(ICE_ONLY_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId === 'ice');
   if(MEADOW_EXCLUDED_LANDMARK_IDS.has(l.id)) l.group.visible = (currentIslandId !== 'meadow');
 });
 document.getElementById('versionLabel').textContent = GAME_VERSION;
