@@ -3095,7 +3095,7 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.30.2';
+const GAME_VERSION = 'v1.30.3';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
@@ -8913,18 +8913,38 @@ function updateZip(dt){
 // pairs (north/south, east/west, up/down, left/right) so the balloon keeps travelling across the
 // whole island instead of drifting off it.
 const BAL_PAD = { x:14, z:-3 };
-const BAL_H = 26, BAL_V = 14, BAL_MAXR = 36, BAL_HOME = { x:0, y:24, z:0 };
+const BAL_H = 26, BAL_V = 14, BAL_MAXR = 44, BAL_HOME = { x:0, y:24, z:0 };
+const BAL_BEARING_NAME = { 0:'北', 90:'東', 180:'南', 270:'西' };
 const BAL_CMDS = [
-  { id:'up',    en:'Go up!',     ja:'上へ ゆこう！',       vec:[0,BAL_V,0],  label:'⬆ up' },
-  { id:'down',  en:'Go down!',   ja:'下へ おりよう！',     vec:[0,-BAL_V,0], label:'⬇ down' },
-  { id:'left',  en:'Turn left!', ja:'左へ すすもう！',     vec:[BAL_H,0,0],  label:'⬅ left' },
-  { id:'right', en:'Turn right!',ja:'右へ すすもう！',     vec:[-BAL_H,0,0], label:'➡ right' },
-  { id:'north', en:'Go north!',  ja:'北へ すすもう！（おしろの ほう）', vec:[0,0,BAL_H], label:'N north' },
-  { id:'south', en:'Go south!',  ja:'南へ すすもう！',     vec:[0,0,-BAL_H], label:'S south' },
-  { id:'east',  en:'Go east!',   ja:'東へ すすもう！（みぎ）', vec:[-BAL_H,0,0], label:'E east' },
-  { id:'west',  en:'Go west!',   ja:'西へ すすもう！（ひだり）', vec:[BAL_H,0,0], label:'W west' },
+  { id:'up',    kind:'v',   dy:BAL_V,  en:'Go up!',      ja:'上へ ゆこう！',   label:'⬆ up' },
+  { id:'down',  kind:'v',   dy:-BAL_V, en:'Go down!',    ja:'下へ おりよう！', label:'⬇ down' },
+  { id:'left',  kind:'rel', turn:-90,   en:'Turn left!',  ja:'ふうせんの 左へ まがって すすもう！', label:'⬅ left' },
+  { id:'right', kind:'rel', turn:90,    en:'Turn right!', ja:'ふうせんの 右へ まがって すすもう！', label:'➡ right' },
+  { id:'north', kind:'abs', brg:0,      en:'Go north!',   ja:'北へ すすもう！（おしろの ほう）', label:'N north' },
+  { id:'south', kind:'abs', brg:180,    en:'Go south!',   ja:'南へ すすもう！', label:'S south' },
+  { id:'east',  kind:'abs', brg:90,     en:'Go east!',    ja:'東へ すすもう！', label:'E east' },
+  { id:'west',  kind:'abs', brg:270,    en:'Go west!',    ja:'西へ すすもう！', label:'W west' },
 ];
+// compass bearing -> world direction (north = +z, east = -x, so that east is on the right when you face north)
+function balDir(brgDeg){ const r = brgDeg*Math.PI/180; return { x:-Math.sin(r), z:Math.cos(r) }; }
 const BAL_PAIRS = [['up','down'],['north','south'],['east','west'],['left','right']];
+function balPlanOrder(){
+  const byId = {}; BAL_CMDS.forEach(c => byId[c.id] = c);
+  let best = null, bestR = 1e9;
+  for(let tries=0; tries<400; tries++){
+    const seq = BAL_PAIRS.slice().sort(()=>Math.random()-0.5).map(p => Math.random() < 0.5 ? p : [p[1],p[0]]).reduce((a,p)=>a.concat(p.map(id => byId[id])), []);
+    let x = BAL_HOME.x, z = BAL_HOME.z, brg = 0, maxR = 0;
+    seq.forEach(c=>{
+      if(c.kind === 'v') return;
+      brg = c.kind === 'abs' ? c.brg : (((brg + c.turn) % 360) + 360) % 360;
+      const d = balDir(brg); x += d.x*BAL_H; z += d.z*BAL_H;
+      maxR = Math.max(maxR, Math.hypot(x,z));
+    });
+    if(maxR < bestR){ bestR = maxR; best = seq; }
+    if(maxR <= BAL_MAXR) break;
+  }
+  return best;
+}
 const balloonMesh = new THREE.Group();
 let balFlame = null;
 {
@@ -8988,6 +9008,24 @@ iceDecorGroup.add(balSky);
     }
   }
 }
+function makeCompassSign(letter, jp, color){
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  let cx = null; try{ cx = c.getContext('2d'); }catch(e){}
+  if(cx){
+    cx.fillStyle = 'rgba(255,255,255,0.92)'; cx.beginPath(); cx.arc(128,128,120,0,Math.PI*2); cx.fill();
+    cx.lineWidth = 12; cx.strokeStyle = color; cx.stroke();
+    cx.fillStyle = color; cx.font = '800 120px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(letter, 128, 105);
+    cx.fillStyle = '#4A3B5C'; cx.font = '800 54px sans-serif'; cx.fillText(jp, 128, 190);
+  }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, fog:false }));
+  sp.scale.set(14,14,1);
+  return sp;
+}
+[['N','北',0xD9453D,0,1],['E','東',0x4F8FE0,-1,0],['S','南',0x4CAF6E,0,-1],['W','西',0xF2A530,1,0]].forEach(([l,jp,col,dx,dz])=>{
+  const sp = makeCompassSign(l, jp, '#' + col.toString(16).padStart(6,'0'));
+  sp.position.set(dx*58, 26, dz*58);          // north is the palace side (+z); east is -x
+  balSky.add(sp);
+});
 const balStar = new THREE.Group();
 {
   const m = new THREE.MeshBasicMaterial({ color:0xFFE08A });
@@ -9003,7 +9041,7 @@ balBurst.visible = false;
 balSky.add(balBurst);
 
 const bal = { active:false, phase:'idle', t:0, pos:new THREE.Vector3(BAL_PAD.x,0,BAL_PAD.z), from:new THREE.Vector3(), to:new THREE.Vector3(),
-  order:[], idx:0, firstTry:true, correct:0, speedFrac:0, burstT:0, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
+  order:[], idx:0, firstTry:true, correct:0, speedFrac:0, burstT:0, bearing:0, dispBearing:0, camSide:1, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
 function balHud(){
   let el = document.getElementById('balHud');
   if(el) return el;
@@ -9019,6 +9057,15 @@ function balHud(){
       '<div style="display:flex; align-items:center; justify-content:center; gap:10px;"><div class="e" style="font-size:26px; font-weight:800;"></div>' +
       '<button class="snd" style="width:40px; height:40px; border:0; border-radius:20px; background:#EFE7F5; font-size:18px; cursor:pointer;">🔊</button></div>' +
       '<div class="j" style="font-size:13px; font-weight:700; opacity:.8;"></div><div class="m" style="min-height:18px; font-size:13px; font-weight:800;"></div></div>' +
+    '<div style="position:absolute; top:116px; right:10px; width:66px; height:66px; border-radius:50%; background:rgba(255,255,255,0.9); box-shadow:0 4px 14px rgba(0,0,0,.25); pointer-events:none;">' +
+      '<div class="dial" style="position:absolute; inset:0; font-size:13px; font-weight:800;">' +
+        '<div style="position:absolute; top:2px; left:0; right:0; text-align:center; color:#D9453D;">N</div>' +
+        '<div style="position:absolute; bottom:2px; left:0; right:0; text-align:center;">S</div>' +
+        '<div style="position:absolute; right:5px; top:23px;">E</div>' +
+        '<div style="position:absolute; left:5px; top:23px;">W</div>' +
+      '</div>' +
+      '<div style="position:absolute; left:50%; top:-6px; width:0; height:0; margin-left:-5px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:10px solid #4A3B5C;"></div>' +
+    '</div>' +
     '<div style="position:absolute; bottom:18px; left:50%; transform:translateX(-50%); width:min(96vw,540px); display:flex; flex-direction:column; gap:8px;">' + rows + '</div>';
   document.body.appendChild(el);
   BAL_CMDS.forEach((c,i)=> el.querySelector('.b'+i).addEventListener('click', ()=> balTap(c.id)));
@@ -9028,7 +9075,7 @@ function balHud(){
 function balShowCommand(){
   const c = bal.order[bal.idx]; const el = balHud();
   bal.phase = 'wait'; bal.firstTry = true;
-  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　⭐ ' + bal.correct + '　えいごの とおりに ふうせんを とばそう';
+  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　⭐ ' + bal.correct + '　いまの むき：' + BAL_BEARING_NAME[((Math.round(bal.bearing/90)*90)%360+360)%360];
   el.querySelector('.e').textContent = c.en; el.querySelector('.j').textContent = c.ja; el.querySelector('.m').textContent = '';
   try{ speakEnglish(c.en); }catch(e){}
 }
@@ -9039,8 +9086,15 @@ function balTap(id){
     if(bal.firstTry){ bal.correct++; addCoins(1); }
     playCorrectSound(); msg.textContent = '⭕ ' + c.en + '　⭐を めざして とぶよ！';
     bal.from.copy(bal.pos);
-    bal.to.set(bal.pos.x + c.vec[0], bal.pos.y + c.vec[1], bal.pos.z + c.vec[2]);
-    const r = Math.hypot(bal.to.x, bal.to.z); if(r > BAL_MAXR){ bal.to.x *= BAL_MAXR/r; bal.to.z *= BAL_MAXR/r; }
+    let mx = 0, my = 0, mz = 0;
+    if(c.kind === 'v') my = c.dy;
+    else {
+      bal.bearing = c.kind === 'abs' ? c.brg : (((bal.bearing + c.turn) % 360) + 360) % 360;     // turn left/right from the balloon's own heading
+      const d = balDir(bal.bearing); mx = d.x*BAL_H; mz = d.z*BAL_H;
+    }
+    bal.to.set(bal.pos.x + mx, bal.pos.y + my, bal.pos.z + mz);
+    { let tt = 1; while(tt > 0.3 && Math.hypot(bal.from.x + mx*tt, bal.from.z + mz*tt) > BAL_MAXR) tt -= 0.05; bal.to.x = bal.from.x + mx*tt; bal.to.z = bal.from.z + mz*tt; }
+    bal.camSide = -bal.camSide;
     bal.to.y = Math.max(8, Math.min(44, bal.to.y));
     balStar.position.copy(bal.to); balStar.visible = true;
     bal.phase = 'move'; bal.t = 0;
@@ -9052,9 +9106,8 @@ function boardBalloon(landmark){
   if(rideActive) return;
   rideActive = true;
   // opposite pairs, in random order and random direction within each pair
-  const byId = {}; BAL_CMDS.forEach(c => byId[c.id] = c);
-  bal.order = BAL_PAIRS.slice().sort(()=>Math.random()-0.5).map(p => Math.random() < 0.5 ? p : [p[1],p[0]]).reduce((a,p)=>a.concat(p.map(id => byId[id])), []);
-  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0, speedFrac:0 });
+  bal.order = balPlanOrder();
+  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0, speedFrac:0, bearing:0, dispBearing:0 });
   bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
   balSky.visible = true; balStar.visible = false;
   moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
@@ -9068,6 +9121,7 @@ function endBalloon(){
   bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
   balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z); balloonMesh.rotation.set(0,0,0);
   player.position.set(BAL_PAD.x - 3.2, 0, BAL_PAD.z); player.rotation.set(0,0,0);
+  const dd = document.getElementById('balHud'); if(dd && dd.querySelector('.dial')) dd.querySelector('.dial').style.transform = 'rotate(0deg)';
   camera.fov = 52; camera.updateProjectionMatrix();
   camera.position.set(BAL_PAD.x - 3.2, 2.6, BAL_PAD.z - 6.8);
 }
@@ -9120,10 +9174,9 @@ function updateBalloon(dt){
   const wob = (bal.phase === 'wait' || bal.phase === 'pause') ? 1 : 0.4;
   const dx = Math.sin(nowS*0.7)*1.3*wob, dy = Math.sin(nowS*1.1)*0.5*wob, dz = Math.cos(nowS*0.6)*1.3*wob;
   balloonMesh.position.set(bal.pos.x + dx, bal.pos.y + dy, bal.pos.z + dz);
-  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05 + speedFrac*0.04; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;
+  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05 + speedFrac*0.04; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;   // (yaw is set below)
   if(balFlame) balFlame.scale.set(1, 0.8 + 0.5*Math.abs(Math.sin(nowS*9)) + speedFrac*0.4, 1);
   player.position.set(balloonMesh.position.x, balloonMesh.position.y + 0.5, balloonMesh.position.z);
-  player.rotation.set(0,0,0);
   // the star spins, and a ring bursts outward when it is reached
   if(balStar.visible){ balStar.rotation.y = nowS*2.2; const sc = 1 + Math.sin(nowS*6)*0.1; balStar.scale.set(sc,sc,sc); }
   if(bal.burstT > 0){
@@ -9132,10 +9185,20 @@ function updateBalloon(dt){
     balBurst.scale.setScalar(1 + k*9); balBurst.material.opacity = 0.9*(1-k); balBurst.rotation.x = Math.PI/2;
     if(bal.burstT === 0) balBurst.visible = false;
   }
-  // camera: from the south looking north, so "north" is up the screen and east is to the right;
-  // it pulls back and the view widens while the balloon is flying
-  bal.camPos.set(balloonMesh.position.x, balloonMesh.position.y + 4.5 + 2*speedFrac, balloonMesh.position.z - (14 + 7*speedFrac));
-  bal.camLook.set(balloonMesh.position.x, balloonMesh.position.y + 2.8, balloonMesh.position.z + 8);
+  // camera: behind the balloon along its heading (smoothed), pulling back while it flies; the compass dial turns with the view
+  let dBrg = bal.bearing - bal.dispBearing; dBrg = ((dBrg + 540) % 360) - 180;
+  bal.dispBearing += dBrg * (1 - Math.exp(-dt*2.2));
+  const fd = balDir(bal.dispBearing);
+  balloonMesh.rotation.y = -bal.dispBearing*Math.PI/180;
+  player.rotation.y = balloonMesh.rotation.y;
+  const mk = (bal.phase === 'move') ? Math.min(1, bal.t/3.8) : 0, mw = Math.sin(mk*Math.PI);
+  const back = 14 + 7*speedFrac;
+  const ang = Math.atan2(fd.x, fd.z) + Math.PI + mw*0.5*bal.camSide;            // the camera swings round the balloon during a flight
+  const bp = balloonMesh.position;
+  bal.camPos.set(bp.x + Math.sin(ang)*back, bp.y + 4.5 + 2*speedFrac + mw*((bal.to.y - bal.from.y)/BAL_V)*3, bp.z + Math.cos(ang)*back);
+  bal.camLook.set(bp.x + fd.x*8, bp.y + 2.8, bp.z + fd.z*8);
+  if(bal.phase === 'move'){ bal.camLook.lerp(bal.to, 0.4*mw); }                    // and keeps the star in view
+  const dial = document.getElementById('balHud'); if(dial){ const dd = dial.querySelector('.dial'); if(dd) dd.style.transform = 'rotate(' + (-bal.dispBearing) + 'deg)'; }
   camera.fov += ((52 + 10*speedFrac) - camera.fov) * (1 - Math.exp(-dt*4));
   camera.updateProjectionMatrix();
 }
