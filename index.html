@@ -3095,13 +3095,13 @@ const ISLANDS = [
 ];
 
 let currentIslandId = 'meadow';
-const GAME_VERSION = 'v1.30.0';
+const GAME_VERSION = 'v1.30.2';
 
 // ⚠️ TEMPORARY FOR TESTING: set to true to travel to any island regardless
 // of mastered-word count. Only the actual travel permission is bypassed —
 // unlockStatusFor (used for the displayed "◯語ひつよう" text) is untouched.
 // Set back to false before shipping to real players.
-const TESTING_UNLOCK_ALL_ISLANDS = true;
+const TESTING_UNLOCK_ALL_ISLANDS = false;
 
 // unlockAt is a mastered-word-count threshold (not a level number), so it
 // stays stable even if WORDS_PER_LEVEL is tuned later.
@@ -6605,10 +6605,28 @@ function setRingLabel(sp, text){
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = '#4A3B5C';
-  ctx.font = '800 ' + (text.length > 8 ? 34 : 46) + 'px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, c.width/2, c.height/2+2);
+  const fit = fitLabelText(ctx, text, c.width - 40);
+  ctx.font = '800 ' + fit.size + 'px sans-serif';
+  if(fit.lines.length === 1){
+    ctx.fillText(fit.lines[0], c.width/2, c.height/2+2);
+  } else {
+    const lh = fit.size*1.15, y0 = c.height/2 + 2 - lh/2;
+    ctx.fillText(fit.lines[0], c.width/2, y0);
+    ctx.fillText(fit.lines[1], c.width/2, y0 + lh);
+  }
   sp.userData.tex.needsUpdate = true;
+}
+// choose a font size (and a two-line split if needed) so the text always stays inside the label frame
+function fitLabelText(ctx, text, maxW){
+  const width = (str, size) => { ctx.font = '800 ' + size + 'px sans-serif'; return ctx.measureText(str).width; };
+  for(let size=46; size>=34; size-=2){ if(width(text,size) <= maxW) return { lines:[text], size }; }
+  let cut = Math.ceil(text.length/2);
+  const sp = text.indexOf(' ', Math.floor(text.length/2) - 3);
+  if(sp > 0 && sp < text.length-1 && Math.abs(sp - text.length/2) <= 3) cut = sp;
+  const l1 = text.slice(0,cut).trim(), l2 = text.slice(cut).trim();
+  for(let size=38; size>=16; size-=2){ if(Math.max(width(l1,size), width(l2,size)) <= maxW) return { lines:[l1,l2], size }; }
+  return { lines:[l1,l2], size:16 };
 }
 DRAGON_GATES.forEach(g=>{
   const f = dragonFrameAt(g.s);
@@ -8226,7 +8244,7 @@ function getAfHud(){
   el = document.createElement('div');
   el.id = 'afHud';
   el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
-  const laneCss = 'flex:1; min-height:68px; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+  const laneCss = 'flex:1; min-width:0; min-height:68px; line-height:1.2; overflow-wrap:anywhere; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
   el.innerHTML =
     '<div id="afTop" style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
       '<div id="afHead" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
@@ -8273,7 +8291,8 @@ function setAfLaneLabels(opts){
   [0,1,2].forEach(i=>{
     const b = el.querySelector('#afLane'+i);
     b.textContent = opts ? (arrows[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i];
-    b.style.fontSize = (opts && opts[i].ja.length > 5) ? '14px' : '17px';
+    const n = opts ? opts[i].ja.length : 0;
+    b.style.fontSize = n > 6 ? '13px' : n > 4 ? '15px' : '17px';
   });
 }
 function askAfQuestion(g, idx){
@@ -8533,7 +8552,7 @@ function createLaneRide(cfg){
     el = document.createElement('div');
     el.id = cfg.hudId;
     el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
-    const lc = 'flex:1; min-height:68px; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
+    const lc = 'flex:1; min-width:0; min-height:68px; line-height:1.2; overflow-wrap:anywhere; padding:6px 4px; font-size:17px; font-weight:800; border:0; border-radius:18px; color:#4A3B5C; cursor:pointer; -webkit-tap-highlight-color:transparent; pointer-events:auto; box-shadow:0 4px 12px rgba(0,0,0,.25);';
     el.innerHTML =
       '<div style="position:absolute; top:12px; left:50%; transform:translateX(-50%); width:min(92vw,460px); background:rgba(255,255,255,0.92); border-radius:18px; padding:8px 12px; text-align:center; pointer-events:auto; box-shadow:0 6px 20px rgba(0,0,0,.25);">' +
         '<div class="h" style="font-size:12px; font-weight:800; opacity:.7;"></div>' +
@@ -8550,7 +8569,7 @@ function createLaneRide(cfg){
   function refreshBtns(){ const el = document.getElementById(cfg.hudId); if(!el) return; [0,1,2].forEach(i => { el.querySelector('.l'+i).style.outline = (S.laneTarget === i) ? '4px solid #4A3B5C' : 'none'; }); }
   function setLaneLabels(opts){
     const el = hud(); const ar = ['◀ ','▲ ','▶ '];
-    [0,1,2].forEach(i=>{ const b = el.querySelector('.l'+i); b.textContent = opts ? (ar[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i]; b.style.fontSize = (opts && opts[i].ja.length > 5) ? '14px' : '17px'; });
+    [0,1,2].forEach(i=>{ const b = el.querySelector('.l'+i); b.textContent = opts ? (ar[i] + opts[i].ja) : ['◀ ひだり','▲ まんなか','▶ みぎ'][i]; const n = opts ? opts[i].ja.length : 0; b.style.fontSize = n > 6 ? '13px' : n > 4 ? '15px' : '17px'; });
   }
   function ask(g, i){
     g.asked = true; g.q = pickAfQuestion();
@@ -8889,18 +8908,25 @@ function updateZip(dt){
 }
 
 // ---------- 🎈 熱気球 ----------
+// Each correct command sends the balloon on a long, sweeping flight (26 m sideways, 14 m up or down)
+// towards a glowing star, through a sky full of clouds and sparkles. The commands come in opposite
+// pairs (north/south, east/west, up/down, left/right) so the balloon keeps travelling across the
+// whole island instead of drifting off it.
 const BAL_PAD = { x:14, z:-3 };
+const BAL_H = 26, BAL_V = 14, BAL_MAXR = 36, BAL_HOME = { x:0, y:24, z:0 };
 const BAL_CMDS = [
-  { id:'up',    en:'Go up!',     ja:'上へ ゆこう！',       vec:[0,9,0],  label:'⬆ up' },
-  { id:'down',  en:'Go down!',   ja:'下へ おりよう！',     vec:[0,-9,0], label:'⬇ down' },
-  { id:'left',  en:'Turn left!', ja:'左へ すすもう！',     vec:[9,0,0],  label:'⬅ left' },
-  { id:'right', en:'Turn right!',ja:'右へ すすもう！',     vec:[-9,0,0], label:'➡ right' },
-  { id:'north', en:'Go north!',  ja:'北へ すすもう！（おしろの ほう）', vec:[0,0,9], label:'N north' },
-  { id:'south', en:'Go south!',  ja:'南へ すすもう！',     vec:[0,0,-9], label:'S south' },
-  { id:'east',  en:'Go east!',   ja:'東へ すすもう！（みぎ）', vec:[-9,0,0], label:'E east' },
-  { id:'west',  en:'Go west!',   ja:'西へ すすもう！（ひだり）', vec:[9,0,0], label:'W west' },
+  { id:'up',    en:'Go up!',     ja:'上へ ゆこう！',       vec:[0,BAL_V,0],  label:'⬆ up' },
+  { id:'down',  en:'Go down!',   ja:'下へ おりよう！',     vec:[0,-BAL_V,0], label:'⬇ down' },
+  { id:'left',  en:'Turn left!', ja:'左へ すすもう！',     vec:[BAL_H,0,0],  label:'⬅ left' },
+  { id:'right', en:'Turn right!',ja:'右へ すすもう！',     vec:[-BAL_H,0,0], label:'➡ right' },
+  { id:'north', en:'Go north!',  ja:'北へ すすもう！（おしろの ほう）', vec:[0,0,BAL_H], label:'N north' },
+  { id:'south', en:'Go south!',  ja:'南へ すすもう！',     vec:[0,0,-BAL_H], label:'S south' },
+  { id:'east',  en:'Go east!',   ja:'東へ すすもう！（みぎ）', vec:[-BAL_H,0,0], label:'E east' },
+  { id:'west',  en:'Go west!',   ja:'西へ すすもう！（ひだり）', vec:[BAL_H,0,0], label:'W west' },
 ];
+const BAL_PAIRS = [['up','down'],['north','south'],['east','west'],['left','right']];
 const balloonMesh = new THREE.Group();
+let balFlame = null;
 {
   const g = new THREE.SphereGeometry(3.1,28,18);
   const col = new THREE.Color(), pos = g.attributes.position, colors = [];
@@ -8920,8 +8946,8 @@ const balloonMesh = new THREE.Group();
     rope.position.set(dx*0.85, 2.3, dz*0.85); rope.rotation.z = -dx*0.12; rope.rotation.x = dz*0.12;
     balloonMesh.add(rope);
   });
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,8), new THREE.MeshBasicMaterial({color:0xFFB04A})); flame.position.y = 2.6;
-  balloonMesh.add(flame, makeBlobShadow(1.6));
+  balFlame = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,8), new THREE.MeshBasicMaterial({color:0xFFB04A})); balFlame.position.y = 2.6;
+  balloonMesh.add(balFlame, makeBlobShadow(1.6));
 }
 balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z);
 iceDecorGroup.add(balloonMesh);
@@ -8934,15 +8960,57 @@ function makeBalloonPad(x,z){
   g.position.set(x,0,z);
   return { group:g, marker };
 }
+// the sky the balloon flies through: sparkles, soft clouds, and the star it is flying to
+const balSky = new THREE.Group();
+balSky.visible = false;
+iceDecorGroup.add(balSky);
+{
+  const n = 520, pos = new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, r = Math.sqrt(Math.random())*46;
+    pos[i*3] = Math.cos(a)*r; pos[i*3+1] = 4 + Math.random()*44; pos[i*3+2] = Math.sin(a)*r;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color:0xE6F7FF, size:0.5, transparent:true, opacity:0.85, depthWrite:false, blending:THREE.AdditiveBlending }));
+  pts.frustumCulled = false; balSky.add(pts);
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  let cx = null; try{ cx = c.getContext('2d'); }catch(e){}
+  if(cx){ const gr = cx.createRadialGradient(32,32,2,32,32,30); gr.addColorStop(0,'rgba(255,255,255,0.9)'); gr.addColorStop(1,'rgba(255,255,255,0)'); cx.fillStyle = gr; cx.fillRect(0,0,64,64); }
+  const tex = new THREE.CanvasTexture(c);
+  for(let i=0;i<34;i++){
+    const a = Math.random()*Math.PI*2, r = Math.sqrt(Math.random())*44;
+    for(let k=0;k<4;k++){
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, opacity:0.5, depthWrite:false }));
+      const s = 9 + Math.random()*8;
+      sp.scale.set(s, s*0.6, 1);
+      sp.position.set(Math.cos(a)*r + (k-1.5)*5, 11 + (i%7)*5 + Math.random()*3, Math.sin(a)*r + (Math.random()-0.5)*4);
+      balSky.add(sp);
+    }
+  }
+}
+const balStar = new THREE.Group();
+{
+  const m = new THREE.MeshBasicMaterial({ color:0xFFE08A });
+  const a = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), m);
+  const b = new THREE.Mesh(new THREE.OctahedronGeometry(1.3), m); b.rotation.set(0.8,0.5,0.3);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2,0.1,8,28), new THREE.MeshBasicMaterial({ color:0xFFF3B8 }));
+  balStar.add(a, b, ring);
+  balStar.visible = false;
+  balSky.add(balStar);
+}
+const balBurst = new THREE.Mesh(new THREE.TorusGeometry(1,0.12,8,32), new THREE.MeshBasicMaterial({ color:0xFFE08A, transparent:true, opacity:0 }));
+balBurst.visible = false;
+balSky.add(balBurst);
+
 const bal = { active:false, phase:'idle', t:0, pos:new THREE.Vector3(BAL_PAD.x,0,BAL_PAD.z), from:new THREE.Vector3(), to:new THREE.Vector3(),
-  order:[], idx:0, firstTry:true, correct:0, cmdAt:0, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
+  order:[], idx:0, firstTry:true, correct:0, speedFrac:0, burstT:0, camPos:new THREE.Vector3(), camLook:new THREE.Vector3() };
 function balHud(){
   let el = document.getElementById('balHud');
   if(el) return el;
   el = document.createElement('div');
   el.id = 'balHud';
   el.style.cssText = 'position:fixed; inset:0; z-index:520; pointer-events:none; display:none; color:#4A3B5C;';
-  const bc = 'flex:1; min-height:52px; font-size:16px; font-weight:800; border:0; border-radius:16px; background:#FFF; color:#4A3B5C; cursor:pointer; pointer-events:auto; box-shadow:0 3px 0 #BFD6EE; -webkit-tap-highlight-color:transparent;';
+  const bc = 'flex:1; min-width:0; min-height:52px; font-size:16px; font-weight:800; border:0; border-radius:16px; background:#FFF; color:#4A3B5C; cursor:pointer; pointer-events:auto; box-shadow:0 3px 0 #BFD6EE; -webkit-tap-highlight-color:transparent;';
   let rows = '';
   for(let r=0;r<2;r++){ rows += '<div style="display:flex; gap:8px;">'; for(let c=0;c<4;c++) rows += '<button class="b'+(r*4+c)+'" style="'+bc+'">'+BAL_CMDS[r*4+c].label+'</button>'; rows += '</div>'; }
   el.innerHTML =
@@ -8960,7 +9028,7 @@ function balHud(){
 function balShowCommand(){
   const c = bal.order[bal.idx]; const el = balHud();
   bal.phase = 'wait'; bal.firstTry = true;
-  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　えいごの とおりに ふうせんを うごかそう';
+  el.querySelector('.h').textContent = '🎈 ' + (bal.idx+1) + '/' + bal.order.length + '　⭐ ' + bal.correct + '　えいごの とおりに ふうせんを とばそう';
   el.querySelector('.e').textContent = c.en; el.querySelector('.j').textContent = c.ja; el.querySelector('.m').textContent = '';
   try{ speakEnglish(c.en); }catch(e){}
 }
@@ -8969,11 +9037,12 @@ function balTap(id){
   const c = bal.order[bal.idx], msg = balHud().querySelector('.m');
   if(id === c.id){
     if(bal.firstTry){ bal.correct++; addCoins(1); }
-    playCorrectSound(); msg.textContent = '⭕ ' + c.en;
+    playCorrectSound(); msg.textContent = '⭕ ' + c.en + '　⭐を めざして とぶよ！';
     bal.from.copy(bal.pos);
     bal.to.set(bal.pos.x + c.vec[0], bal.pos.y + c.vec[1], bal.pos.z + c.vec[2]);
-    const r = Math.hypot(bal.to.x, bal.to.z); if(r > 30){ bal.to.x *= 30/r; bal.to.z *= 30/r; }
-    bal.to.y = Math.max(8, Math.min(40, bal.to.y));
+    const r = Math.hypot(bal.to.x, bal.to.z); if(r > BAL_MAXR){ bal.to.x *= BAL_MAXR/r; bal.to.z *= BAL_MAXR/r; }
+    bal.to.y = Math.max(8, Math.min(44, bal.to.y));
+    balStar.position.copy(bal.to); balStar.visible = true;
     bal.phase = 'move'; bal.t = 0;
   } else {
     bal.firstTry = false; playWrongSound(); msg.textContent = '🔊 もういちど よく きいてみよう';
@@ -8982,19 +9051,24 @@ function balTap(id){
 function boardBalloon(landmark){
   if(rideActive) return;
   rideActive = true;
-  bal.order = BAL_CMDS.slice().sort(()=>Math.random()-0.5);
-  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0 });
+  // opposite pairs, in random order and random direction within each pair
+  const byId = {}; BAL_CMDS.forEach(c => byId[c.id] = c);
+  bal.order = BAL_PAIRS.slice().sort(()=>Math.random()-0.5).map(p => Math.random() < 0.5 ? p : [p[1],p[0]]).reduce((a,p)=>a.concat(p.map(id => byId[id])), []);
+  Object.assign(bal, { active:true, phase:'rise', t:0, idx:0, correct:0, speedFrac:0 });
   bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
+  balSky.visible = true; balStar.visible = false;
   moveTarget = null; interactBtn.classList.remove('show'); playCorrectSound();
-  const el = balHud(); el.querySelector('.h').textContent = '🎈 ねつききゅう'; el.querySelector('.e').textContent = 'Up we go…'; el.querySelector('.j').textContent = 'ゆっくり のぼっていくよ'; el.querySelector('.m').textContent = '';
+  const el = balHud(); el.querySelector('.h').textContent = '🎈 ねつききゅう'; el.querySelector('.e').textContent = 'Up we go…'; el.querySelector('.j').textContent = '雲の上まで のぼっていくよ'; el.querySelector('.m').textContent = '';
   el.style.display = 'block';
 }
 function endBalloon(){
   bal.active = false; bal.phase = 'idle'; rideActive = false;
   const el = document.getElementById('balHud'); if(el) el.style.display = 'none';
+  balSky.visible = false; balStar.visible = false; balBurst.visible = false;
   bal.pos.set(BAL_PAD.x, 0, BAL_PAD.z);
   balloonMesh.position.set(BAL_PAD.x, 0, BAL_PAD.z); balloonMesh.rotation.set(0,0,0);
   player.position.set(BAL_PAD.x - 3.2, 0, BAL_PAD.z); player.rotation.set(0,0,0);
+  camera.fov = 52; camera.updateProjectionMatrix();
   camera.position.set(BAL_PAD.x - 3.2, 2.6, BAL_PAD.z - 6.8);
 }
 function cancelBalloon(){ if(bal.active) endBalloon(); }
@@ -9012,28 +9086,58 @@ function updateBalloon(dt){
   }
   bal.t += dt;
   const ease = x => x*x*(3-2*x);
+  let speedFrac = 0;
   if(bal.phase === 'rise'){
-    const k = Math.min(1, bal.t/4); bal.pos.y = 20*ease(k);
-    if(k >= 1){ balShowCommand(); }
+    const k = Math.min(1, bal.t/6), e = ease(k);
+    bal.pos.set(BAL_PAD.x*(1-e) + BAL_HOME.x*e, BAL_HOME.y*e, BAL_PAD.z*(1-e) + BAL_HOME.z*e);
+    speedFrac = Math.sin(k*Math.PI);
+    if(k >= 1) balShowCommand();
   } else if(bal.phase === 'move'){
-    const k = Math.min(1, bal.t/2.4); bal.pos.lerpVectors(bal.from, bal.to, ease(k));
+    const k = Math.min(1, bal.t/3.8);
+    bal.pos.lerpVectors(bal.from, bal.to, ease(k));
+    speedFrac = Math.sin(k*Math.PI);
     if(k >= 1){
+      balStar.visible = false;
+      balBurst.position.copy(bal.to); balBurst.visible = true; bal.burstT = 0.8;
       bal.idx++;
-      if(bal.idx >= bal.order.length){ bal.phase = 'descend'; bal.t = 0; bal.from.copy(bal.pos); const el = balHud(); el.querySelector('.e').textContent = 'Going home…'; el.querySelector('.j').textContent = 'おりていくよ'; el.querySelector('.m').textContent = ''; }
-      else { bal.phase = 'pause'; setTimeout(()=>{ if(bal.active && bal.phase === 'pause') balShowCommand(); }, 400); }
+      if(bal.idx >= bal.order.length){
+        bal.phase = 'descend'; bal.t = 0; bal.from.copy(bal.pos);
+        const el = balHud(); el.querySelector('.e').textContent = 'Going home…'; el.querySelector('.j').textContent = 'おりていくよ'; el.querySelector('.m').textContent = '';
+      } else {
+        bal.phase = 'pause';
+        setTimeout(()=>{ if(bal.active && bal.phase === 'pause') balShowCommand(); }, 500);
+      }
     }
   } else if(bal.phase === 'descend'){
-    const k = Math.min(1, bal.t/5);
-    bal.pos.set(bal.from.x + (BAL_PAD.x - bal.from.x)*ease(k), bal.from.y*(1-ease(k)), bal.from.z + (BAL_PAD.z - bal.from.z)*ease(k));
+    const k = Math.min(1, bal.t/7), e = ease(k);
+    const swirl = Math.sin(e*Math.PI*2)*8*(1-e);
+    bal.pos.set(bal.from.x + (BAL_PAD.x - bal.from.x)*e + swirl, bal.from.y*(1-e), bal.from.z + (BAL_PAD.z - bal.from.z)*e + swirl*0.6);
+    speedFrac = Math.sin(k*Math.PI)*0.6;
     if(k >= 1){ finishBalloon(); return; }
   }
-  balloonMesh.position.copy(bal.pos);
-  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;
-  player.position.set(bal.pos.x, bal.pos.y + 0.5, bal.pos.z);
+  bal.speedFrac = speedFrac;
+  // the balloon is never perfectly still: it drifts and bobs a little while it waits
+  const wob = (bal.phase === 'wait' || bal.phase === 'pause') ? 1 : 0.4;
+  const dx = Math.sin(nowS*0.7)*1.3*wob, dy = Math.sin(nowS*1.1)*0.5*wob, dz = Math.cos(nowS*0.6)*1.3*wob;
+  balloonMesh.position.set(bal.pos.x + dx, bal.pos.y + dy, bal.pos.z + dz);
+  balloonMesh.rotation.z = Math.sin(nowS*1.3)*0.05 + speedFrac*0.04; balloonMesh.rotation.x = Math.sin(nowS*0.9)*0.03;
+  if(balFlame) balFlame.scale.set(1, 0.8 + 0.5*Math.abs(Math.sin(nowS*9)) + speedFrac*0.4, 1);
+  player.position.set(balloonMesh.position.x, balloonMesh.position.y + 0.5, balloonMesh.position.z);
   player.rotation.set(0,0,0);
-  // camera: from the south looking north, so "north" is up the screen and east is to the right
-  bal.camPos.set(bal.pos.x, bal.pos.y + 4.5, bal.pos.z - 14);
-  bal.camLook.set(bal.pos.x, bal.pos.y + 2.8, bal.pos.z + 8);
+  // the star spins, and a ring bursts outward when it is reached
+  if(balStar.visible){ balStar.rotation.y = nowS*2.2; const sc = 1 + Math.sin(nowS*6)*0.1; balStar.scale.set(sc,sc,sc); }
+  if(bal.burstT > 0){
+    bal.burstT = Math.max(0, bal.burstT - dt);
+    const k = 1 - bal.burstT/0.8;
+    balBurst.scale.setScalar(1 + k*9); balBurst.material.opacity = 0.9*(1-k); balBurst.rotation.x = Math.PI/2;
+    if(bal.burstT === 0) balBurst.visible = false;
+  }
+  // camera: from the south looking north, so "north" is up the screen and east is to the right;
+  // it pulls back and the view widens while the balloon is flying
+  bal.camPos.set(balloonMesh.position.x, balloonMesh.position.y + 4.5 + 2*speedFrac, balloonMesh.position.z - (14 + 7*speedFrac));
+  bal.camLook.set(balloonMesh.position.x, balloonMesh.position.y + 2.8, balloonMesh.position.z + 8);
+  camera.fov += ((52 + 10*speedFrac) - camera.fov) * (1 - Math.exp(-dt*4));
+  camera.updateProjectionMatrix();
 }
 
 /* =========================================================
